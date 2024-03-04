@@ -21,5 +21,4 @@ model User {
   classname  String
   level      Int
   experience Int
-  strength   Int
 }

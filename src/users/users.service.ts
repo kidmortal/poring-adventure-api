@@ -22,7 +22,6 @@ export class UsersService {
             email: `dump${index}@test.com`,
             experience: 1,
             level: 1,
-            strength: 1,
           },
         });
         console.log(created);
@@ -35,14 +34,6 @@ export class UsersService {
   }
 
   findAll() {
-    prisma.user.update({
-      where: {
-        email: 'amanda@algo',
-      },
-      data: {
-        name: 'amanda',
-      },
-    });
     return prisma.user.findMany({});
   }
 
