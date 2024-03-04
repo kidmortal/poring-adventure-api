@@ -25,11 +25,13 @@
   "dependencies": {
     "@libsql/client": "^0.5.2",
     "@nestjs/common": "^10.0.0",
+    "@nestjs/config": "^3.2.0",
     "@nestjs/core": "^10.0.0",
     "@nestjs/mapped-types": "*",
     "@nestjs/platform-express": "^10.0.0",
     "@prisma/adapter-libsql": "^5.10.2",
     "@prisma/client": "^5.10.2",
+    "firebase-admin": "^12.0.0",
     "prisma": "^5.10.2",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1"

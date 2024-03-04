@@ -6,10 +6,13 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
+  Headers,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { AuthGuard } from 'src/auth/auth.guard';
 
 @Controller('users')
 export class UsersController {
@@ -35,8 +38,10 @@ export class UsersController {
     return this.usersService.wipeDatabase();
   }
 
+  @UseGuards(AuthGuard)
   @Get(':email')
-  findOne(@Param('email') email: string) {
+  findOne(@Param('email') email: string, @Headers() headers) {
+    console.log(headers);
     return this.usersService.findOne(email);
   }
 
