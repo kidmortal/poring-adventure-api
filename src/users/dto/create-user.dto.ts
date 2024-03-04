@@ -4,4 +4,5 @@ export class CreateUserDto {
   classname: string;
   level: number;
   experience: number;
+  strength: number;
 }
