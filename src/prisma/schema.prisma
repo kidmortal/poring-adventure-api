@@ -15,10 +15,20 @@ datasource db {
 }
 
 model User {
-  id         Int    @id @default(autoincrement())
-  email      String @unique
+  id         Int         @id @default(autoincrement())
+  email      String      @unique
   name       String
   classname  String
   level      Int
   experience Int
+  appearance Appearance?
+}
+
+model Appearance {
+  id        Int    @id @default(autoincrement())
+  head      String
+  gender    String
+  costume   String
+  User      User   @relation(fields: [userEmail], references: [email])
+  userEmail String @unique
 }

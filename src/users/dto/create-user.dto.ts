@@ -1,8 +1,8 @@
 export class CreateUserDto {
+  // core info
   email: string;
   name: string;
   classname: string;
-  level: number;
-  experience: number;
-  strength: number;
+  // appearance
+  gender: string;
 }
