@@ -58,8 +58,15 @@ export class UsersController {
     return this.usersService.update(+id, updateUserDto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(+id);
+  @UseGuards(AuthGuard)
+  @Delete(':email')
+  remove(@Param('email') email: string, @Headers() headers) {
+    const authEmail = headers['authenticated_email'];
+    if (authEmail != email) {
+      throw new ForbiddenException(
+        `Your access token is for ${authEmail}, but you are trying to delete a character from ${email}`,
+      );
+    }
+    return this.usersService.remove(email);
   }
 }
