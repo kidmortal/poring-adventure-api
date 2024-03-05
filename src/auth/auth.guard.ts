@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { FirebaseRepository } from 'src/firebase/firebase.repository';
 
 @Injectable()
@@ -7,11 +12,25 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+    const headerEmail = request.headers['authenticated_email'];
+    if (headerEmail) {
+      throw new ForbiddenException('Remove authenticated_email from headers');
+    }
     const token = request.headers['auth'];
     if (token) {
-      const email = await this.firebaseRepository.validateEmail({ token });
-      request.headers['authenticated_email'] = email;
+      try {
+        const email = await this.firebaseRepository.validateEmail({ token });
+        request.headers['authenticated_email'] = email;
+        return true;
+      } catch (error) {
+        console.log(error);
+        throw new ForbiddenException(
+          'An invalid access token has been provided ',
+        );
+      }
     }
-    return true;
+    throw new ForbiddenException(
+      'No auth token provided, make sure to add a token on auth header',
+    );
   }
 }

@@ -5,10 +5,31 @@ import { prisma } from 'src/prisma/prisma';
 
 @Injectable()
 export class UsersService {
-  create(createUserDto: CreateUserDto) {
-    return prisma.user.create({
-      data: createUserDto,
+  async create(createUserDto: CreateUserDto) {
+    await prisma.user.create({
+      data: {
+        name: createUserDto.name,
+        classname: createUserDto.classname,
+        email: createUserDto.email,
+        level: 1,
+        experience: 1,
+      },
     });
+    await prisma.appearance.create({
+      data: {
+        userEmail: createUserDto.email,
+        costume: createUserDto.classname,
+        gender: createUserDto.gender,
+        head: 'head_1',
+      },
+    });
+    const fullUser = await prisma.user.findUnique({
+      where: { email: createUserDto.email },
+      include: {
+        appearance: true,
+      },
+    });
+    return fullUser;
   }
 
   async dumpMockUsers() {
@@ -37,8 +58,10 @@ export class UsersService {
     return prisma.user.findMany({});
   }
 
-  findOne(email: string) {
-    return prisma.user.findUnique({ where: { email } });
+  async findOne(email: string) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    console.log(user);
+    return user;
   }
 
   update(id: number, updateUserDto: UpdateUserDto) {
