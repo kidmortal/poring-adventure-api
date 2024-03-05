@@ -29,6 +29,6 @@ model Appearance {
   head      String
   gender    String
   costume   String
-  User      User   @relation(fields: [userEmail], references: [email])
+  User      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   userEmail String @unique
 }
