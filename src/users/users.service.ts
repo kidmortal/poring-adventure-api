@@ -59,7 +59,10 @@ export class UsersService {
   }
 
   async findOne(email: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { appearance: true },
+    });
     console.log(user);
     return user;
   }
