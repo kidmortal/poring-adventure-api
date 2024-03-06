@@ -6,10 +6,13 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
+  Headers,
 } from '@nestjs/common';
 import { MarketService } from './market.service';
 import { CreateMarketDto } from './dto/create-market.dto';
 import { UpdateMarketDto } from './dto/update-market.dto';
+import { AuthGuard } from 'src/auth/auth.guard';
 
 @Controller('market')
 export class MarketController {
@@ -23,6 +26,16 @@ export class MarketController {
   @Get()
   findAll() {
     return this.marketService.findAll();
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('/purchase/:id')
+  purchase(@Param('id') id: string, @Headers() headers) {
+    const authEmail = headers['authenticated_email'];
+    return this.marketService.purchase({
+      marketListingId: +id,
+      buyerEmail: authEmail,
+    });
   }
 
   @Get(':id')
