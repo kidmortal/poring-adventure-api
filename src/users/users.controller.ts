@@ -14,6 +14,7 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('users')
 export class UsersController {
@@ -48,6 +49,7 @@ export class UsersController {
     return this.usersService.wipeDatabase();
   }
 
+  @Throttle({ default: { limit: 30, ttl: 30000 } })
   @Get(':email')
   findOne(@Param('email') email: string) {
     return this.usersService.findOne(email);
