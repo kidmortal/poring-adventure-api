@@ -25,7 +25,12 @@ export class MarketService {
   }
 
   findAll() {
-    return `This action returns all market`;
+    return prisma.marketListing.findMany({
+      take: 10,
+      include: {
+        item: true,
+      },
+    });
   }
 
   findOne(id: number) {
