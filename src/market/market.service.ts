@@ -101,6 +101,7 @@ export class MarketService {
       take: 10,
       include: {
         item: true,
+        seller: true,
       },
     });
   }

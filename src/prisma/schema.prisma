@@ -15,17 +15,16 @@ datasource db {
 }
 
 model User {
-  id              Int             @id @default(autoincrement())
-  email           String          @unique
-  name            String
-  classname       String
-  level           Int             @default(1)
-  experience      Int             @default(1)
-  silver          Int             @default(20)
-  items           Item[]
-  appearance      Appearance?
-  marketSellings  MarketListing[] @relation("seller")
-  marketPurchases MarketListing[] @relation("buyer")
+  id             Int             @id @default(autoincrement())
+  email          String          @unique
+  name           String
+  classname      String
+  level          Int             @default(1)
+  experience     Int             @default(1)
+  silver         Int             @default(20)
+  items          Item[]
+  appearance     Appearance?
+  marketSellings MarketListing[] @relation("seller")
 }
 
 model Appearance {
@@ -45,8 +44,6 @@ model MarketListing {
   itemId      Int       @unique
   seller      User      @relation(name: "seller", fields: [sellerEmail], references: [email], onDelete: Cascade)
   sellerEmail String
-  buyer       User?     @relation(name: "buyer", fields: [buyerEmail], references: [email], onDelete: Cascade)
-  buyerEmail  String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   expiresAt   DateTime?
