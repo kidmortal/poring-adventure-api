@@ -1,11 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { CreateMarketDto } from './dto/create-market.dto';
 import { UpdateMarketDto } from './dto/update-market.dto';
+import { prisma } from 'src/prisma/prisma';
 
 @Injectable()
 export class MarketService {
   create(createMarketDto: CreateMarketDto) {
-    return 'This action adds a new market';
+    return prisma.marketListing.create({
+      data: {
+        price: createMarketDto.price,
+        stack: createMarketDto.stack,
+        seller: {
+          connect: {
+            email: createMarketDto.sellerEmail,
+          },
+        },
+        item: {
+          connect: {
+            id: createMarketDto.itemId,
+          },
+        },
+      },
+    });
   }
 
   findAll() {
