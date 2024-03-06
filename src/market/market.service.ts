@@ -5,14 +5,30 @@ import { prisma } from 'src/prisma/prisma';
 
 @Injectable()
 export class MarketService {
-  create(createMarketDto: CreateMarketDto) {
+  async create(createMarketDto: CreateMarketDto, sellerEmail: string) {
+    const item = await prisma.item.findUnique({
+      where: { id: createMarketDto.itemId },
+    });
+
+    if (!item) {
+      throw new BadRequestException(
+        `No item found with id ${createMarketDto.itemId}`,
+      );
+    }
+
+    if (item.userEmail != sellerEmail) {
+      throw new BadRequestException(
+        `This item belongs to ${item.userEmail}, but you are authenticated as ${sellerEmail}`,
+      );
+    }
+
     return prisma.marketListing.create({
       data: {
         price: createMarketDto.price,
         stack: createMarketDto.stack,
         seller: {
           connect: {
-            email: createMarketDto.sellerEmail,
+            email: sellerEmail,
           },
         },
         item: {
