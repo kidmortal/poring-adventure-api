@@ -56,7 +56,7 @@ model Item {
   id            Int            @id @default(autoincrement())
   name          String
   category      String
-  stack         String
+  stack         Int
   image         String?
   User          User?          @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   userEmail     String?
