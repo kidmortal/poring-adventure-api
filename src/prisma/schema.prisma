@@ -46,7 +46,7 @@ model MarketListing {
   seller      User      @relation(name: "seller", fields: [sellerEmail], references: [email], onDelete: Cascade)
   sellerEmail String
   buyer       User?     @relation(name: "buyer", fields: [buyerEmail], references: [email], onDelete: Cascade)
-  buyerEmail  String
+  buyerEmail  String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   expiresAt   DateTime?
