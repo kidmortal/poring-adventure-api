@@ -11,8 +11,6 @@ export class UsersService {
         name: createUserDto.name,
         classname: createUserDto.classname,
         email: createUserDto.email,
-        level: 1,
-        experience: 1,
       },
     });
     await prisma.appearance.create({
