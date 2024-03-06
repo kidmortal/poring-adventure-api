@@ -59,6 +59,6 @@ model Item {
   stack         Int
   image         String?
   User          User?          @relation(fields: [userEmail], references: [email], onDelete: Cascade)
-  userEmail     String?
+  userEmail     String
   marketListing MarketListing?
 }

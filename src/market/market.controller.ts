@@ -18,9 +18,11 @@ import { AuthGuard } from 'src/auth/auth.guard';
 export class MarketController {
   constructor(private readonly marketService: MarketService) {}
 
+  @UseGuards(AuthGuard)
   @Post()
-  create(@Body() createMarketDto: CreateMarketDto) {
-    return this.marketService.create(createMarketDto);
+  create(@Body() createMarketDto: CreateMarketDto, @Headers() headers) {
+    const authEmail = headers['authenticated_email'];
+    return this.marketService.create(createMarketDto, authEmail);
   }
 
   @Get()
