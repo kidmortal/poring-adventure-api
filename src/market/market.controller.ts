@@ -50,8 +50,10 @@ export class MarketController {
     return this.marketService.update(+id, updateMarketDto);
   }
 
+  @UseGuards(AuthGuard)
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.marketService.remove(+id);
+  remove(@Param('id') id: string, @Headers() headers) {
+    const authEmail = headers['authenticated_email'];
+    return this.marketService.remove(+id, authEmail);
   }
 }

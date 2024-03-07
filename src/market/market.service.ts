@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CreateMarketDto } from './dto/create-market.dto';
 import { UpdateMarketDto } from './dto/update-market.dto';
 import { prisma } from 'src/prisma/prisma';
@@ -114,7 +118,21 @@ export class MarketService {
     return `This action updates a #${id} market`;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} market`;
+  async remove(id: number, authEmail: string) {
+    const marketListing = await prisma.marketListing.findUnique({
+      where: { id },
+    });
+
+    if (!marketListing) {
+      throw new BadRequestException('Listing not found');
+    }
+
+    if (marketListing?.sellerEmail !== authEmail) {
+      throw new UnauthorizedException(
+        `You are signed as ${authEmail}, but the listing number ${id} was made by ${marketListing.sellerEmail}`,
+      );
+    }
+
+    return prisma.marketListing.delete({ where: { id } });
   }
 }
