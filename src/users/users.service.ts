@@ -69,7 +69,8 @@ export class UsersService {
       where: { email },
       include: {
         appearance: true,
-        items: { include: { marketListing: true } },
+        inventory: { include: { item: true } },
+        equipment: { include: { item: true } },
       },
     });
     console.log(user);

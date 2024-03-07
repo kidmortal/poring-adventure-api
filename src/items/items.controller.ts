@@ -6,10 +6,13 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
+  Headers,
 } from '@nestjs/common';
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
+import { AuthGuard } from 'src/auth/auth.guard';
 
 @Controller('items')
 export class ItemsController {
@@ -28,6 +31,13 @@ export class ItemsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.itemsService.findOne(+id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('/equip/:id')
+  equipItem(@Param('id') id: string, @Headers() headers) {
+    const authEmail = headers['authenticated_email'];
+    return this.itemsService.equipItem({ itemId: +id, userEmail: authEmail });
   }
 
   @Patch(':id')
