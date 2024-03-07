@@ -15,16 +15,27 @@ datasource db {
 }
 
 model User {
-  id             Int             @id @default(autoincrement())
-  email          String          @unique
-  name           String
-  classname      String
-  level          Int             @default(1)
-  experience     Int             @default(1)
-  silver         Int             @default(20)
-  items          Item[]
-  appearance     Appearance?
-  marketSellings MarketListing[] @relation("seller")
+  id              Int             @id @default(autoincrement())
+  email           String          @unique
+  name            String
+  classname       String
+  level           Int             @default(1)
+  experience      Int             @default(1)
+  silver          Int             @default(20)
+  items           Item[]
+  appearance      Appearance?
+  equipment       EquippedItem?
+  marketSellings  MarketListing[]
+  equippedItemsId Int?
+}
+
+model EquippedItem {
+  id        Int    @id @default(autoincrement())
+  type      String
+  user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  userEmail String @unique
+  item      Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemId    Int    @unique
 }
 
 model Appearance {
@@ -42,7 +53,7 @@ model MarketListing {
   stack       Int
   item        Item      @relation(fields: [itemId], references: [id])
   itemId      Int       @unique
-  seller      User      @relation(name: "seller", fields: [sellerEmail], references: [email], onDelete: Cascade)
+  seller      User      @relation(fields: [sellerEmail], references: [email], onDelete: Cascade)
   sellerEmail String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -58,4 +69,5 @@ model Item {
   User          User?          @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   userEmail     String
   marketListing MarketListing?
+  equipped      EquippedItem?
 }
