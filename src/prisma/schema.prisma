@@ -15,26 +15,34 @@ datasource db {
 }
 
 model User {
-  id              Int             @id @default(autoincrement())
-  email           String          @unique
-  name            String
-  classname       String
-  level           Int             @default(1)
-  experience      Int             @default(1)
-  silver          Int             @default(20)
-  items           Item[]
-  appearance      Appearance?
-  equipment       EquippedItem?
-  marketSellings  MarketListing[]
-  equippedItemsId Int?
+  id         Int             @id @default(autoincrement())
+  email      String          @unique
+  name       String
+  classname  String
+  level      Int             @default(1)
+  experience Int             @default(1)
+  silver     Int             @default(20)
+  appearance Appearance?
+  equipment  EquippedItem[]
+  inventory  InventoryItem[]
+  market     MarketListing[]
+}
+
+model InventoryItem {
+  id            Int            @id @default(autoincrement())
+  stack         Int
+  user          User           @relation(fields: [userEmail], references: [email])
+  userEmail     String
+  item          Item           @relation(fields: [itemId], references: [id])
+  itemId        Int            @unique
+  marketListing MarketListing?
 }
 
 model EquippedItem {
   id        Int    @id @default(autoincrement())
-  type      String
-  user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
-  userEmail String @unique
-  item      Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user      User   @relation(fields: [userEmail], references: [email])
+  userEmail String
+  item      Item   @relation(fields: [itemId], references: [id])
   itemId    Int    @unique
 }
 
@@ -43,31 +51,28 @@ model Appearance {
   head      String
   gender    String
   costume   String
-  User      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   userEmail String @unique
 }
 
 model MarketListing {
-  id          Int       @id @default(autoincrement())
+  id          Int           @id @default(autoincrement())
   price       Int
   stack       Int
-  item        Item      @relation(fields: [itemId], references: [id])
-  itemId      Int       @unique
-  seller      User      @relation(fields: [sellerEmail], references: [email], onDelete: Cascade)
+  item        InventoryItem @relation(fields: [inventoryId], references: [id])
+  inventoryId Int           @unique
+  seller      User          @relation(fields: [sellerEmail], references: [email], onDelete: Cascade)
   sellerEmail String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
   expiresAt   DateTime?
 }
 
 model Item {
-  id            Int            @id @default(autoincrement())
-  name          String
-  category      String
-  stack         Int
-  image         String?
-  User          User?          @relation(fields: [userEmail], references: [email], onDelete: Cascade)
-  userEmail     String
-  marketListing MarketListing?
-  equipped      EquippedItem?
+  id        Int             @id @default(autoincrement())
+  name      String
+  category  String
+  image     String?
+  equipped  EquippedItem[]
+  inventory InventoryItem[]
 }
