@@ -34,8 +34,10 @@ model InventoryItem {
   user          User           @relation(fields: [userEmail], references: [email])
   userEmail     String
   item          Item           @relation(fields: [itemId], references: [id])
-  itemId        Int            @unique
+  itemId        Int
   marketListing MarketListing?
+
+  @@unique([userEmail, itemId])
 }
 
 model EquippedItem {
@@ -59,7 +61,7 @@ model MarketListing {
   id          Int           @id @default(autoincrement())
   price       Int
   stack       Int
-  item        InventoryItem @relation(fields: [inventoryId], references: [id])
+  inventory   InventoryItem @relation(fields: [inventoryId], references: [id])
   inventoryId Int           @unique
   seller      User          @relation(fields: [sellerEmail], references: [email], onDelete: Cascade)
   sellerEmail String

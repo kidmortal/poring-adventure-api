@@ -12,6 +12,7 @@ import { MarketService } from './market.service';
 import { CreateMarketDto } from './dto/create-market.dto';
 // import { UpdateMarketDto } from './dto/update-market.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
+import { PurchaseMarketDto } from './dto/purchase-market.dto';
 
 @Controller('market')
 export class MarketController {
@@ -30,11 +31,12 @@ export class MarketController {
   }
 
   @UseGuards(AuthGuard)
-  @Get('/purchase/:id')
-  purchase(@Param('id') id: string, @Headers() headers) {
+  @Post('/purchase')
+  purchase(@Body() purchaseDto: PurchaseMarketDto, @Headers() headers) {
     const authEmail = headers['authenticated_email'];
     return this.marketService.purchase({
-      marketListingId: +id,
+      marketListingId: purchaseDto.marketListingId,
+      stacks: purchaseDto.stack,
       buyerEmail: authEmail,
     });
   }
