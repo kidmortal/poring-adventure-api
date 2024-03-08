@@ -43,11 +43,9 @@ export class UsersService {
             level: 1,
           },
         });
-        console.log(created);
+
         createdUsers.push(created);
-      } catch (error) {
-        console.log(`Error creating user ${index}`);
-      }
+      } catch (error) {}
     }
     return createdUsers;
   }
@@ -73,7 +71,7 @@ export class UsersService {
         equipment: { include: { item: true } },
       },
     });
-    console.log(user);
+
     return user;
   }
 
