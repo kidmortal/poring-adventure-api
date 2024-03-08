@@ -22,7 +22,7 @@ export class MarketController {
   @Post()
   create(@Body() createMarketDto: CreateMarketDto, @Headers() headers) {
     const authEmail = headers['authenticated_email'];
-    return this.marketService.create(createMarketDto, authEmail);
+    return this.marketService.addItemToMarket(createMarketDto, authEmail);
   }
 
   @Get()
