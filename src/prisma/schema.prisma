@@ -19,13 +19,26 @@ model User {
   email      String          @unique
   name       String
   classname  String
-  level      Int             @default(1)
-  experience Int             @default(1)
   silver     Int             @default(20)
   appearance Appearance?
+  stats      Stats?
   equipment  EquippedItem[]
   inventory  InventoryItem[]
   market     MarketListing[]
+}
+
+model Stats {
+  id         Int    @id @default(autoincrement())
+  level      Int    @default(1)
+  experience Int    @default(1)
+  health     Int    @default(20)
+  maxHealth  Int    @default(20)
+  attack     Int    @default(1)
+  str        Int    @default(1)
+  agi        Int    @default(1)
+  int        Int    @default(1)
+  user       User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  userEmail  String @unique
 }
 
 model InventoryItem {
@@ -75,6 +88,8 @@ model Item {
   name      String
   category  String
   image     String?
+  attack    Int?
+  health    Int?
   equipped  EquippedItem[]
   inventory InventoryItem[]
 }

@@ -6,55 +6,31 @@ import { prisma } from 'src/prisma/prisma';
 @Injectable()
 export class UsersService {
   async create(createUserDto: CreateUserDto) {
-    await prisma.user.create({
+    const newUser = await prisma.user.create({
       data: {
         name: createUserDto.name,
         classname: createUserDto.classname,
         email: createUserDto.email,
-      },
-    });
-    await prisma.appearance.create({
-      data: {
-        userEmail: createUserDto.email,
-        costume: createUserDto.classname,
-        gender: createUserDto.gender,
-        head: 'head_1',
-      },
-    });
-    const fullUser = await prisma.user.findUnique({
-      where: { email: createUserDto.email },
-      include: {
-        appearance: true,
-      },
-    });
-    return fullUser;
-  }
-
-  async dumpMockUsers() {
-    const createdUsers: any = [];
-    for (let index = 0; index < 200; index++) {
-      try {
-        const created = await prisma.user.create({
-          data: {
-            name: `Dump ${index}`,
-            classname: 'none',
-            email: `dump${index}@test.com`,
-            experience: 1,
-            level: 1,
+        appearance: {
+          create: {
+            costume: createUserDto.classname,
+            gender: createUserDto.gender,
+            head: 'head_1',
           },
-        });
-
-        createdUsers.push(created);
-      } catch (error) {}
-    }
-    return createdUsers;
+        },
+        stats: {
+          create: { experience: 1 },
+        },
+      },
+    });
+    return newUser;
   }
 
   findAll() {
     return prisma.user.findMany({
       take: 10,
       orderBy: {
-        level: 'desc',
+        silver: 'desc',
       },
       include: {
         appearance: true,
@@ -69,18 +45,19 @@ export class UsersService {
         appearance: true,
         inventory: { include: { item: true, marketListing: true } },
         equipment: { include: { item: true } },
+        stats: true,
       },
     });
 
     return user;
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
+  updateUser(id: number, updateUserDto: UpdateUserDto) {
     console.log(updateUserDto);
     return `This action updates a #${id} user`;
   }
 
-  async remove(email: string) {
+  async deleteUser(email: string) {
     const deletedUser = await prisma.user.delete({
       where: { email },
       include: {
@@ -129,9 +106,5 @@ export class UsersService {
       userEmail: args.receiverEmail,
       amount: args.amount,
     });
-  }
-
-  wipeDatabase() {
-    return prisma.user.deleteMany({});
   }
 }
