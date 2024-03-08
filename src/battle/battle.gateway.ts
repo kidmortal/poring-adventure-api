@@ -1,17 +1,14 @@
 import {
   WebSocketGateway,
-  WebSocketServer,
   SubscribeMessage,
   MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
-import { Server } from 'http';
 import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({ cors: true })
 export class BattleGateway {
-  @WebSocketServer() server: Server;
   private logger = new Logger('Websocket');
 
   @SubscribeMessage('create_battle')
