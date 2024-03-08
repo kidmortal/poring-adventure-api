@@ -23,4 +23,10 @@ export class MarketGateway {
     this.logger.debug('create_market_listing');
     return this.marketService.addItemToMarket(createMarketDto, email);
   }
+
+  @SubscribeMessage('get_all_market_listing')
+  async findAll() {
+    this.logger.debug('get_all_market_listing');
+    return this.marketService.findAll();
+  }
 }
