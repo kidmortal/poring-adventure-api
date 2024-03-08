@@ -9,6 +9,65 @@ export class ItemsService {
     return prisma.item.create({ data: createItemDto });
   }
 
+  async removeItemFromUser(args: {
+    userEmail: string;
+    itemId: number;
+    stack: number;
+  }) {
+    const userHasItem = await prisma.inventoryItem.findUnique({
+      where: {
+        userEmail_itemId: {
+          userEmail: args.userEmail,
+          itemId: args.itemId,
+        },
+      },
+    });
+
+    if (!userHasItem) {
+      throw new BadRequestException('User doesnt have this item');
+    }
+    console.log(`User has items ok`);
+    if (userHasItem && userHasItem.stack < args.stack) {
+      throw new BadRequestException(
+        `User only have ${userHasItem.stack} stacks, but you trying to remove ${args.stack}`,
+      );
+    }
+
+    if (userHasItem.stack === args.stack) {
+      const updateAmount = await prisma.inventoryItem.delete({
+        where: {
+          userEmail_itemId: {
+            userEmail: args.userEmail,
+            itemId: args.itemId,
+          },
+        },
+      });
+      return updateAmount;
+    }
+
+    if (userHasItem.stack > args.stack) {
+      const updateAmount = await prisma.inventoryItem.update({
+        where: {
+          userEmail_itemId: {
+            userEmail: args.userEmail,
+            itemId: args.itemId,
+          },
+        },
+        data: {
+          stack: {
+            decrement: args.stack,
+          },
+        },
+      });
+      return updateAmount;
+    }
+
+    throw new BadRequestException(
+      `There was an error processing this`,
+      `args: ${JSON.stringify(args)}`,
+    );
+  }
+
   async addItemToUser(args: {
     userEmail: string;
     itemId: number;
@@ -16,15 +75,19 @@ export class ItemsService {
   }) {
     const userHasItem = await prisma.inventoryItem.findUnique({
       where: {
-        userEmail: args.userEmail,
-        itemId: args.itemId,
+        userEmail_itemId: {
+          userEmail: args.userEmail,
+          itemId: args.itemId,
+        },
       },
     });
     if (userHasItem) {
       const updateAmount = await prisma.inventoryItem.update({
         where: {
-          userEmail: args.userEmail,
-          itemId: args.itemId,
+          userEmail_itemId: {
+            userEmail: args.userEmail,
+            itemId: args.itemId,
+          },
         },
         data: {
           stack: {
@@ -34,7 +97,13 @@ export class ItemsService {
       });
       return updateAmount;
     }
+    console.log(`Receiving item doesnt have item yet`);
     try {
+      console.log({
+        userEmail: args.userEmail,
+        itemId: args.itemId,
+        stack: args.stack,
+      });
       const createNewItem = await prisma.inventoryItem.create({
         data: {
           userEmail: args.userEmail,
@@ -44,10 +113,33 @@ export class ItemsService {
       });
       return createNewItem;
     } catch (error) {
+      console.log(error);
       throw new BadRequestException(
         'Either the user or the item does not exist',
       );
     }
+  }
+
+  async transferItemFromUserToUser(args: {
+    senderEmail: string;
+    receiverEmail: string;
+    itemId: number;
+    stack: number;
+  }) {
+    console.log(
+      `Trasfering item from ${args.senderEmail} to ${args.receiverEmail}`,
+    );
+    await this.removeItemFromUser({
+      itemId: args.itemId,
+      stack: args.stack,
+      userEmail: args.senderEmail,
+    });
+    console.log(`Remove item from sender ok`);
+    return this.addItemToUser({
+      itemId: args.itemId,
+      stack: args.stack,
+      userEmail: args.receiverEmail,
+    });
   }
 
   async equipItem(args: { itemId: number; userEmail: string }) {

@@ -92,6 +92,47 @@ export class UsersService {
     return deletedUser;
   }
 
+  async addSilverToUser(args: { userEmail: string; amount: number }) {
+    return prisma.user.update({
+      where: {
+        email: args.userEmail,
+      },
+      data: {
+        silver: {
+          increment: args.amount,
+        },
+      },
+    });
+  }
+
+  async removeSilverFromUser(args: { userEmail: string; amount: number }) {
+    return prisma.user.update({
+      where: {
+        email: args.userEmail,
+      },
+      data: {
+        silver: {
+          decrement: args.amount,
+        },
+      },
+    });
+  }
+
+  async transferSilverFromUserToUser(args: {
+    senderEmail: string;
+    receiverEmail: string;
+    amount: number;
+  }) {
+    await this.removeSilverFromUser({
+      userEmail: args.senderEmail,
+      amount: args.amount,
+    });
+    return await this.addSilverToUser({
+      userEmail: args.receiverEmail,
+      amount: args.amount,
+    });
+  }
+
   wipeDatabase() {
     return prisma.user.deleteMany({});
   }

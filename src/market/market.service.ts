@@ -6,12 +6,23 @@ import {
 import { CreateMarketDto } from './dto/create-market.dto';
 // import { UpdateMarketDto } from './dto/update-market.dto';
 import { prisma } from 'src/prisma/prisma';
+import { ItemsService } from 'src/items/items.service';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class MarketService {
+  constructor(
+    private readonly itemService: ItemsService,
+    private readonly userService: UsersService,
+  ) {}
   async create(createMarketDto: CreateMarketDto, sellerEmail: string) {
     const inventoryItem = await prisma.inventoryItem.findUnique({
-      where: { itemId: createMarketDto.itemId, userEmail: sellerEmail },
+      where: {
+        userEmail_itemId: {
+          itemId: createMarketDto.itemId,
+          userEmail: sellerEmail,
+        },
+      },
     });
 
     if (!inventoryItem) {
@@ -46,78 +57,94 @@ export class MarketService {
             email: sellerEmail,
           },
         },
-        item: {
+        inventory: {
           connect: {
-            itemId: createMarketDto.itemId,
-            userEmail: sellerEmail,
+            id: inventoryItem.id,
           },
         },
       },
     });
   }
 
-  async purchase(args: { marketListingId: number; buyerEmail: string }) {
-    console.log(args);
-    // const purchasingUser = await prisma.user.findUnique({
-    //   where: { email: args.buyerEmail },
-    // });
-    // if (!purchasingUser) {
-    //   throw new BadRequestException('User not registered');
-    // }
-    // const marketListing = await prisma.marketListing.findUnique({
-    //   where: { id: args.marketListingId },
-    // });
-    // if (!marketListing) {
-    //   throw new BadRequestException('Listing not found');
-    // }
-    // const purchaseTotalPrice = marketListing.price * marketListing.stack;
-    // if (purchasingUser.silver < purchaseTotalPrice) {
-    //   throw new BadRequestException('You are too poor for that');
-    // }
-    // await prisma.user.update({
-    //   where: {
-    //     email: purchasingUser.email,
-    //   },
-    //   data: {
-    //     silver: {
-    //       decrement: purchaseTotalPrice,
-    //     },
-    //   },
-    // });
+  async purchase(args: {
+    marketListingId: number;
+    buyerEmail: string;
+    stacks: number;
+  }) {
+    const purchasingUser = await prisma.user.findUnique({
+      where: { email: args.buyerEmail },
+    });
+    if (!purchasingUser) {
+      throw new BadRequestException('User not registered');
+    }
+    const marketListing = await prisma.marketListing.findUnique({
+      where: { id: args.marketListingId },
+      include: {
+        inventory: true,
+      },
+    });
+    if (!marketListing) {
+      throw new BadRequestException('Listing not found');
+    }
+    const purchaseTotalPrice = marketListing.price * args.stacks;
+    if (purchasingUser.silver < purchaseTotalPrice) {
+      throw new BadRequestException('You are too poor for that');
+    }
 
-    // await prisma.user.update({
-    //   where: {
-    //     email: marketListing.sellerEmail,
-    //   },
-    //   data: {
-    //     silver: {
-    //       increment: purchaseTotalPrice,
-    //     },
-    //   },
-    // });
+    await this.userService.transferSilverFromUserToUser({
+      senderEmail: purchasingUser.email,
+      receiverEmail: marketListing.sellerEmail,
+      amount: purchaseTotalPrice,
+    });
 
-    // await prisma.item.update({
-    //   where: {
-    //     id: marketListing.itemId,
-    //   },
-    //   data: {
-    //     userEmail: purchasingUser.email,
-    //   },
-    // });
+    await this.itemService.transferItemFromUserToUser({
+      senderEmail: marketListing.sellerEmail,
+      receiverEmail: purchasingUser.email,
+      itemId: marketListing.inventory.itemId,
+      stack: args.stacks,
+    });
 
-    // await prisma.marketListing.delete({
-    //   where: {
-    //     id: marketListing.id,
-    //   },
-    // });
-    return true;
+    await this.decrementOrRemoveMarketListing({
+      marketListingId: marketListing.id,
+      currentStacks: marketListing.stack,
+      decrementStacks: args.stacks,
+    });
+  }
+
+  async decrementOrRemoveMarketListing(args: {
+    marketListingId: number;
+    currentStacks: number;
+    decrementStacks: number;
+  }) {
+    if (args.decrementStacks < args.currentStacks) {
+      return await prisma.marketListing.update({
+        where: {
+          id: args.marketListingId,
+        },
+        data: {
+          stack: {
+            decrement: args.decrementStacks,
+          },
+        },
+      });
+    }
+    if (args.decrementStacks === args.currentStacks) {
+      return await prisma.marketListing.delete({
+        where: {
+          id: args.marketListingId,
+        },
+      });
+    }
+    throw new BadRequestException(
+      `Invalid decrement has been provided, you cant remove ${args.decrementStacks} from ${args.currentStacks}`,
+    );
   }
 
   findAll() {
     return prisma.marketListing.findMany({
       take: 10,
       include: {
-        item: {
+        inventory: {
           include: {
             item: true,
           },
