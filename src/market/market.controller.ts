@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   UseGuards,
@@ -11,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { MarketService } from './market.service';
 import { CreateMarketDto } from './dto/create-market.dto';
-import { UpdateMarketDto } from './dto/update-market.dto';
+// import { UpdateMarketDto } from './dto/update-market.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 
 @Controller('market')
@@ -45,10 +44,10 @@ export class MarketController {
     return this.marketService.findOne(+id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateMarketDto: UpdateMarketDto) {
-    return this.marketService.update(+id, updateMarketDto);
-  }
+  // @Patch(':id')
+  // update(@Param('id') id: string, @Body() updateMarketDto: UpdateMarketDto) {
+  //   return this.marketService.update(+id, updateMarketDto);
+  // }
 
   @UseGuards(AuthGuard)
   @Delete(':id')
