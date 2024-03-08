@@ -15,13 +15,16 @@ export class MarketService {
     private readonly itemService: ItemsService,
     private readonly userService: UsersService,
   ) {}
-  async create(createMarketDto: CreateMarketDto, sellerEmail: string) {
+  async addItemToMarket(createMarketDto: CreateMarketDto, sellerEmail: string) {
     const inventoryItem = await prisma.inventoryItem.findUnique({
       where: {
         userEmail_itemId: {
           itemId: createMarketDto.itemId,
           userEmail: sellerEmail,
         },
+      },
+      include: {
+        marketListing: true,
       },
     });
 
@@ -37,32 +40,23 @@ export class MarketService {
       );
     }
 
-    const listed = await prisma.marketListing.findUnique({
-      where: {
-        sellerEmail,
-        inventoryId: inventoryItem.id,
-      },
-    });
+    if (inventoryItem.marketListing) {
+      const remainingStock =
+        inventoryItem.stack - inventoryItem.marketListing.stack;
 
-    if (listed) {
-      throw new BadRequestException(`There is already a listing of this item`);
+      if (createMarketDto.stack > remainingStock) {
+        throw new BadRequestException(
+          `You only have ${remainingStock}, but trying to post ${createMarketDto.stack} stacks`,
+        );
+      }
     }
 
-    return prisma.marketListing.create({
-      data: {
-        price: createMarketDto.price,
-        stack: createMarketDto.stack,
-        seller: {
-          connect: {
-            email: sellerEmail,
-          },
-        },
-        inventory: {
-          connect: {
-            id: inventoryItem.id,
-          },
-        },
-      },
+    return this.createOrIncrementMarketListing({
+      price: createMarketDto.price,
+      stack: createMarketDto.stack,
+      currentStacks: inventoryItem.stack,
+      inventoryId: inventoryItem.id,
+      sellerEmail,
     });
   }
 
@@ -108,6 +102,40 @@ export class MarketService {
       marketListingId: marketListing.id,
       currentStacks: marketListing.stack,
       decrementStacks: args.stacks,
+    });
+  }
+
+  async createOrIncrementMarketListing(args: {
+    price: number;
+    stack: number;
+    currentStacks: number;
+    inventoryId: number;
+    sellerEmail: string;
+  }) {
+    return prisma.marketListing.upsert({
+      where: {
+        sellerEmail: args.sellerEmail,
+        inventoryId: args.inventoryId,
+      },
+      create: {
+        price: args.price,
+        stack: args.stack,
+        seller: {
+          connect: {
+            email: args.sellerEmail,
+          },
+        },
+        inventory: {
+          connect: {
+            id: args.inventoryId,
+          },
+        },
+      },
+      update: {
+        stack: {
+          increment: args.stack,
+        },
+      },
     });
   }
 
