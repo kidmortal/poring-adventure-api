@@ -4,26 +4,37 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { CreateMarketDto } from './dto/create-market.dto';
-import { UpdateMarketDto } from './dto/update-market.dto';
+// import { UpdateMarketDto } from './dto/update-market.dto';
 import { prisma } from 'src/prisma/prisma';
 
 @Injectable()
 export class MarketService {
   async create(createMarketDto: CreateMarketDto, sellerEmail: string) {
-    const item = await prisma.item.findUnique({
-      where: { id: createMarketDto.itemId },
+    const inventoryItem = await prisma.inventoryItem.findUnique({
+      where: { itemId: createMarketDto.itemId, userEmail: sellerEmail },
     });
 
-    if (!item) {
+    if (!inventoryItem) {
       throw new BadRequestException(
-        `No item found with id ${createMarketDto.itemId}`,
+        `No item found with id ${createMarketDto.itemId} on ${sellerEmail} inventory`,
       );
     }
 
-    if (item.userEmail != sellerEmail) {
+    if (inventoryItem.stack < createMarketDto.stack) {
       throw new BadRequestException(
-        `This item belongs to ${item.userEmail}, but you are authenticated as ${sellerEmail}`,
+        `You only have ${inventoryItem.stack}, but trying to sell ${createMarketDto.stack}`,
       );
+    }
+
+    const listed = await prisma.marketListing.findUnique({
+      where: {
+        sellerEmail,
+        inventoryId: inventoryItem.id,
+      },
+    });
+
+    if (listed) {
+      throw new BadRequestException(`There is already a listing of this item`);
     }
 
     return prisma.marketListing.create({
@@ -37,7 +48,8 @@ export class MarketService {
         },
         item: {
           connect: {
-            id: createMarketDto.itemId,
+            itemId: createMarketDto.itemId,
+            userEmail: sellerEmail,
           },
         },
       },
@@ -45,58 +57,59 @@ export class MarketService {
   }
 
   async purchase(args: { marketListingId: number; buyerEmail: string }) {
-    const purchasingUser = await prisma.user.findUnique({
-      where: { email: args.buyerEmail },
-    });
-    if (!purchasingUser) {
-      throw new BadRequestException('User not registered');
-    }
-    const marketListing = await prisma.marketListing.findUnique({
-      where: { id: args.marketListingId },
-    });
-    if (!marketListing) {
-      throw new BadRequestException('Listing not found');
-    }
-    const purchaseTotalPrice = marketListing.price * marketListing.stack;
-    if (purchasingUser.silver < purchaseTotalPrice) {
-      throw new BadRequestException('You are too poor for that');
-    }
-    await prisma.user.update({
-      where: {
-        email: purchasingUser.email,
-      },
-      data: {
-        silver: {
-          decrement: purchaseTotalPrice,
-        },
-      },
-    });
+    console.log(args);
+    // const purchasingUser = await prisma.user.findUnique({
+    //   where: { email: args.buyerEmail },
+    // });
+    // if (!purchasingUser) {
+    //   throw new BadRequestException('User not registered');
+    // }
+    // const marketListing = await prisma.marketListing.findUnique({
+    //   where: { id: args.marketListingId },
+    // });
+    // if (!marketListing) {
+    //   throw new BadRequestException('Listing not found');
+    // }
+    // const purchaseTotalPrice = marketListing.price * marketListing.stack;
+    // if (purchasingUser.silver < purchaseTotalPrice) {
+    //   throw new BadRequestException('You are too poor for that');
+    // }
+    // await prisma.user.update({
+    //   where: {
+    //     email: purchasingUser.email,
+    //   },
+    //   data: {
+    //     silver: {
+    //       decrement: purchaseTotalPrice,
+    //     },
+    //   },
+    // });
 
-    await prisma.user.update({
-      where: {
-        email: marketListing.sellerEmail,
-      },
-      data: {
-        silver: {
-          increment: purchaseTotalPrice,
-        },
-      },
-    });
+    // await prisma.user.update({
+    //   where: {
+    //     email: marketListing.sellerEmail,
+    //   },
+    //   data: {
+    //     silver: {
+    //       increment: purchaseTotalPrice,
+    //     },
+    //   },
+    // });
 
-    await prisma.item.update({
-      where: {
-        id: marketListing.itemId,
-      },
-      data: {
-        userEmail: purchasingUser.email,
-      },
-    });
+    // await prisma.item.update({
+    //   where: {
+    //     id: marketListing.itemId,
+    //   },
+    //   data: {
+    //     userEmail: purchasingUser.email,
+    //   },
+    // });
 
-    await prisma.marketListing.delete({
-      where: {
-        id: marketListing.id,
-      },
-    });
+    // await prisma.marketListing.delete({
+    //   where: {
+    //     id: marketListing.id,
+    //   },
+    // });
     return true;
   }
 
@@ -104,7 +117,11 @@ export class MarketService {
     return prisma.marketListing.findMany({
       take: 10,
       include: {
-        item: true,
+        item: {
+          include: {
+            item: true,
+          },
+        },
         seller: true,
       },
     });
@@ -114,9 +131,9 @@ export class MarketService {
     return `This action returns a #${id} market`;
   }
 
-  update(id: number, updateMarketDto: UpdateMarketDto) {
-    return `This action updates a #${id} market`;
-  }
+  // update(id: number, updateMarketDto: UpdateMarketDto) {
+  //   return `This action updates a #${id} market`;
+  // }
 
   async remove(id: number, authEmail: string) {
     const marketListing = await prisma.marketListing.findUnique({
