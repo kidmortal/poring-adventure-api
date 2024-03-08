@@ -39,16 +39,6 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
-  @Get('/dump')
-  dumpData() {
-    return this.usersService.dumpMockUsers();
-  }
-
-  @Get('/wipe')
-  wipeData() {
-    return this.usersService.wipeDatabase();
-  }
-
   @Throttle({ default: { limit: 30, ttl: 30000 } })
   @Get(':email')
   findOne(@Param('email') email: string) {
@@ -57,7 +47,7 @@ export class UsersController {
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(+id, updateUserDto);
+    return this.usersService.updateUser(+id, updateUserDto);
   }
 
   @UseGuards(AuthGuard)
@@ -69,6 +59,6 @@ export class UsersController {
         `Your access token is for ${authEmail}, but you are trying to delete a character from ${email}`,
       );
     }
-    return this.usersService.remove(email);
+    return this.usersService.deleteUser(email);
   }
 }
