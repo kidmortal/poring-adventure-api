@@ -85,6 +85,12 @@ export class MarketService {
       throw new BadRequestException('You are too poor for that');
     }
 
+    await this.decrementOrRemoveMarketListing({
+      marketListingId: marketListing.id,
+      currentStacks: marketListing.stack,
+      decrementStacks: args.stacks,
+    });
+
     await this.userService.transferSilverFromUserToUser({
       senderEmail: purchasingUser.email,
       receiverEmail: marketListing.sellerEmail,
@@ -96,12 +102,6 @@ export class MarketService {
       receiverEmail: purchasingUser.email,
       itemId: marketListing.inventory.itemId,
       stack: args.stacks,
-    });
-
-    await this.decrementOrRemoveMarketListing({
-      marketListingId: marketListing.id,
-      currentStacks: marketListing.stack,
-      decrementStacks: args.stacks,
     });
   }
 

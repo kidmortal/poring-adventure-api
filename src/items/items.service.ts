@@ -26,7 +26,7 @@ export class ItemsService {
     if (!userHasItem) {
       throw new BadRequestException('User doesnt have this item');
     }
-    console.log(`User has items ok`);
+
     if (userHasItem && userHasItem.stack < args.stack) {
       throw new BadRequestException(
         `User only have ${userHasItem.stack} stacks, but you trying to remove ${args.stack}`,
@@ -97,13 +97,8 @@ export class ItemsService {
       });
       return updateAmount;
     }
-    console.log(`Receiving item doesnt have item yet`);
+
     try {
-      console.log({
-        userEmail: args.userEmail,
-        itemId: args.itemId,
-        stack: args.stack,
-      });
       const createNewItem = await prisma.inventoryItem.create({
         data: {
           userEmail: args.userEmail,
@@ -113,7 +108,6 @@ export class ItemsService {
       });
       return createNewItem;
     } catch (error) {
-      console.log(error);
       throw new BadRequestException(
         'Either the user or the item does not exist',
       );
@@ -126,15 +120,12 @@ export class ItemsService {
     itemId: number;
     stack: number;
   }) {
-    console.log(
-      `Trasfering item from ${args.senderEmail} to ${args.receiverEmail}`,
-    );
     await this.removeItemFromUser({
       itemId: args.itemId,
       stack: args.stack,
       userEmail: args.senderEmail,
     });
-    console.log(`Remove item from sender ok`);
+
     return this.addItemToUser({
       itemId: args.itemId,
       stack: args.stack,
