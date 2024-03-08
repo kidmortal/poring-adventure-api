@@ -39,8 +39,6 @@ export class WebsocketGateway
       client.disconnect();
     }
     client.handshake.auth.email = authEmail;
-
-    client.emit('message', { msg: `vai tomar no cu ${authEmail}` });
   }
 
   handleDisconnect(client: Socket) {
