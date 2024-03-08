@@ -107,4 +107,19 @@ export class UsersService {
       amount: args.amount,
     });
   }
+
+  async revalidateUsers() {
+    const invalidUsers = await prisma.user.findMany({
+      where: {
+        stats: null,
+      },
+    });
+    for await (const user of invalidUsers) {
+      await prisma.stats.create({
+        data: {
+          userEmail: user.email,
+        },
+      });
+    }
+  }
 }

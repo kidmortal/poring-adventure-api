@@ -14,5 +14,6 @@ export class CreateItemDto {
   @IsNotEmpty()
   userEmail: string;
 
-  image?: string;
+  @IsNotEmpty()
+  image: string;
 }

@@ -5,6 +5,7 @@ import { ItemsModule } from './items/items.module';
 import { MarketModule } from './market/market.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { MonstersModule } from './monsters/monsters.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { APP_GUARD } from '@nestjs/core';
     UsersModule,
     ItemsModule,
     MarketModule,
+    MonstersModule,
   ],
   controllers: [],
   providers: [
