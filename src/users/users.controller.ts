@@ -39,6 +39,11 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
+  @Get('/revalidate')
+  revalidateUsers() {
+    return this.usersService.revalidateUsers();
+  }
+
   @Throttle({ default: { limit: 30, ttl: 30000 } })
   @Get(':email')
   findOne(@Param('email') email: string) {
