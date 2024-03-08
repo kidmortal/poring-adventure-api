@@ -11,6 +11,7 @@ export class AuthGuard implements CanActivate {
   constructor(private readonly firebaseRepository: FirebaseRepository) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    console.log('guard');
     const request = context.switchToHttp().getRequest();
     const headerEmail = request.headers['authenticated_email'];
     if (headerEmail) {

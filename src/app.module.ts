@@ -6,6 +6,8 @@ import { MarketModule } from './market/market.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { MonstersModule } from './monsters/monsters.module';
+import { BattleModule } from './battle/battle.module';
+import { WebsocketModule } from './websocket/websocket.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { MonstersModule } from './monsters/monsters.module';
     ItemsModule,
     MarketModule,
     MonstersModule,
+    BattleModule,
+    WebsocketModule,
   ],
   controllers: [],
   providers: [
