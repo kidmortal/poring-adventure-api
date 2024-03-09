@@ -12,20 +12,16 @@ export class WebsocketService {
   }
 
   sendTextNotification(email: string, text: string) {
-    const socket = this.getUserSocket(email);
-    if (socket) {
-      socket.emit('notification', text);
+    const sockets = this.getUserSockets(email);
+    if (sockets.length > 0) {
+      sockets.forEach((socket) => socket.emit('notification', text));
     }
   }
 
-  private getUserSocket(email: string) {
-    const socket = this.wsClients.find(
+  private getUserSockets(email: string) {
+    const sockets = this.wsClients.filter(
       (socket) => socket.handshake.auth.email === email,
     );
-    if (socket) {
-      return socket;
-    } else {
-      return false;
-    }
+    return sockets;
   }
 }
