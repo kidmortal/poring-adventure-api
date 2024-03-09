@@ -15,6 +15,10 @@ export class UserGateway {
   @SubscribeMessage('get_user')
   async findOne(@MessageBody() email: string) {
     this.logger.debug('get_user');
-    return this.userService.findOne(email);
+    const user = await this.userService.findOne(email);
+    if (!user) {
+      return false;
+    }
+    return user;
   }
 }
