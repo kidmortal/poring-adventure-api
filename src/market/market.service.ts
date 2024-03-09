@@ -103,6 +103,7 @@ export class MarketService {
       itemId: marketListing.inventory.itemId,
       stack: args.stacks,
     });
+    return true;
   }
 
   async createOrIncrementMarketListing(args: {
