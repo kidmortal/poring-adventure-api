@@ -55,8 +55,16 @@ export class BattleService {
     battle.log.push(
       `${battle.monster.name} Dealt 1 damage to ${battle.user.name}`,
     );
+    if (this.verifyBattleEnded(battle)) {
+      return;
+    }
 
     return battle;
+  }
+
+  private verifyBattleEnded(battle: Battle) {
+    console.log(battle);
+    return false;
   }
 
   private getUserBattle(userEmail: string) {
