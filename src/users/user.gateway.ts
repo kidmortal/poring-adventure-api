@@ -1,8 +1,9 @@
 import {
   WebSocketGateway,
   SubscribeMessage,
-  MessageBody,
+  ConnectedSocket,
 } from '@nestjs/websockets';
+import { Socket } from 'socket.io';
 
 import { Logger } from '@nestjs/common';
 import { UsersService } from './users.service';
@@ -13,8 +14,9 @@ export class UserGateway {
   private logger = new Logger('Websocket');
 
   @SubscribeMessage('get_user')
-  async findOne(@MessageBody() email: string) {
+  async findOne(@ConnectedSocket() client: Socket) {
     this.logger.debug('get_user');
+    const email = client.handshake.auth.email;
     const user = await this.userService.findOne(email);
     if (!user) {
       return false;

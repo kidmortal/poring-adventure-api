@@ -46,8 +46,15 @@ export class BattleService {
     if (!battle) {
       return false;
     }
+    // @ts-expect-error i hate ts
+    battle.user.stats.health -= 1;
     battle.monster.health -= 1;
-    battle.log.push('Dealt 1 damage');
+    battle.log.push(
+      `${battle.user.name} Dealt 1 damage to ${battle.monster.name}`,
+    );
+    battle.log.push(
+      `${battle.monster.name} Dealt 1 damage to ${battle.user.name}`,
+    );
 
     return battle;
   }
