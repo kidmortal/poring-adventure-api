@@ -21,4 +21,11 @@ export class UserGateway {
     }
     return user;
   }
+
+  @SubscribeMessage('get_all_user')
+  async findAll() {
+    this.logger.debug('get_all_user');
+    const users = await this.userService.findAll();
+    return users;
+  }
 }
