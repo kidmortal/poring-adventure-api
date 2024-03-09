@@ -20,6 +20,7 @@ model User {
   name       String
   classname  String
   silver     Int             @default(20)
+  admin      Boolean         @default(false)
   appearance Appearance?
   stats      Stats?
   equipment  EquippedItem[]
