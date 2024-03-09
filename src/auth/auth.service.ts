@@ -6,7 +6,11 @@ export class AuthService {
   constructor(private readonly firebaseRepository: FirebaseRepository) {}
   async getAuthenticatedEmailFromToken(token: string) {
     if (!token) return false;
-    const email = await this.firebaseRepository.validateEmail({ token });
-    return email;
+    try {
+      const email = await this.firebaseRepository.validateEmail({ token });
+      return email;
+    } catch (error) {
+      return false;
+    }
   }
 }
