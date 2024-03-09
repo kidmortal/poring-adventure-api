@@ -67,7 +67,7 @@ export class UsersService {
     return deletedUser;
   }
 
-  async addSilverToUser(args: { userEmail: string; amount: number }) {
+  private async addSilverToUser(args: { userEmail: string; amount: number }) {
     return prisma.user.update({
       where: {
         email: args.userEmail,
@@ -80,7 +80,10 @@ export class UsersService {
     });
   }
 
-  async removeSilverFromUser(args: { userEmail: string; amount: number }) {
+  private async removeSilverFromUser(args: {
+    userEmail: string;
+    amount: number;
+  }) {
     return prisma.user.update({
       where: {
         email: args.userEmail,

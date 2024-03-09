@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   UseGuards,
@@ -12,9 +11,8 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+
 import { AuthGuard } from 'src/auth/auth.guard';
-import { Throttle } from '@nestjs/throttler';
 
 @Controller('users')
 export class UsersController {
@@ -34,27 +32,6 @@ export class UsersController {
     return this.usersService.create(createUserDto);
   }
 
-  @Get()
-  findAll() {
-    return this.usersService.findAll();
-  }
-
-  @Get('/revalidate')
-  revalidateUsers() {
-    return this.usersService.revalidateUsers();
-  }
-
-  @Throttle({ default: { limit: 30, ttl: 30000 } })
-  @Get(':email')
-  findOne(@Param('email') email: string) {
-    return this.usersService.findOne(email);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.updateUser(+id, updateUserDto);
-  }
-
   @UseGuards(AuthGuard)
   @Delete(':email')
   remove(@Param('email') email: string, @Headers() headers) {
@@ -65,5 +42,10 @@ export class UsersController {
       );
     }
     return this.usersService.deleteUser(email);
+  }
+
+  @Get('/revalidate')
+  revalidateUsers() {
+    return this.usersService.revalidateUsers();
   }
 }
