@@ -15,7 +15,7 @@ export class UsersService {
           create: {
             costume: createUserDto.classname,
             gender: createUserDto.gender,
-            head: 'head_1',
+            head: '1',
           },
         },
         stats: {
