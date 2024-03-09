@@ -1,28 +1,16 @@
-import {
-  WebSocketGateway,
-  SubscribeMessage,
-  MessageBody,
-  ConnectedSocket,
-} from '@nestjs/websockets';
-import { Socket } from 'socket.io';
+import { WebSocketGateway, SubscribeMessage } from '@nestjs/websockets';
 
 import { Logger } from '@nestjs/common';
+import { MonstersService } from './monsters.service';
 
 @WebSocketGateway({ cors: true })
 export class MonsterGateway {
+  constructor(private readonly monsterService: MonstersService) {}
   private logger = new Logger('Websocket');
 
   @SubscribeMessage('get_monster')
-  async deleteItem(
-    @MessageBody() itemId: string,
-    @ConnectedSocket() client: Socket,
-  ) {
-    const email = client.handshake.auth.email;
-
-    if (email) {
-      this.logger.debug(`get_monster autorized`);
-    } else {
-      this.logger.debug(`get_monster forbidden`);
-    }
+  async getMonster() {
+    this.logger.debug('get_monster');
+    return this.monsterService.findOne();
   }
 }
