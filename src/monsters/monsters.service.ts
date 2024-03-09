@@ -21,8 +21,8 @@ export class MonstersService {
     });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} monster`;
+  async findOne() {
+    return prisma.monster.findFirst();
   }
 
   update(id: number, updateMonsterDto: UpdateMonsterDto) {
