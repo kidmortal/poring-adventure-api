@@ -98,6 +98,8 @@ model Item {
 model Drop {
   id        Int     @id @default(autoincrement())
   chance    Int
+  minAmount Int     @default(1)
+  maxAmount Int     @default(1)
   monster   Monster @relation(fields: [monsterId], references: [id])
   monsterId Int
   item      Item    @relation(fields: [itemId], references: [id])
@@ -112,5 +114,6 @@ model Monster {
   image  String
   attack Int
   health Int
+  silver Int
   drops  Drop[]
 }

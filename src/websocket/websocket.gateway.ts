@@ -9,26 +9,24 @@ import { Server } from 'http';
 import { Logger } from '@nestjs/common';
 
 import { AuthService } from 'src/auth/auth.service';
+import { WebsocketService } from './websocket.service';
 
 @WebSocketGateway({ cors: true })
 export class WebsocketGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer() server: Server;
-  wsClients: Socket[] = [];
+
   private logger = new Logger('Websocket');
 
-  constructor(private readonly auth: AuthService) {}
-
-  broadcast(event, message: any) {
-    for (const c of this.wsClients) {
-      c.emit(event, message);
-    }
-  }
+  constructor(
+    private readonly websocket: WebsocketService,
+    private readonly auth: AuthService,
+  ) {}
 
   async handleConnection(client: Socket) {
     this.logger.debug(`socket ${client.id} connected`);
-    this.wsClients.push(client);
+    this.websocket.wsClients.push(client);
     const accessToken = client.handshake.auth?.acessToken;
     if (!accessToken) {
       client.disconnect();
@@ -42,9 +40,9 @@ export class WebsocketGateway
   }
 
   handleDisconnect(client: Socket) {
-    for (let i = 0; i < this.wsClients.length; i++) {
-      if (this.wsClients[i] === client) {
-        const disconnectedSocket = this.wsClients.splice(i, 1);
+    for (let i = 0; i < this.websocket.wsClients.length; i++) {
+      if (this.websocket.wsClients[i] === client) {
+        const disconnectedSocket = this.websocket.wsClients.splice(i, 1);
         this.logger.debug(`socket ${disconnectedSocket[0].id} disconnected`);
         break;
       }
