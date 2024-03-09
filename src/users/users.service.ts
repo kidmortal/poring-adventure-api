@@ -55,6 +55,17 @@ export class UsersService {
     return user;
   }
 
+  async isAdmin(email: string) {
+    if (!email) {
+      throw new BadRequestException('No email provided');
+    }
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    return user.admin;
+  }
+
   updateUser(id: number, updateUserDto: UpdateUserDto) {
     console.log(updateUserDto);
     return `This action updates a #${id} user`;

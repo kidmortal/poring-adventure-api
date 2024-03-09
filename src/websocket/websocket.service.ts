@@ -16,6 +16,25 @@ export class WebsocketService {
     if (sockets.length > 0) {
       sockets.forEach((socket) => socket.emit('notification', text));
     }
+    return true;
+  }
+
+  getAllSockets() {
+    const socketList: { id: string; email: string }[] = [];
+    this.wsClients.forEach((socket) => {
+      socketList.push({
+        id: socket.id.slice(0, 6),
+        email: socket.handshake.auth?.email,
+      });
+    });
+    return socketList;
+  }
+
+  breakUserConnection(email: string) {
+    const sockets = this.getUserSockets(email);
+    if (sockets.length > 0) {
+      sockets.forEach((socket) => socket.disconnect());
+    }
   }
 
   private getUserSockets(email: string) {
