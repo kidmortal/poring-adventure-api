@@ -1,27 +1,35 @@
 import {
   WebSocketGateway,
   SubscribeMessage,
-  MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { BattleService } from './battle.service';
 
 @WebSocketGateway({ cors: true })
 export class BattleGateway {
+  constructor(private readonly battleService: BattleService) {}
   private logger = new Logger('Websocket');
 
-  @SubscribeMessage('create_battle')
-  async deleteItem(
-    @MessageBody() itemId: string,
-    @ConnectedSocket() client: Socket,
-  ) {
+  @SubscribeMessage('battle_create')
+  async create(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
+    this.logger.debug('create_battle');
+    return this.battleService.create(email);
+  }
 
-    if (email) {
-      this.logger.debug(`create_battle autorized`);
-    } else {
-      this.logger.debug(`create_battle forbidden`);
-    }
+  @SubscribeMessage('battle_reset')
+  async reset(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('battle_reset');
+    return this.battleService.remove(email);
+  }
+
+  @SubscribeMessage('battle_attack')
+  async attack(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('battle_attack');
+    return this.battleService.attack(email);
   }
 }
