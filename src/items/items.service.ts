@@ -215,8 +215,10 @@ export class ItemsService {
 
     return prisma.equippedItem.delete({
       where: {
-        userEmail: args.userEmail,
-        itemId: args.itemId,
+        userEmail_itemId: {
+          userEmail: args.userEmail,
+          itemId: args.itemId,
+        },
       },
     });
   }
@@ -255,7 +257,7 @@ export class ItemsService {
     });
 
     if (!inventoryItem) {
-      throw new BadRequestException('User doesnt have this item');
+      false;
     }
     return inventoryItem;
   }
@@ -263,8 +265,10 @@ export class ItemsService {
   async getEquippedItem(args: { userEmail: string; itemId: number }) {
     return prisma.equippedItem.findUnique({
       where: {
-        userEmail: args.userEmail,
-        itemId: args.itemId,
+        userEmail_itemId: {
+          userEmail: args.userEmail,
+          itemId: args.itemId,
+        },
       },
       include: {
         item: true,
