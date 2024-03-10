@@ -86,14 +86,16 @@ export class BattleService {
     if (battle.battleFinished) {
       return false;
     }
+    const userDamage = battle.user.stats.attack;
+    const monsterDamage = battle.monster.attack;
 
-    battle.user.stats.health -= 1;
-    battle.monster.health -= 1;
+    battle.user.stats.health -= monsterDamage;
+    battle.monster.health -= userDamage;
     battle.log.push(
-      `${battle.user.name} Dealt 1 damage to ${battle.monster.name}`,
+      `${battle.user.name} Dealt ${userDamage} damage to ${battle.monster.name}`,
     );
     battle.log.push(
-      `${battle.monster.name} Dealt 1 damage to ${battle.user.name}`,
+      `${battle.monster.name} Dealt ${monsterDamage} damage to ${battle.user.name}`,
     );
     return this.settleBattleAndProcessRewards(battle);
   }
