@@ -6,7 +6,7 @@ import { MonstersService } from './monsters.service';
 @WebSocketGateway({ cors: true })
 export class MonsterGateway {
   constructor(private readonly monsterService: MonstersService) {}
-  private logger = new Logger('Websocket');
+  private logger = new Logger('Websocket - monsters');
 
   @SubscribeMessage('get_monster')
   async getMonster() {

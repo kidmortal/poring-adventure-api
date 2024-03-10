@@ -11,7 +11,7 @@ import { UsersService } from './users.service';
 @WebSocketGateway({ cors: true })
 export class UserGateway {
   constructor(private readonly userService: UsersService) {}
-  private logger = new Logger('Websocket');
+  private logger = new Logger('Websocket - users');
 
   @SubscribeMessage('get_user')
   async findOne(@ConnectedSocket() client: Socket) {
