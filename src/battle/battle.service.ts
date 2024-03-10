@@ -1,17 +1,43 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
-import { UpdateBattleDto } from './dto/update-battle.dto';
-import { Battle } from './entities/battle';
+import { Battle, BattleDrop } from './entities/battle';
 import { MonstersService } from 'src/monsters/monsters.service';
 import { UsersService } from 'src/users/users.service';
+import { utils } from 'src/utils';
+import { ItemsService } from 'src/items/items.service';
+import { Item } from '@prisma/client';
+import { WebsocketService } from 'src/websocket/websocket.service';
 
 @Injectable()
 export class BattleService {
   constructor(
     private readonly monsterService: MonstersService,
     private readonly userService: UsersService,
+    private readonly itemService: ItemsService,
+    private readonly socket: WebsocketService,
   ) {}
   private battleList: Battle[] = [];
+  private logger = new Logger('Battle');
+
+  private notifyUsers(battle: Battle | false) {
+    if (!battle) return;
+    const email = battle.user.email;
+    console.log(`notifying ${email}`);
+    this.socket.sendMessageToSocket({
+      email,
+      payload: battle,
+      event: 'battle_update',
+    });
+  }
+
+  async getBattleFromUser(email: string) {
+    const battle = await this.getUserBattle(email);
+    if (battle) {
+      this.notifyUsers(battle);
+      return battle;
+    }
+    return false;
+  }
 
   async create(userEmail: string) {
     const battle = this.getUserBattle(userEmail);
@@ -22,11 +48,17 @@ export class BattleService {
         user: userData,
         monster: monsterData,
         log: [],
+        attackerTurn: '',
+        battleFinished: false,
+        userLost: false,
+        drops: [],
       };
+      this.notifyUsers(newBattleInstance);
       this.battleList.push(newBattleInstance);
-      return newBattleInstance;
+      return true;
     }
-    return battle;
+    this.notifyUsers(battle);
+    return true;
   }
 
   async remove(userEmail: string) {
@@ -36,6 +68,11 @@ export class BattleService {
 
     if (battleIndex >= 0) {
       this.battleList.splice(battleIndex, 1);
+      this.socket.sendMessageToSocket({
+        email: userEmail,
+        payload: undefined,
+        event: 'battle_update',
+      });
       return true;
     }
     return false;
@@ -46,7 +83,10 @@ export class BattleService {
     if (!battle) {
       return false;
     }
-    // @ts-expect-error i hate ts
+    if (battle.battleFinished) {
+      return false;
+    }
+
     battle.user.stats.health -= 1;
     battle.monster.health -= 1;
     battle.log.push(
@@ -55,16 +95,66 @@ export class BattleService {
     battle.log.push(
       `${battle.monster.name} Dealt 1 damage to ${battle.user.name}`,
     );
-    if (this.verifyBattleEnded(battle)) {
-      return;
-    }
-
-    return battle;
+    return this.settleBattleAndProcessRewards(battle);
   }
 
-  private verifyBattleEnded(battle: Battle) {
-    console.log(battle);
-    return false;
+  private async settleBattleAndProcessRewards(battle: Battle) {
+    const monsterAlive = battle.monster.health > 0;
+    const userAlive = battle.user.stats.health > 0;
+    if (monsterAlive && userAlive) {
+      this.notifyUsers(battle);
+      return true;
+    }
+    console.log('finished');
+    battle.battleFinished = true;
+    if (monsterAlive && !userAlive) {
+      this.logger.log('User lost battle, skipping updates');
+      battle.userLost = true;
+      this.notifyUsers(battle);
+      return true;
+    }
+    const user = battle.user;
+    const silverGain = battle.monster.silver;
+    const drops = battle.monster.drops;
+    const dropedItems: { itemId: number; stack: number; item: Item }[] = [];
+
+    drops.forEach(({ chance, item, itemId, minAmount, maxAmount }) => {
+      if (utils.isSuccess(chance)) {
+        const amount = utils.getRandomNumberBetween(minAmount, maxAmount);
+        dropedItems.push({
+          itemId: itemId,
+          stack: amount,
+          item: item,
+        });
+      }
+    });
+
+    const battleDrop: BattleDrop = {
+      userEmail: user.email,
+      silver: silverGain,
+      dropedItems: dropedItems,
+    };
+    battle.drops = [battleDrop];
+    await this.updateStatsAndRewards(battle);
+    this.notifyUsers(battle);
+    return true;
+  }
+
+  private async updateStatsAndRewards(battle: Battle) {
+    this.logger.log('Battle finished, giving rewards');
+    this.logger.log(JSON.stringify(battle.drops));
+    for await (const { userEmail, silver, dropedItems } of battle.drops) {
+      const remainingHealth = battle.user.stats.health;
+      await this.userService.addSilverToUser({ userEmail, amount: silver });
+      await this.userService.updateUserHealth({
+        userEmail,
+        amount: remainingHealth,
+      });
+      for await (const { itemId, stack } of dropedItems) {
+        await this.itemService.addItemToUser({ userEmail, itemId, stack });
+      }
+    }
+    return true;
   }
 
   private getUserBattle(userEmail: string) {
@@ -75,17 +165,5 @@ export class BattleService {
       return onGoingBattle;
     }
     return false;
-  }
-
-  findAll() {
-    return `This action returns all battle`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} battle`;
-  }
-
-  update(id: number, updateBattleDto: UpdateBattleDto) {
-    return `This action updates a #${id} battle`;
   }
 }

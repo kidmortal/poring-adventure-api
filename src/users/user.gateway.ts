@@ -17,6 +17,10 @@ export class UserGateway {
   async findOne(@ConnectedSocket() client: Socket) {
     this.logger.debug('get_user');
     const email = client.handshake.auth.email;
+    console.log(`email provided ${email}`);
+    if (!email) {
+      return;
+    }
     const user = await this.userService.findOne(email);
     if (!user) {
       return false;

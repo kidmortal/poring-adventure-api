@@ -15,8 +15,15 @@ export class BattleGateway {
   @SubscribeMessage('battle_create')
   async create(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
-    this.logger.debug('create_battle');
+    this.logger.debug('battle_create');
     return this.battleService.create(email);
+  }
+
+  @SubscribeMessage('battle_update')
+  async update(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('battle_update');
+    return this.battleService.getBattleFromUser(email);
   }
 
   @SubscribeMessage('battle_reset')

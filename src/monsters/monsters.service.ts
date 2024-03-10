@@ -22,7 +22,15 @@ export class MonstersService {
   }
 
   async findOne() {
-    return prisma.monster.findFirst();
+    return prisma.monster.findFirst({
+      include: {
+        drops: {
+          include: {
+            item: true,
+          },
+        },
+      },
+    });
   }
 
   update(id: number, updateMonsterDto: UpdateMonsterDto) {
