@@ -59,7 +59,9 @@ model EquippedItem {
   user      User   @relation(fields: [userEmail], references: [email])
   userEmail String
   item      Item   @relation(fields: [itemId], references: [id])
-  itemId    Int    @unique
+  itemId    Int
+
+  @@unique([userEmail, itemId])
 }
 
 model Appearance {
