@@ -21,7 +21,7 @@ export class WebsocketGateway
 {
   @WebSocketServer() server: Server;
 
-  private logger = new Logger('Websocket');
+  private logger = new Logger('Websocket - gateway');
 
   constructor(
     private readonly websocket: WebsocketService,

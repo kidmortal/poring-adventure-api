@@ -2,9 +2,11 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateItemDto } from './dto/create-item.dto';
 // import { UpdateItemDto } from './dto/update-item.dto';
 import { prisma } from 'src/prisma/prisma';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class ItemsService {
+  constructor(private readonly userService: UsersService) {}
   create(createItemDto: CreateItemDto) {
     return prisma.item.create({ data: createItemDto });
   }
@@ -14,18 +16,7 @@ export class ItemsService {
     itemId: number;
     stack: number;
   }) {
-    const userHasItem = await prisma.inventoryItem.findUnique({
-      where: {
-        userEmail_itemId: {
-          userEmail: args.userEmail,
-          itemId: args.itemId,
-        },
-      },
-    });
-
-    if (!userHasItem) {
-      throw new BadRequestException('User doesnt have this item');
-    }
+    const userHasItem = await this.userHasItem(args);
 
     if (userHasItem && userHasItem.stack < args.stack) {
       throw new BadRequestException(
@@ -68,19 +59,34 @@ export class ItemsService {
     );
   }
 
+  async consumeItem(args: {
+    userEmail: string;
+    itemId: number;
+    stack: number;
+  }) {
+    const inventoryItem = await this.getInventoryItem(args);
+    if (inventoryItem) {
+      const item = inventoryItem.item;
+      if (item.category === 'consumable') {
+        if (item.health) {
+          await this.userService.incrementUserHealth({
+            userEmail: args.userEmail,
+            amount: item.health,
+          });
+        }
+        await this.removeItemFromUser(args);
+        return true;
+      }
+    }
+  }
+
   async addItemToUser(args: {
     userEmail: string;
     itemId: number;
     stack: number;
   }) {
-    const userHasItem = await prisma.inventoryItem.findUnique({
-      where: {
-        userEmail_itemId: {
-          userEmail: args.userEmail,
-          itemId: args.itemId,
-        },
-      },
-    });
+    const userHasItem = await this.userHasItem(args);
+
     if (userHasItem) {
       const updateAmount = await prisma.inventoryItem.update({
         where: {
@@ -171,8 +177,39 @@ export class ItemsService {
     return `This action returns all items`;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} item`;
+  async userHasItem(args: { userEmail: string; itemId: number }) {
+    const userHasItem = await prisma.inventoryItem.findUnique({
+      where: {
+        userEmail_itemId: {
+          userEmail: args.userEmail,
+          itemId: args.itemId,
+        },
+      },
+    });
+
+    if (!userHasItem) {
+      throw new BadRequestException('User doesnt have this item');
+    }
+    return userHasItem;
+  }
+
+  async getInventoryItem(args: { userEmail: string; itemId: number }) {
+    const userHasItem = await prisma.inventoryItem.findUnique({
+      where: {
+        userEmail_itemId: {
+          userEmail: args.userEmail,
+          itemId: args.itemId,
+        },
+      },
+      include: {
+        item: true,
+      },
+    });
+
+    if (!userHasItem) {
+      throw new BadRequestException('User doesnt have this item');
+    }
+    return userHasItem;
   }
 
   // update(id: number, updateItemDto: UpdateItemDto) {

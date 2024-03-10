@@ -90,6 +90,33 @@ export class UsersService {
     });
   }
 
+  async incrementUserHealth(args: { userEmail: string; amount: number }) {
+    const currentStats = await prisma.stats.findUnique({
+      where: {
+        userEmail: args.userEmail,
+      },
+    });
+
+    if (currentStats) {
+      const maxHealth = currentStats.maxHealth;
+      const currentHealth = currentStats.health;
+      let finalHealth = currentHealth + args.amount;
+      if (finalHealth > maxHealth) {
+        finalHealth = maxHealth;
+      }
+      return prisma.stats.update({
+        where: {
+          userEmail: args.userEmail,
+        },
+        data: {
+          health: {
+            set: finalHealth,
+          },
+        },
+      });
+    }
+  }
+
   updateUser(id: number, updateUserDto: UpdateUserDto) {
     console.log(updateUserDto);
     return `This action updates a #${id} user`;

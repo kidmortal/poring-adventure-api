@@ -13,7 +13,7 @@ import { PurchaseMarketDto } from './dto/purchase-market.dto';
 @WebSocketGateway({ cors: true })
 export class MarketGateway {
   constructor(private readonly marketService: MarketService) {}
-  private logger = new Logger('Websocket');
+  private logger = new Logger('Websocket - market');
 
   @SubscribeMessage('create_market_listing')
   async create(
