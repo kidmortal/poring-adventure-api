@@ -68,7 +68,7 @@ export class WebsocketGateway
     const authEmail =
       await this.auth.getAuthenticatedEmailFromToken(accessToken);
     if (!authEmail) {
-      client.disconnect();
+      return client.disconnect();
     }
     client.handshake.auth.email = authEmail;
   }

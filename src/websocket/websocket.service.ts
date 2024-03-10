@@ -12,9 +12,17 @@ export class WebsocketService {
   }
 
   sendTextNotification(email: string, text: string) {
-    const sockets = this.getUserSockets(email);
+    return this.sendMessageToSocket({
+      email,
+      event: 'notification',
+      payload: text,
+    });
+  }
+
+  sendMessageToSocket(args: { email: string; event: string; payload: any }) {
+    const sockets = this.getUserSockets(args.email);
     if (sockets.length > 0) {
-      sockets.forEach((socket) => socket.emit('notification', text));
+      sockets.forEach((socket) => socket.emit(args.event, args.payload));
     }
     return true;
   }

@@ -66,6 +66,30 @@ export class UsersService {
     return user.admin;
   }
 
+  async updateUserHealth(args: { userEmail: string; amount: number }) {
+    return prisma.stats.update({
+      where: {
+        userEmail: args.userEmail,
+      },
+      data: {
+        health: args.amount,
+      },
+    });
+  }
+
+  async decrementUserHealth(args: { userEmail: string; amount: number }) {
+    return prisma.stats.update({
+      where: {
+        userEmail: args.userEmail,
+      },
+      data: {
+        health: {
+          decrement: args.amount,
+        },
+      },
+    });
+  }
+
   updateUser(id: number, updateUserDto: UpdateUserDto) {
     console.log(updateUserDto);
     return `This action updates a #${id} user`;
@@ -81,7 +105,7 @@ export class UsersService {
     return deletedUser;
   }
 
-  private async addSilverToUser(args: { userEmail: string; amount: number }) {
+  async addSilverToUser(args: { userEmail: string; amount: number }) {
     return prisma.user.update({
       where: {
         email: args.userEmail,
@@ -94,10 +118,7 @@ export class UsersService {
     });
   }
 
-  private async removeSilverFromUser(args: {
-    userEmail: string;
-    amount: number;
-  }) {
+  async removeSilverFromUser(args: { userEmail: string; amount: number }) {
     return prisma.user.update({
       where: {
         email: args.userEmail,
