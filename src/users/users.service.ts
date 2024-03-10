@@ -117,6 +117,45 @@ export class UsersService {
     }
   }
 
+  async increaseUserStats(args: {
+    userEmail: string;
+    health?: number;
+    attack?: number;
+  }) {
+    return prisma.stats.update({
+      where: {
+        userEmail: args.userEmail,
+      },
+      data: {
+        maxHealth: {
+          increment: args.health ?? 0,
+        },
+        attack: {
+          increment: args.attack ?? 0,
+        },
+      },
+    });
+  }
+  async decreaseUserStats(args: {
+    userEmail: string;
+    health?: number;
+    attack?: number;
+  }) {
+    return prisma.stats.update({
+      where: {
+        userEmail: args.userEmail,
+      },
+      data: {
+        maxHealth: {
+          decrement: args.health ?? 0,
+        },
+        attack: {
+          decrement: args.attack ?? 0,
+        },
+      },
+    });
+  }
+
   updateUser(id: number, updateUserDto: UpdateUserDto) {
     console.log(updateUserDto);
     return `This action updates a #${id} user`;

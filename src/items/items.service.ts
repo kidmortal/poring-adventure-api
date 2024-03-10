@@ -3,6 +3,8 @@ import { CreateItemDto } from './dto/create-item.dto';
 // import { UpdateItemDto } from './dto/update-item.dto';
 import { prisma } from 'src/prisma/prisma';
 import { UsersService } from 'src/users/users.service';
+import { EQUIPABLE_CATEGORIES } from './entities/categories';
+import { Item } from '@prisma/client';
 
 @Injectable()
 export class ItemsService {
@@ -140,37 +142,83 @@ export class ItemsService {
   }
 
   async equipItem(args: { itemId: number; userEmail: string }) {
-    console.log(args);
-    // const item = await prisma.item.findUnique({
-    //   where: { id: args.itemId },
-    //   include: { equipped: true },
-    // });
-    // if (!item) {
-    //   throw new BadRequestException(`No item with id ${args.itemId}`);
-    // }
-    // if (item.userEmail !== args.userEmail) {
-    //   throw new BadRequestException(`This item isn't yours`);
-    // }
-    // if (item.equipped) {
-    //   throw new BadRequestException(`This item is already equipped`);
-    // }
-    // const result = await prisma.equippedItem.create({
-    //   data: {
-    //     type: 'weapon',
-    //     item: {
-    //       connect: {
-    //         id: item.id,
-    //       },
-    //     },
-    //     user: {
-    //       connect: {
-    //         email: args.userEmail,
-    //       },
-    //     },
-    //   },
-    // });
-    // return result;
-    return true;
+    const inventoryItem = await this.getInventoryItem(args);
+    if (inventoryItem) {
+      if (!EQUIPABLE_CATEGORIES.includes(inventoryItem.item.category)) {
+        throw new BadRequestException('This item is not equipable');
+      }
+
+      const equippedItems = await prisma.equippedItem.findMany({
+        where: {
+          userEmail: args.userEmail,
+        },
+        include: {
+          item: true,
+        },
+      });
+
+      equippedItems.forEach((equip) => {
+        if (equip.item.category === inventoryItem.item.category) {
+          throw new BadRequestException(
+            'You cannot equip two of the same kind of equipment',
+          );
+        }
+      });
+
+      await this.removeItemFromUser({ ...args, stack: 1 });
+      await this.addEquipmentToUser({ ...args, itemInfo: inventoryItem.item });
+    }
+    return false;
+  }
+
+  async unequipItem(args: { itemId: number; userEmail: string }) {
+    const equippedItem = await this.getEquippedItem(args);
+    if (equippedItem) {
+      await this.addItemToUser({ ...args, stack: 1 });
+
+      await this.removeEquipmentFromUser({
+        ...args,
+        itemInfo: equippedItem.item,
+      });
+    }
+    return false;
+  }
+
+  async addEquipmentToUser(args: {
+    itemId: number;
+    userEmail: string;
+    itemInfo: Item;
+  }) {
+    await this.userService.increaseUserStats({
+      userEmail: args.userEmail,
+      health: args.itemInfo.health,
+      attack: args.itemInfo.attack,
+    });
+
+    return prisma.equippedItem.create({
+      data: {
+        userEmail: args.userEmail,
+        itemId: args.itemId,
+      },
+    });
+  }
+  async removeEquipmentFromUser(args: {
+    itemId: number;
+    userEmail: string;
+    itemInfo: Item;
+  }) {
+    await this.userService.decreaseUserStats({
+      userEmail: args.userEmail,
+      health: args.itemInfo.health,
+      attack: args.itemInfo.attack,
+    });
+
+    return prisma.equippedItem.delete({
+      where: {
+        userEmail: args.userEmail,
+        itemId: args.itemId,
+      },
+    });
   }
 
   findAll() {
@@ -188,13 +236,13 @@ export class ItemsService {
     });
 
     if (!userHasItem) {
-      throw new BadRequestException('User doesnt have this item');
+      false;
     }
     return userHasItem;
   }
 
   async getInventoryItem(args: { userEmail: string; itemId: number }) {
-    const userHasItem = await prisma.inventoryItem.findUnique({
+    const inventoryItem = await prisma.inventoryItem.findUnique({
       where: {
         userEmail_itemId: {
           userEmail: args.userEmail,
@@ -206,10 +254,22 @@ export class ItemsService {
       },
     });
 
-    if (!userHasItem) {
+    if (!inventoryItem) {
       throw new BadRequestException('User doesnt have this item');
     }
-    return userHasItem;
+    return inventoryItem;
+  }
+
+  async getEquippedItem(args: { userEmail: string; itemId: number }) {
+    return prisma.equippedItem.findUnique({
+      where: {
+        userEmail: args.userEmail,
+        itemId: args.itemId,
+      },
+      include: {
+        item: true,
+      },
+    });
   }
 
   // update(id: number, updateItemDto: UpdateItemDto) {
