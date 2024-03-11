@@ -71,6 +71,11 @@ export class WebsocketGateway
       return client.disconnect();
     }
     client.handshake.auth.email = authEmail;
+    this.websocket.sendMessageToSocket({
+      event: 'authenticated',
+      email: authEmail,
+      payload: {},
+    });
   }
 
   handleDisconnect(client: Socket) {

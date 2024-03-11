@@ -15,9 +15,8 @@ export class UserGateway {
 
   @SubscribeMessage('get_user')
   async findOne(@ConnectedSocket() client: Socket) {
-    this.logger.debug('get_user');
     const email = client.handshake.auth.email;
-    console.log(`email provided ${email}`);
+    this.logger.debug(`'get_user' ${email}`);
     if (!email) {
       return;
     }
