@@ -15,28 +15,28 @@ export class BattleGateway {
   @SubscribeMessage('battle_create')
   async create(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
-    this.logger.debug('battle_create');
+    this.logger.debug(`battle_create ${email}`);
     return this.battleService.create(email);
   }
 
   @SubscribeMessage('battle_update')
   async update(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
-    this.logger.debug('battle_update');
+    this.logger.debug(`battle_update ${email}`);
     return this.battleService.getBattleFromUser(email);
   }
 
   @SubscribeMessage('battle_reset')
   async reset(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
-    this.logger.debug('battle_reset');
+    this.logger.debug(`battle_reset ${email}`);
     return this.battleService.remove(email);
   }
 
   @SubscribeMessage('battle_attack')
   async attack(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
-    this.logger.debug('battle_attack');
+    this.logger.debug(`battle_attack ${email}`);
     return this.battleService.attack(email);
   }
 }
