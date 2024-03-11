@@ -22,28 +22,37 @@ export class MarketGateway {
   ) {
     const email = client.handshake.auth.email;
     this.logger.debug('create_market_listing');
-    return this.marketService.addItemToMarket(createMarketDto, email);
+    const result = await this.marketService.addItemToMarket(
+      createMarketDto,
+      email,
+    );
+    this.marketService.notifyMarketUsers();
+    return result;
   }
 
   @SubscribeMessage('purchase_market_listing')
-  purchase(
+  async purchase(
     @MessageBody() purchaseDto: PurchaseMarketDto,
     @ConnectedSocket() client: Socket,
   ) {
     const email = client.handshake.auth.email;
     this.logger.debug('purchase_market_listing');
-    return this.marketService.purchase({
+    const result = await this.marketService.purchase({
       marketListingId: purchaseDto.marketListingId,
       stacks: purchaseDto.stack,
       buyerEmail: email,
     });
+    this.marketService.notifyMarketUsers();
+    return result;
   }
 
   @SubscribeMessage('remove_market_listing')
   async remove(@MessageBody() id: number, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
-    this.logger.debug('create_market_listing');
-    return this.marketService.remove(id, email);
+    this.logger.debug('remove_market_listing');
+    const result = await this.marketService.remove(id, email);
+    this.marketService.notifyMarketUsers();
+    return result;
   }
 
   @SubscribeMessage('get_all_market_listing')

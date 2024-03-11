@@ -1,11 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Socket } from 'socket.io';
 
 @Injectable()
 export class WebsocketService {
   wsClients: Socket[] = [];
+  private logger = new Logger('Websocket - service');
   constructor() {}
   broadcast(event, message: any) {
+    this.logger.debug(`broadcasting event ${event}`);
     for (const c of this.wsClients) {
       c.emit(event, message);
     }

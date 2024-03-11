@@ -8,12 +8,14 @@ import { CreateMarketDto } from './dto/create-market.dto';
 import { prisma } from 'src/prisma/prisma';
 import { ItemsService } from 'src/items/items.service';
 import { UsersService } from 'src/users/users.service';
+import { WebsocketService } from 'src/websocket/websocket.service';
 
 @Injectable()
 export class MarketService {
   constructor(
     private readonly itemService: ItemsService,
     private readonly userService: UsersService,
+    private readonly websocket: WebsocketService,
   ) {}
   async addItemToMarket(createMarketDto: CreateMarketDto, sellerEmail: string) {
     const inventoryItem = await prisma.inventoryItem.findUnique({
@@ -58,6 +60,11 @@ export class MarketService {
       inventoryId: inventoryItem.id,
       sellerEmail,
     });
+  }
+
+  async notifyMarketUsers() {
+    const listing = await this.findAll();
+    this.websocket.broadcast('market_listing', listing);
   }
 
   async purchase(args: {
