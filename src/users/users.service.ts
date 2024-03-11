@@ -2,9 +2,19 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { prisma } from 'src/prisma/prisma';
+import { WebsocketService } from 'src/websocket/websocket.service';
 
 @Injectable()
 export class UsersService {
+  constructor(private readonly websocket: WebsocketService) {}
+  async notifyUserUpdate(args: { email: string; payload: any }) {
+    return this.websocket.sendMessageToSocket({
+      email: args.email,
+      event: 'user_update',
+      payload: args.payload,
+    });
+  }
+
   async create(createUserDto: CreateUserDto) {
     const newUser = await prisma.user.create({
       data: {

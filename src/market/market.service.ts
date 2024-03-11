@@ -64,7 +64,7 @@ export class MarketService {
 
   async notifyMarketUsers() {
     const listing = await this.findAll();
-    this.websocket.broadcast('market_listing', listing);
+    this.websocket.broadcast('market_update', listing);
   }
 
   async purchase(args: {
