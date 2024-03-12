@@ -30,6 +30,20 @@ export class BattleService {
     this.processMonsterAttack({ battle });
   }
 
+  private notifyBattleRemoved(battle: Battle | false) {
+    if (!battle) return;
+
+    battle.users.forEach((user) => {
+      const email = user.email;
+      console.log(`notifying ${email}`);
+      this.socket.sendMessageToSocket({
+        email,
+        payload: undefined,
+        event: 'battle_update',
+      });
+    });
+  }
+
   private notifyUsers(battle: Battle | false) {
     if (!battle) return;
     battle.users.forEach((user) => {
@@ -99,12 +113,11 @@ export class BattleService {
     );
 
     if (battleIndex >= 0) {
-      this.battleList.splice(battleIndex, 1);
-      this.socket.sendMessageToSocket({
-        email: userEmail,
-        payload: undefined,
-        event: 'battle_update',
-      });
+      const removedBattle = this.battleList.splice(battleIndex, 1);
+      if (removedBattle[0]) {
+        this.notifyBattleRemoved(removedBattle[0]);
+      }
+
       return true;
     }
     return false;
