@@ -35,7 +35,6 @@ export class BattleService {
 
     battle.users.forEach((user) => {
       const email = user.email;
-      console.log(`notifying ${email}`);
       this.socket.sendMessageToSocket({
         email,
         payload: undefined,
@@ -48,7 +47,6 @@ export class BattleService {
     if (!battle) return;
     battle.users.forEach((user) => {
       const email = user.email;
-      console.log(`notifying ${email}`);
       this.socket.sendMessageToSocket({
         email,
         payload: battle,
@@ -58,8 +56,9 @@ export class BattleService {
   }
 
   async getBattleFromUser(email: string) {
-    const battle = await this.getUserBattle(email);
+    const battle = this.getUserBattle(email);
     if (battle) {
+      this.logger.debug(`Notifying party about updates`);
       this.notifyUsers(battle);
       return battle;
     }
@@ -127,9 +126,15 @@ export class BattleService {
     const battle = this.getUserBattle(userEmail);
     if (!battle) return false;
     if (battle.battleFinished) return false;
-    this.processUserAttack({ battle, email: userEmail });
-    const didBattleFinish = await this.settleBattleAndProcessRewards(battle);
-    if (didBattleFinish) return true;
+    const didAttack = await this.processUserAttack({
+      battle,
+      email: userEmail,
+    });
+    if (didAttack) {
+      const didBattleFinish = await this.settleBattleAndProcessRewards(battle);
+      if (didBattleFinish) return true;
+    }
+
     return false;
   }
 
@@ -217,6 +222,7 @@ export class BattleService {
       this.notifyUsers(args.battle);
       return true;
     }
+    this.logger.debug(`Not your turn ${args.email}`);
     return false;
   }
 
@@ -261,12 +267,17 @@ export class BattleService {
   }
 
   private getUserBattle(userEmail: string) {
-    const onGoingBattle = this.battleList.find((battle) =>
-      battle.users.find((u) => u?.email === userEmail),
-    );
-    if (onGoingBattle) {
-      return onGoingBattle;
-    }
-    return false;
+    let userBattle = undefined;
+    if (!userEmail) return userBattle;
+    this.battleList.forEach((onGoingBattle) => {
+      const hasUser = onGoingBattle.users.find(
+        (user) => user.email === userEmail,
+      );
+      if (hasUser) {
+        userBattle = onGoingBattle;
+      }
+    });
+
+    return userBattle;
   }
 }
