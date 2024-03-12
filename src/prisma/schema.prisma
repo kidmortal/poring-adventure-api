@@ -26,6 +26,8 @@ model User {
   equipment  EquippedItem[]
   inventory  InventoryItem[]
   market     MarketListing[]
+  partyId    Int?
+  Party      Party?          @relation(fields: [partyId], references: [id])
 }
 
 model Stats {
@@ -120,4 +122,15 @@ model Monster {
   silver Int    @default(1)
   exp    Int    @default(1)
   drops  Drop[]
+}
+
+model Party {
+  id          Int    @id @default(autoincrement())
+  leaderEmail String @unique
+  members     User[]
+}
+
+model Profession {
+  id   Int    @id @default(autoincrement())
+  name String
 }
