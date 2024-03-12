@@ -124,6 +124,9 @@ export class PartyService {
       where: {
         leaderEmail: args.email,
       },
+      include: {
+        members: true,
+      },
     });
     if (ownedParty) {
       await prisma.party.delete({
@@ -131,6 +134,9 @@ export class PartyService {
           leaderEmail: args.email,
         },
       });
+      ownedParty.members.forEach((member) =>
+        this.notifyUserWithNoParty({ email: member.email }),
+      );
       return true;
     }
     return false;
