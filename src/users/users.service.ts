@@ -62,6 +62,22 @@ export class UsersService {
     });
   }
 
+  async getFullParty(leaderEmail: string) {
+    return prisma.party.findUnique({
+      where: {
+        leaderEmail: leaderEmail,
+      },
+      include: {
+        members: {
+          include: {
+            appearance: true,
+            stats: true,
+          },
+        },
+      },
+    });
+  }
+
   async findOne(email: string) {
     if (!email) {
       throw new BadRequestException('No email provided');
