@@ -2,6 +2,7 @@ import {
   WebSocketGateway,
   SubscribeMessage,
   ConnectedSocket,
+  MessageBody,
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { PartyService } from './party.service';
@@ -31,5 +32,29 @@ export class PartyGateway {
     this.logger.debug('remove_party');
     const email = client.handshake.auth.email;
     return this.partyService.remove({ email });
+  }
+
+  @SubscribeMessage('invite_to_party')
+  invite(
+    @MessageBody() invitedEmail: string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.logger.debug('invite_to_party');
+    const email = client.handshake.auth.email;
+    return this.partyService.invite({ leaderEmail: email, invitedEmail });
+  }
+
+  @SubscribeMessage('kick_from_party')
+  kick(@MessageBody() kickedEmail: string, @ConnectedSocket() client: Socket) {
+    this.logger.debug('kick_from_party');
+    const email = client.handshake.auth.email;
+    return this.partyService.kick({ leaderEmail: email, kickedEmail });
+  }
+
+  @SubscribeMessage('join_party')
+  join(@MessageBody() partyId: number, @ConnectedSocket() client: Socket) {
+    this.logger.debug('join_party');
+    const email = client.handshake.auth.email;
+    return this.partyService.joinParty({ email, partyId });
   }
 }
