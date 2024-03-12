@@ -21,8 +21,8 @@ export class BattleService {
   private battleList: Battle[] = [];
   private logger = new Logger('Battle');
 
-  @Cron('* * * * * *')
-  private runEverySecond() {
+  @Cron('*/3 * * * * *')
+  private autoRun() {
     this.battleList.forEach((b) => this.tickBattle(b));
   }
 
