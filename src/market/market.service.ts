@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { CreateMarketDto } from './dto/create-market.dto';
@@ -214,6 +215,11 @@ export class MarketService {
       );
     }
 
-    return prisma.marketListing.delete({ where: { id } });
+    try {
+      const deletedItem = await prisma.marketListing.delete({ where: { id } });
+      return deletedItem;
+    } catch (error) {
+      throw new InternalServerErrorException(error);
+    }
   }
 }

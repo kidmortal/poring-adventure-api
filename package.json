@@ -1,8 +1,8 @@
 {
-  "name": "zenith-app",
-  "version": "0.0.1",
-  "description": "",
-  "author": "",
+  "name": "poring-adventure-app",
+  "version": "1.0.0",
+  "description": "Poring adventure service",
+  "author": "Kidmortal",
   "private": true,
   "license": "UNLICENSED",
   "prisma": {

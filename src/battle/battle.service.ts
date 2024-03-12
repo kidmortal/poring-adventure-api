@@ -232,8 +232,10 @@ export class BattleService {
     const attacker = attackerList[attackerIndex];
 
     const monster = args.battle.monsters.find((m) => m.name === attacker);
+    const isMonsterAlive = monster?.health > 0;
 
-    if (monster) {
+    if (monster && isMonsterAlive) {
+      console.log('imma fire mah laser');
       const monsterDamage = monster.attack;
       const targetUser = args.battle.users[0];
       targetUser.stats.health -= monsterDamage;
