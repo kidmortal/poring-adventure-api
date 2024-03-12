@@ -13,9 +13,10 @@ export type UserWithStats = User & {
 };
 
 export type Battle = {
-  user: UserWithStats;
-  monster: MonsterWithDrops;
-  attackerTurn: string;
+  users: UserWithStats[];
+  monsters: MonsterWithDrops[];
+  attackerTurn: number;
+  attackerList: string[];
   battleFinished: boolean;
   userLost: boolean;
   log: string[];

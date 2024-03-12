@@ -7,6 +7,8 @@ import { utils } from 'src/utils';
 import { ItemsService } from 'src/items/items.service';
 import { Item } from '@prisma/client';
 import { WebsocketService } from 'src/websocket/websocket.service';
+import { BattleUtils } from './battleUtils';
+import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class BattleService {
@@ -19,14 +21,25 @@ export class BattleService {
   private battleList: Battle[] = [];
   private logger = new Logger('Battle');
 
+  @Cron('* * * * * *')
+  private runEverySecond() {
+    this.battleList.forEach((b) => this.tickBattle(b));
+  }
+
+  private tickBattle(battle: Battle) {
+    this.processMonsterAttack({ battle });
+  }
+
   private notifyUsers(battle: Battle | false) {
     if (!battle) return;
-    const email = battle.user.email;
-    console.log(`notifying ${email}`);
-    this.socket.sendMessageToSocket({
-      email,
-      payload: battle,
-      event: 'battle_update',
+    battle.users.forEach((user) => {
+      const email = user.email;
+      console.log(`notifying ${email}`);
+      this.socket.sendMessageToSocket({
+        email,
+        payload: battle,
+        event: 'battle_update',
+      });
     });
   }
 
@@ -41,18 +54,27 @@ export class BattleService {
 
   async create(userEmail: string) {
     const battle = this.getUserBattle(userEmail);
+
     if (!battle) {
       const userData = await this.userService.findOne(userEmail);
       const monsterData = await this.monsterService.findOne();
+      const users = [userData];
+      const monsters = [monsterData];
+      const attackerList = BattleUtils.generateBattleAttackOrder(
+        users,
+        monsters,
+      );
       const newBattleInstance: Battle = {
-        user: userData,
-        monster: monsterData,
+        users: users,
+        monsters: monsters,
         log: [],
-        attackerTurn: '',
+        attackerTurn: 0,
+        attackerList: attackerList,
         battleFinished: false,
         userLost: false,
         drops: [],
       };
+
       this.notifyUsers(newBattleInstance);
       this.battleList.push(newBattleInstance);
       return true;
@@ -62,8 +84,8 @@ export class BattleService {
   }
 
   async remove(userEmail: string) {
-    const battleIndex = this.battleList.findIndex(
-      (battle) => battle.user.email === userEmail,
+    const battleIndex = this.battleList.findIndex((battle) =>
+      battle.users.find((u) => u.email === userEmail),
     );
 
     if (battleIndex >= 0) {
@@ -86,26 +108,21 @@ export class BattleService {
     if (battle.battleFinished) {
       return false;
     }
-    const userDamage = battle.user.stats.attack;
-    const monsterDamage = battle.monster.attack;
+    this.processUserAttack({ battle, email: userEmail });
+    const didBattleFinish = await this.settleBattleAndProcessRewards(battle);
+    if (didBattleFinish) {
+      return true;
+    }
 
-    battle.user.stats.health -= monsterDamage;
-    battle.monster.health -= userDamage;
-    battle.log.push(
-      `${battle.user.name} Dealt ${userDamage} damage to ${battle.monster.name}`,
-    );
-    battle.log.push(
-      `${battle.monster.name} Dealt ${monsterDamage} damage to ${battle.user.name}`,
-    );
-    return this.settleBattleAndProcessRewards(battle);
+    return true;
   }
 
   private async settleBattleAndProcessRewards(battle: Battle) {
-    const monsterAlive = battle.monster.health > 0;
-    const userAlive = battle.user.stats.health > 0;
+    const monsterAlive = battle.monsters[0].health > 0;
+    const userAlive = battle.users[0].stats.health > 0;
     if (monsterAlive && userAlive) {
       this.notifyUsers(battle);
-      return true;
+      return false;
     }
     console.log('finished');
     battle.battleFinished = true;
@@ -115,28 +132,33 @@ export class BattleService {
       this.notifyUsers(battle);
       return true;
     }
-    const user = battle.user;
-    const silverGain = battle.monster.silver;
-    const drops = battle.monster.drops;
-    const dropedItems: { itemId: number; stack: number; item: Item }[] = [];
 
-    drops.forEach(({ chance, item, itemId, minAmount, maxAmount }) => {
-      if (utils.isSuccess(chance)) {
-        const amount = utils.getRandomNumberBetween(minAmount, maxAmount);
-        dropedItems.push({
-          itemId: itemId,
-          stack: amount,
-          item: item,
-        });
-      }
+    const dropedItems: { itemId: number; stack: number; item: Item }[] = [];
+    const targetMonster = battle.monsters[0];
+    battle.users.forEach((user) => {
+      const silverGain = targetMonster.silver;
+      const drops = targetMonster.drops;
+
+      drops.forEach(({ chance, item, itemId, minAmount, maxAmount }) => {
+        if (utils.isSuccess(chance)) {
+          const amount = utils.getRandomNumberBetween(minAmount, maxAmount);
+          dropedItems.push({
+            itemId: itemId,
+            stack: amount,
+            item: item,
+          });
+        }
+      });
+
+      const battleDrop: BattleDrop = {
+        userEmail: user.email,
+        silver: silverGain,
+        dropedItems: dropedItems,
+      };
+
+      battle.drops.push(battleDrop);
     });
 
-    const battleDrop: BattleDrop = {
-      userEmail: user.email,
-      silver: silverGain,
-      dropedItems: dropedItems,
-    };
-    battle.drops = [battleDrop];
     await this.updateStatsAndRewards(battle);
     this.notifyUsers(battle);
     return true;
@@ -146,7 +168,8 @@ export class BattleService {
     this.logger.log('Battle finished, giving rewards');
     this.logger.log(JSON.stringify(battle.drops));
     for await (const { userEmail, silver, dropedItems } of battle.drops) {
-      const remainingHealth = battle.user.stats.health;
+      const rewardUser = battle.users.find((u) => u.email === userEmail);
+      const remainingHealth = rewardUser.stats.health;
       await this.userService.addSilverToUser({ userEmail, amount: silver });
       await this.userService.updateUserHealth({
         userEmail,
@@ -155,13 +178,75 @@ export class BattleService {
       for await (const { itemId, stack } of dropedItems) {
         await this.itemService.addItemToUser({ userEmail, itemId, stack });
       }
+      await this.userService.notifyUserUpdateWithProfile({ email: userEmail });
     }
+
     return true;
+  }
+
+  private async processUserAttack(args: { battle: Battle; email: string }) {
+    const user = args.battle.users.find((u) => u.email === args.email);
+    const attackerList = args.battle.attackerList;
+    const attackerIndex = args.battle.attackerTurn;
+    const attacker = attackerList[attackerIndex];
+
+    if (user && attacker === user.name) {
+      const userDamage = user.stats.attack;
+      const targetMonster = args.battle.monsters[0];
+      targetMonster.health -= userDamage;
+      args.battle.log.push(
+        `${user.name} Dealt ${userDamage} damage to ${targetMonster.name}`,
+      );
+      this.processNextTurn({ battle: args.battle });
+      this.notifyUsers(args.battle);
+      return true;
+    }
+    return false;
+  }
+
+  private async processMonsterAttack(args: { battle: Battle }) {
+    const attackerList = args.battle.attackerList;
+    const attackerIndex = args.battle.attackerTurn;
+    const attacker = attackerList[attackerIndex];
+
+    const monster = args.battle.monsters.find((m) => m.name === attacker);
+
+    if (monster) {
+      const monsterDamage = monster.attack;
+      const targetUser = args.battle.users[0];
+      targetUser.stats.health -= monsterDamage;
+
+      args.battle.log.push(
+        `${monster.name} Dealt ${monsterDamage} damage to ${targetUser.name}`,
+      );
+      this.processNextTurn({ battle: args.battle });
+      this.notifyUsers(args.battle);
+      return true;
+    }
+    return false;
+  }
+
+  private async processNextTurn(args: { battle: Battle }) {
+    const pastAttacker = args.battle.attackerTurn;
+    const attackerList = args.battle.attackerList;
+    const maxIndex = attackerList.length - 1;
+
+    console.log({
+      pastAttacker,
+      length: attackerList.length,
+    });
+    if (pastAttacker < maxIndex) {
+      return (args.battle.attackerTurn = pastAttacker + 1);
+    } else if (pastAttacker === maxIndex) {
+      return (args.battle.attackerTurn = 0);
+    } else {
+      return args.battle.attackerTurn - 1;
+    }
   }
 
   private getUserBattle(userEmail: string) {
     const onGoingBattle = this.battleList.find(
-      (battle) => battle.user.email === userEmail,
+      (battle) => battle.users.find((u) => u.email === userEmail).email,
     );
     if (onGoingBattle) {
       return onGoingBattle;

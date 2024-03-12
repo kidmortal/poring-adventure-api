@@ -15,6 +15,20 @@ export class UsersService {
     });
   }
 
+  async notifyUserUpdateWithProfile(args: { email: string }) {
+    const user = await this.findOne(args.email);
+
+    if (user) {
+      this.websocket.sendMessageToSocket({
+        email: args.email,
+        event: 'user_update',
+        payload: user,
+      });
+      return true;
+    }
+    return false;
+  }
+
   async create(createUserDto: CreateUserDto) {
     const newUser = await prisma.user.create({
       data: {
