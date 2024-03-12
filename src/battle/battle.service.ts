@@ -261,8 +261,8 @@ export class BattleService {
   }
 
   private getUserBattle(userEmail: string) {
-    const onGoingBattle = this.battleList.find(
-      (battle) => battle.users.find((u) => u.email === userEmail).email,
+    const onGoingBattle = this.battleList.find((battle) =>
+      battle.users.find((u) => u?.email === userEmail),
     );
     if (onGoingBattle) {
       return onGoingBattle;
