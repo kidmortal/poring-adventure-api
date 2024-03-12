@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { Battle, BattleDrop } from './entities/battle';
+import { Battle, BattleDrop, UserWithStats } from './entities/battle';
 import { MonstersService } from 'src/monsters/monsters.service';
 import { UsersService } from 'src/users/users.service';
 import { utils } from 'src/utils';
@@ -56,9 +56,19 @@ export class BattleService {
     const battle = this.getUserBattle(userEmail);
 
     if (!battle) {
+      let users: UserWithStats[] = [];
       const userData = await this.userService.findOne(userEmail);
+      if (userData.partyId) {
+        const fullPartyInfo = await this.userService.getFullParty(
+          userData.email,
+        );
+        const partyMembers = fullPartyInfo.members;
+        users = partyMembers;
+      } else {
+        users = [userData];
+      }
       const monsterData = await this.monsterService.findOne();
-      const users = [userData];
+
       const monsters = [monsterData];
       const attackerList = BattleUtils.generateBattleAttackOrder(
         users,
@@ -102,19 +112,12 @@ export class BattleService {
 
   async attack(userEmail: string) {
     const battle = this.getUserBattle(userEmail);
-    if (!battle) {
-      return false;
-    }
-    if (battle.battleFinished) {
-      return false;
-    }
+    if (!battle) return false;
+    if (battle.battleFinished) return false;
     this.processUserAttack({ battle, email: userEmail });
     const didBattleFinish = await this.settleBattleAndProcessRewards(battle);
-    if (didBattleFinish) {
-      return true;
-    }
-
-    return true;
+    if (didBattleFinish) return true;
+    return false;
   }
 
   private async settleBattleAndProcessRewards(battle: Battle) {
@@ -133,11 +136,11 @@ export class BattleService {
       return true;
     }
 
-    const dropedItems: { itemId: number; stack: number; item: Item }[] = [];
     const targetMonster = battle.monsters[0];
     battle.users.forEach((user) => {
       const silverGain = targetMonster.silver;
       const drops = targetMonster.drops;
+      const dropedItems: { itemId: number; stack: number; item: Item }[] = [];
 
       drops.forEach(({ chance, item, itemId, minAmount, maxAmount }) => {
         if (utils.isSuccess(chance)) {
