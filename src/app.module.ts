@@ -9,6 +9,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { MonstersModule } from './monsters/monsters.module';
 import { BattleModule } from './battle/battle.module';
 import { WebsocketModule } from './websocket/websocket.module';
+import { PartyModule } from './party/party.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { WebsocketModule } from './websocket/websocket.module';
     MonstersModule,
     BattleModule,
     WebsocketModule,
+    PartyModule,
   ],
   controllers: [],
   providers: [
