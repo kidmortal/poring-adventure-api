@@ -157,6 +157,7 @@ export class BattleService {
     const targetMonster = battle.monsters[0];
     battle.users.forEach((user) => {
       const silverGain = targetMonster.silver;
+      const expGain = targetMonster.exp;
       const drops = targetMonster.drops;
       const dropedItems: { itemId: number; stack: number; item: Item }[] = [];
 
@@ -174,6 +175,7 @@ export class BattleService {
       const battleDrop: BattleDrop = {
         userEmail: user.email,
         silver: silverGain,
+        exp: expGain,
         dropedItems: dropedItems,
       };
 
@@ -260,10 +262,6 @@ export class BattleService {
     const attackerList = args.battle.attackerList;
     const maxIndex = attackerList.length - 1;
 
-    console.log({
-      pastAttacker,
-      length: attackerList.length,
-    });
     if (pastAttacker < maxIndex) {
       return (args.battle.attackerTurn = pastAttacker + 1);
     } else if (pastAttacker === maxIndex) {

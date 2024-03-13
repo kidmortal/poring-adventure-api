@@ -223,6 +223,18 @@ export class UsersService {
       },
     });
   }
+  async addExpToUser(args: { userEmail: string; amount: number }) {
+    return prisma.stats.update({
+      where: {
+        userEmail: args.userEmail,
+      },
+      data: {
+        experience: {
+          increment: args.amount,
+        },
+      },
+    });
+  }
 
   async removeSilverFromUser(args: { userEmail: string; amount: number }) {
     return prisma.user.update({
