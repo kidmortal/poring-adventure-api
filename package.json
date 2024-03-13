@@ -32,6 +32,7 @@
     "@nestjs/platform-socket.io": "^10.3.3",
     "@nestjs/platform-ws": "^10.3.3",
     "@nestjs/schedule": "^4.0.1",
+    "@nestjs/serve-static": "^4.0.1",
     "@nestjs/throttler": "^5.1.2",
     "@nestjs/websockets": "^10.3.3",
     "@prisma/adapter-libsql": "^5.10.2",

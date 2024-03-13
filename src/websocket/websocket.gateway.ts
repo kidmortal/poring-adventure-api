@@ -3,9 +3,6 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   WebSocketServer,
-  SubscribeMessage,
-  ConnectedSocket,
-  MessageBody,
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { Server } from 'http';
