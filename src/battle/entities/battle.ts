@@ -31,6 +31,7 @@ export type BattleLog = {
 export type BattleDrop = {
   userEmail: string;
   silver: number;
+  exp: number;
   dropedItems: BattleUserDropedItem[];
 };
 

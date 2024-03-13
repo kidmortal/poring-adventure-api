@@ -1,14 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { CreateMonsterDto } from './dto/create-monster.dto';
-import { UpdateMonsterDto } from './dto/update-monster.dto';
+
 import { prisma } from 'src/prisma/prisma';
 
 @Injectable()
 export class MonstersService {
-  create(createMonsterDto: CreateMonsterDto) {
-    return 'This action adds a new monster';
-  }
-
   findAll() {
     return prisma.monster.findMany({
       include: {
@@ -22,7 +17,10 @@ export class MonstersService {
   }
 
   async findOne() {
+    const monsterCount = await prisma.monster.count();
+    const skip = Math.floor(Math.random() * monsterCount);
     return prisma.monster.findFirst({
+      skip,
       include: {
         drops: {
           include: {
@@ -31,10 +29,6 @@ export class MonstersService {
         },
       },
     });
-  }
-
-  update(id: number, updateMonsterDto: UpdateMonsterDto) {
-    return `This action updates a #${id} monster`;
   }
 
   remove(id: number) {
