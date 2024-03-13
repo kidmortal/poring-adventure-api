@@ -10,9 +10,15 @@ import { MonstersModule } from './monsters/monsters.module';
 import { BattleModule } from './battle/battle.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { PartyModule } from './party/party.module';
+import { MainController } from './main.controller';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
   imports: [
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'public'),
+    }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
@@ -29,7 +35,7 @@ import { PartyModule } from './party/party.module';
     WebsocketModule,
     PartyModule,
   ],
-  controllers: [],
+  controllers: [MainController],
   providers: [
     {
       provide: APP_GUARD,
