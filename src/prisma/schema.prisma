@@ -15,19 +15,20 @@ datasource db {
 }
 
 model User {
-  id         Int             @id @default(autoincrement())
-  email      String          @unique
-  name       String
-  classname  String
-  silver     Int             @default(20)
-  admin      Boolean         @default(false)
-  appearance Appearance?
-  stats      Stats?
-  equipment  EquippedItem[]
-  inventory  InventoryItem[]
-  market     MarketListing[]
-  partyId    Int?
-  Party      Party?          @relation(fields: [partyId], references: [id])
+  id            Int             @id @default(autoincrement())
+  email         String          @unique
+  name          String
+  classname     String
+  silver        Int             @default(20)
+  admin         Boolean         @default(false)
+  appearance    Appearance?
+  stats         Stats?
+  equipment     EquippedItem[]
+  inventory     InventoryItem[]
+  market        MarketListing[]
+  partyId       Int?
+  Party         Party?          @relation(fields: [partyId], references: [id])
+  notifications Notification[]
 }
 
 model Stats {
@@ -36,6 +37,8 @@ model Stats {
   experience Int    @default(1)
   health     Int    @default(20)
   maxHealth  Int    @default(20)
+  mana       Int    @default(20)
+  maxMana    Int    @default(20)
   attack     Int    @default(1)
   str        Int    @default(1)
   agi        Int    @default(1)
@@ -94,7 +97,11 @@ model Item {
   category  String
   image     String
   attack    Int?
+  str       Int?
+  agi       Int?
+  int       Int?
   health    Int?
+  mana      Int?
   equipped  EquippedItem[]
   inventory InventoryItem[]
   Drop      Drop[]
@@ -131,6 +138,19 @@ model Party {
 }
 
 model Profession {
-  id   Int    @id @default(autoincrement())
-  name String
+  id     Int    @id @default(autoincrement())
+  name   String
+  health Int    @default(1)
+  mana   Int    @default(1)
+  str    Int    @default(1)
+  agi    Int    @default(1)
+  int    Int    @default(1)
+}
+
+model Notification {
+  id         Int     @id @default(autoincrement())
+  content    String
+  visualized Boolean
+  user       User    @relation(fields: [userId], references: [id])
+  userId     Int
 }
