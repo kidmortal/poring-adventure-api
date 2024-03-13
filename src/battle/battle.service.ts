@@ -215,9 +215,12 @@ export class BattleService {
       const userDamage = user.stats.attack;
       const targetMonster = args.battle.monsters[0];
       targetMonster.health -= userDamage;
-      args.battle.log.push(
-        `${user.name} Dealt ${userDamage} damage to ${targetMonster.name}`,
-      );
+      this.pushLog({
+        battle: args.battle,
+        log: `${user.name} Dealt ${userDamage} damage to ${targetMonster.name}`,
+        icon: 'attack',
+      });
+
       this.processNextTurn({ battle: args.battle });
       this.notifyUsers(args.battle);
       return true;
@@ -235,14 +238,16 @@ export class BattleService {
     const isMonsterAlive = monster?.health > 0;
 
     if (monster && isMonsterAlive) {
-      console.log('imma fire mah laser');
       const monsterDamage = monster.attack;
       const targetUser = args.battle.users[0];
       targetUser.stats.health -= monsterDamage;
 
-      args.battle.log.push(
-        `${monster.name} Dealt ${monsterDamage} damage to ${targetUser.name}`,
-      );
+      this.pushLog({
+        battle: args.battle,
+        log: `${monster.name} Dealt ${monsterDamage} damage to ${targetUser.name}`,
+        icon: 'attack',
+      });
+
       this.processNextTurn({ battle: args.battle });
       this.notifyUsers(args.battle);
       return true;
@@ -281,5 +286,17 @@ export class BattleService {
     });
 
     return userBattle;
+  }
+
+  private pushLog({
+    battle,
+    log,
+    icon,
+  }: {
+    battle: Battle;
+    log: string;
+    icon?: string;
+  }) {
+    battle.log.push({ message: log, icon });
   }
 }

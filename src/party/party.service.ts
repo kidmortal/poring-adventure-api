@@ -40,6 +40,23 @@ export class PartyService {
     }
     return false;
   }
+  async notifyPartyJoinMember(args: {
+    email: string;
+    joinedPlayerName: string;
+  }) {
+    const party = await this.getUserParty(args);
+    if (party) {
+      party.members.forEach((member) => {
+        this.websocket.sendMessageToSocket({
+          email: member.email,
+          event: 'notification',
+          payload: `${args.joinedPlayerName} Joined the party`,
+        });
+      });
+      return party;
+    }
+    return false;
+  }
 
   async create(args: { email: string }) {
     const userHasParty = await this.userHasParty({ email: args.email });
@@ -93,6 +110,10 @@ export class PartyService {
         data: { partyId: args.partyId },
       });
       if (result) {
+        this.notifyPartyJoinMember({
+          email: args.email,
+          joinedPlayerName: result.name,
+        });
         this.notifyPartyWithData({ email: args.email });
         return true;
       }
