@@ -19,8 +19,13 @@ export type Battle = {
   attackerList: string[];
   battleFinished: boolean;
   userLost: boolean;
-  log: string[];
+  log: BattleLog[];
   drops: BattleDrop[];
+};
+
+export type BattleLog = {
+  icon?: string;
+  message: string;
 };
 
 export type BattleDrop = {
