@@ -23,12 +23,15 @@ model User {
   admin         Boolean         @default(false)
   appearance    Appearance?
   stats         Stats?
+  profession    Profession?     @relation(fields: [professionId], references: [id])
+  professionId  Int?
   equipment     EquippedItem[]
   inventory     InventoryItem[]
   market        MarketListing[]
-  partyId       Int?
   Party         Party?          @relation(fields: [partyId], references: [id])
+  partyId       Int?
   notifications Notification[]
+  learnedSkills LearnedSkill[]
 }
 
 model Stats {
@@ -138,13 +141,42 @@ model Party {
 }
 
 model Profession {
-  id     Int    @id @default(autoincrement())
+  id     Int     @id @default(autoincrement())
   name   String
-  health Int    @default(1)
-  mana   Int    @default(1)
-  str    Int    @default(1)
-  agi    Int    @default(1)
-  int    Int    @default(1)
+  health Int     @default(1)
+  mana   Int     @default(1)
+  str    Int     @default(1)
+  agi    Int     @default(1)
+  int    Int     @default(1)
+  skills Skill[]
+  User   User[]
+}
+
+model Skill {
+  id            Int            @id @default(autoincrement())
+  requiredLevel Int            @default(1)
+  manaCost      Int            @default(1)
+  category      String         @default("targetEnemy")
+  effect        String?
+  name          String
+  image         String
+  attribute     String
+  multiplier    Int            @default(1)
+  profession    Profession     @relation(fields: [professionId], references: [id])
+  professionId  Int
+  LearnedSkill  LearnedSkill[]
+}
+
+model LearnedSkill {
+  id           Int     @id @default(autoincrement())
+  user         User    @relation(fields: [userEmail], references: [email])
+  userEmail    String
+  skill        Skill   @relation(fields: [skillId], references: [id])
+  skillId      Int
+  masteryLevel Int
+  equipped     Boolean
+
+  @@unique([userEmail, skillId])
 }
 
 model Notification {
