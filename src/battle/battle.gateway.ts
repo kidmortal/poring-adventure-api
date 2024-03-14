@@ -2,6 +2,7 @@ import {
   WebSocketGateway,
   SubscribeMessage,
   ConnectedSocket,
+  MessageBody,
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
@@ -38,5 +39,14 @@ export class BattleGateway {
     const email = client.handshake.auth.email;
     this.logger.debug(`battle_attack ${email}`);
     return this.battleService.attack(email);
+  }
+  @SubscribeMessage('battle_cast')
+  async cast(
+    @MessageBody() skillId: number,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`battle_cast ${email}`);
+    return this.battleService.cast({ email, skillId });
   }
 }

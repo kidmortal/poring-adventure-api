@@ -95,6 +95,17 @@ export class BattleService {
     }
     return false;
   }
+  async cast(args: { email: string; skillId: number }) {
+    const battle = this.getUserBattle(args.email);
+    if (!battle) return false;
+    if (battle.battleFinished) return false;
+    const didAttack = await battle.processUserCast(args);
+    if (didAttack) {
+      const didBattleFinish = await this.settleBattleAndProcessRewards(battle);
+      if (didBattleFinish) return true;
+    }
+    return false;
+  }
 
   private async settleBattleAndProcessRewards(battle: BattleInstance) {
     const monsterAlive = battle.isMonsterAlive;

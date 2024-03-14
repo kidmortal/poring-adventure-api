@@ -72,6 +72,7 @@ export class UsersService {
           include: {
             appearance: true,
             stats: true,
+            learnedSkills: { include: { skill: true } },
           },
         },
       },
