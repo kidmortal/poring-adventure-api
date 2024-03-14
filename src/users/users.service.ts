@@ -15,6 +15,14 @@ export class UsersService {
     });
   }
 
+  async notifyUserError(args: { email: string; errorMessage: any }) {
+    return this.websocket.sendMessageToSocket({
+      email: args.email,
+      event: 'error_notification',
+      payload: args.errorMessage,
+    });
+  }
+
   async notifyUserUpdateWithProfile(args: { email: string }) {
     const user = await this.findOne(args.email);
 
@@ -33,7 +41,6 @@ export class UsersService {
     const newUser = await prisma.user.create({
       data: {
         name: createUserDto.name,
-        classname: createUserDto.costume,
         email: createUserDto.email,
         appearance: {
           create: {
