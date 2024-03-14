@@ -13,6 +13,7 @@ import { PartyModule } from './party/party.module';
 import { MainController } from './main.controller';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { SkillsModule } from './skills/skills.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { join } from 'path';
     BattleModule,
     WebsocketModule,
     PartyModule,
+    SkillsModule,
   ],
   controllers: [MainController],
   providers: [
