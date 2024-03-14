@@ -109,13 +109,18 @@ export class UsersService {
     return user.admin;
   }
 
-  async updateUserHealth(args: { userEmail: string; amount: number }) {
+  async updateUserHealthMana(args: {
+    userEmail: string;
+    health: number;
+    mana: number;
+  }) {
     return prisma.stats.update({
       where: {
         userEmail: args.userEmail,
       },
       data: {
-        health: args.amount,
+        health: args.health,
+        mana: args.mana,
       },
     });
   }
@@ -154,6 +159,46 @@ export class UsersService {
         data: {
           health: {
             set: finalHealth,
+          },
+        },
+      });
+    }
+  }
+
+  async decrementUserMana(args: { userEmail: string; amount: number }) {
+    return prisma.stats.update({
+      where: {
+        userEmail: args.userEmail,
+      },
+      data: {
+        mana: {
+          decrement: args.amount,
+        },
+      },
+    });
+  }
+
+  async incrementUserMana(args: { userEmail: string; amount: number }) {
+    const currentStats = await prisma.stats.findUnique({
+      where: {
+        userEmail: args.userEmail,
+      },
+    });
+
+    if (currentStats) {
+      const maxMana = currentStats.maxMana;
+      const currentMana = currentStats.mana;
+      let finalMana = currentMana + args.amount;
+      if (finalMana > maxMana) {
+        finalMana = maxMana;
+      }
+      return prisma.stats.update({
+        where: {
+          userEmail: args.userEmail,
+        },
+        data: {
+          mana: {
+            set: finalMana,
           },
         },
       });
