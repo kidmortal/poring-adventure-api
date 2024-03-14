@@ -11,6 +11,11 @@ import { BattleUtils } from '../battleUtils';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import { utils } from 'src/utils';
 
+enum SkillCategory {
+  TargetEnemy = 'target_enemy',
+  TargetAlly = 'target_ally',
+}
+
 export type MonsterWithDrops = Monster & {
   drops: DropWithItem[];
 };
@@ -125,21 +130,65 @@ export class BattleInstance {
     if (isUserTurn) {
       const user = this.getUserFromBattle(args.email);
       const skill = this.getSkillFromUser(args);
-      const userAttribute: number = user.stats[skill.skill.attribute];
-      const multiplier = skill.skill.multiplier * skill.masteryLevel;
-      const userDamage = user.stats.attack + userAttribute * multiplier;
-      const targetMonster = this.monsters[0];
-      user.stats.mana -= skill.skill.manaCost;
-      targetMonster.health -= userDamage;
-      this.pushLog({
-        log: `${user.name} Dealt ${userDamage} damage to ${targetMonster.name}`,
-        icon: skill.skill.image,
-      });
-      this.processNextTurn();
-      this.notifyUsers();
-      return true;
+      switch (skill.skill.category) {
+        case SkillCategory.TargetEnemy:
+          return this.processCastTargetEnemy({ user, skill });
+        case SkillCategory.TargetAlly:
+          return this.processCastTargetAlly({ user, skill });
+
+        default:
+          return this.processCastTargetEnemy({ user, skill });
+      }
     }
     return false;
+  }
+
+  private async processCastTargetEnemy(args: {
+    user: UserWithStats;
+    skill: LearnedSkillWithSkill;
+  }) {
+    const userAttribute: number = args.user.stats[args.skill.skill.attribute];
+    const multiplier = args.skill.skill.multiplier * args.skill.masteryLevel;
+    const userDamage = args.user.stats.attack + userAttribute * multiplier;
+    const targetMonster = this.monsters[0];
+    args.user.stats.mana -= args.skill.skill.manaCost;
+    targetMonster.health -= userDamage;
+    this.pushLog({
+      log: `${args.user.name} Dealt ${userDamage} damage to ${targetMonster.name}`,
+      icon: args.skill.skill.image,
+    });
+    this.processNextTurn();
+    this.notifyUsers();
+    return true;
+  }
+
+  private async processCastTargetAlly(args: {
+    user: UserWithStats;
+    skill: LearnedSkillWithSkill;
+  }) {
+    const userAttribute: number = args.user.stats[args.skill.skill.attribute];
+    const multiplier = args.skill.skill.multiplier * args.skill.masteryLevel;
+    const userHealing = userAttribute * multiplier;
+    const targetAlly = this.getLowestHealthMember();
+    args.user.stats.mana -= args.skill.skill.manaCost;
+    targetAlly.stats.health += userHealing;
+    this.pushLog({
+      log: `${args.user.name} Healed ${targetAlly.name} by ${userHealing} Points`,
+      icon: args.skill.skill.image,
+    });
+    this.processNextTurn();
+    this.notifyUsers();
+    return true;
+  }
+
+  private getLowestHealthMember() {
+    let lowestUser = this.users[0];
+    this.users.forEach((user) => {
+      if (user.stats.health < lowestUser.stats.health) {
+        lowestUser = user;
+      }
+    });
+    return lowestUser;
   }
 
   private async processMonsterAttack() {

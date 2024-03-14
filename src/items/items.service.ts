@@ -76,6 +76,12 @@ export class ItemsService {
             amount: item.health,
           });
         }
+        if (item.mana) {
+          await this.userService.incrementUserMana({
+            userEmail: args.userEmail,
+            amount: item.mana,
+          });
+        }
         await this.removeItemFromUser(args);
         return true;
       }

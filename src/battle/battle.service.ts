@@ -140,11 +140,14 @@ export class BattleService {
     } of battle.droppedItems) {
       const rewardUser = battle.getUserFromBattle(userEmail);
       const remainingHealth = rewardUser.stats.health;
+      const remainingMana = rewardUser.stats.mana;
       await this.userService.addSilverToUser({ userEmail, amount: silver });
-      await this.userService.updateUserHealth({
+      await this.userService.updateUserHealthMana({
         userEmail,
-        amount: remainingHealth,
+        health: remainingHealth,
+        mana: remainingMana,
       });
+
       for await (const { itemId, stack } of dropedItems) {
         await this.itemService.addItemToUser({ userEmail, itemId, stack });
       }
