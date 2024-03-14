@@ -171,7 +171,7 @@ export class BattleInstance {
     const userHealing = userAttribute * multiplier;
     const targetAlly = this.getLowestHealthMember();
     args.user.stats.mana -= args.skill.skill.manaCost;
-    targetAlly.stats.health += userHealing;
+    this.healUser({ user: targetAlly, amount: userHealing });
     this.pushLog({
       log: `${args.user.name} Healed ${targetAlly.name} by ${userHealing} Points`,
       icon: args.skill.skill.image,
@@ -184,11 +184,24 @@ export class BattleInstance {
   private getLowestHealthMember() {
     let lowestUser = this.users[0];
     this.users.forEach((user) => {
-      if (user.stats.health < lowestUser.stats.health) {
+      const currentLowestPercentage = Math.floor(
+        (lowestUser.stats.health / lowestUser.stats.maxHealth) * 100,
+      );
+      const currentPercentage = Math.floor(
+        (user.stats.health / user.stats.maxHealth) * 100,
+      );
+      if (currentPercentage < currentLowestPercentage) {
         lowestUser = user;
       }
     });
     return lowestUser;
+  }
+
+  private async healUser(args: { user: UserWithStats; amount: number }) {
+    args.user.stats.health += args.amount;
+    if (args.user.stats.health > args.user.stats.maxHealth) {
+      args.user.stats.health = args.user.stats.maxHealth;
+    }
   }
 
   private async processMonsterAttack() {
