@@ -208,7 +208,11 @@ export class UsersService {
   async increaseUserStats(args: {
     userEmail: string;
     health?: number;
+    mana?: number;
     attack?: number;
+    str?: number;
+    int?: number;
+    agi?: number;
   }) {
     return prisma.stats.update({
       where: {
@@ -218,8 +222,20 @@ export class UsersService {
         maxHealth: {
           increment: args.health ?? 0,
         },
+        maxMana: {
+          increment: args.mana ?? 0,
+        },
         attack: {
           increment: args.attack ?? 0,
+        },
+        str: {
+          increment: args.str ?? 0,
+        },
+        agi: {
+          increment: args.agi ?? 0,
+        },
+        int: {
+          increment: args.int ?? 0,
         },
       },
     });
@@ -227,7 +243,11 @@ export class UsersService {
   async decreaseUserStats(args: {
     userEmail: string;
     health?: number;
+    mana?: number;
     attack?: number;
+    str?: number;
+    int?: number;
+    agi?: number;
   }) {
     return prisma.stats.update({
       where: {
@@ -237,8 +257,20 @@ export class UsersService {
         maxHealth: {
           decrement: args.health ?? 0,
         },
+        maxMana: {
+          decrement: args.mana ?? 0,
+        },
         attack: {
           decrement: args.attack ?? 0,
+        },
+        str: {
+          decrement: args.str ?? 0,
+        },
+        agi: {
+          decrement: args.agi ?? 0,
+        },
+        int: {
+          decrement: args.int ?? 0,
         },
       },
     });

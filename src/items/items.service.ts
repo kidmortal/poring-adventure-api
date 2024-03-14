@@ -199,6 +199,10 @@ export class ItemsService {
       userEmail: args.userEmail,
       health: args.itemInfo.health,
       attack: args.itemInfo.attack,
+      mana: args.itemInfo.mana,
+      str: args.itemInfo.str,
+      agi: args.itemInfo.agi,
+      int: args.itemInfo.int,
     });
 
     return prisma.equippedItem.create({
@@ -217,6 +221,10 @@ export class ItemsService {
       userEmail: args.userEmail,
       health: args.itemInfo.health,
       attack: args.itemInfo.attack,
+      mana: args.itemInfo.mana,
+      str: args.itemInfo.str,
+      agi: args.itemInfo.agi,
+      int: args.itemInfo.int,
     });
 
     return prisma.equippedItem.delete({
