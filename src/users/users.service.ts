@@ -33,11 +33,11 @@ export class UsersService {
     const newUser = await prisma.user.create({
       data: {
         name: createUserDto.name,
-        classname: createUserDto.classname,
+        classname: createUserDto.costume,
         email: createUserDto.email,
         appearance: {
           create: {
-            costume: createUserDto.classname,
+            costume: createUserDto.costume,
             gender: createUserDto.gender,
             head: '1',
           },
@@ -45,6 +45,7 @@ export class UsersService {
         stats: {
           create: { experience: 1 },
         },
+        professionId: createUserDto.professionId,
       },
     });
     return newUser;
@@ -58,6 +59,14 @@ export class UsersService {
       },
       include: {
         appearance: true,
+      },
+    });
+  }
+
+  getAllProfessions() {
+    return prisma.profession.findMany({
+      include: {
+        skills: true,
       },
     });
   }

@@ -9,6 +9,7 @@ import { Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
+import { CreateUserDto } from './dto/create-user.dto';
 
 @WebSocketGateway({ cors: true })
 export class UserGateway {
@@ -43,6 +44,16 @@ export class UserGateway {
     return users;
   }
 
+  @SubscribeMessage('create_user')
+  async create(
+    @MessageBody() createUserDto: CreateUserDto,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('create_user');
+    return this.userService.create({ ...createUserDto, email: email });
+  }
+
   @SubscribeMessage('get_all_sockets')
   async getAllSockets(@ConnectedSocket() client: Socket) {
     this.logger.debug('get_all_sockets');
@@ -52,6 +63,12 @@ export class UserGateway {
       return this.websocket.breakUserConnection(email);
     }
     return this.websocket.getAllSockets();
+  }
+
+  @SubscribeMessage('get_all_professions')
+  async getAllClasses() {
+    this.logger.debug('get_all_professions');
+    return this.userService.getAllProfessions();
   }
 
   @SubscribeMessage('message_socket')

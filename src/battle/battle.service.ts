@@ -109,7 +109,7 @@ export class BattleService {
 
   private async settleBattleAndProcessRewards(battle: BattleInstance) {
     const monsterAlive = battle.isMonsterAlive;
-    const userAlive = battle.isPlayerAlive;
+    const userAlive = battle.isPlayersAlive;
     if (monsterAlive && userAlive) {
       battle.notifyUsers();
       return false;

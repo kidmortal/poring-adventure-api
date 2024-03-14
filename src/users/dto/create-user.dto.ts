@@ -11,7 +11,10 @@ export class CreateUserDto {
   name: string;
 
   @IsNotEmpty()
-  classname: string;
+  professionId: number;
+
+  @IsNotEmpty()
+  costume: string;
 
   // appearance
   @IsIn(ALLOWED_GENDERS)
