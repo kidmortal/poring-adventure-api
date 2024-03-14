@@ -53,9 +53,9 @@ model Stats {
 model InventoryItem {
   id            Int            @id @default(autoincrement())
   stack         Int
-  user          User           @relation(fields: [userEmail], references: [email])
+  user          User           @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   userEmail     String
-  item          Item           @relation(fields: [itemId], references: [id])
+  item          Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
   itemId        Int
   marketListing MarketListing?
 
@@ -64,9 +64,9 @@ model InventoryItem {
 
 model EquippedItem {
   id        Int    @id @default(autoincrement())
-  user      User   @relation(fields: [userEmail], references: [email])
+  user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   userEmail String
-  item      Item   @relation(fields: [itemId], references: [id])
+  item      Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
   itemId    Int
 
   @@unique([userEmail, itemId])
@@ -85,7 +85,7 @@ model MarketListing {
   id          Int           @id @default(autoincrement())
   price       Int
   stack       Int
-  inventory   InventoryItem @relation(fields: [inventoryId], references: [id])
+  inventory   InventoryItem @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
   inventoryId Int           @unique
   seller      User          @relation(fields: [sellerEmail], references: [email], onDelete: Cascade)
   sellerEmail String
@@ -141,15 +141,16 @@ model Party {
 }
 
 model Profession {
-  id     Int     @id @default(autoincrement())
-  name   String
-  health Int     @default(1)
-  mana   Int     @default(1)
-  str    Int     @default(1)
-  agi    Int     @default(1)
-  int    Int     @default(1)
-  skills Skill[]
-  User   User[]
+  id      Int     @id @default(autoincrement())
+  name    String
+  costume String  @default("none")
+  health  Int     @default(1)
+  mana    Int     @default(1)
+  str     Int     @default(1)
+  agi     Int     @default(1)
+  int     Int     @default(1)
+  skills  Skill[]
+  User    User[]
 }
 
 model Skill {
@@ -169,9 +170,9 @@ model Skill {
 
 model LearnedSkill {
   id           Int     @id @default(autoincrement())
-  user         User    @relation(fields: [userEmail], references: [email])
+  user         User    @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   userEmail    String
-  skill        Skill   @relation(fields: [skillId], references: [id])
+  skill        Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
   skillId      Int
   masteryLevel Int
   equipped     Boolean

@@ -26,6 +26,7 @@ export type DropWithItem = Drop & {
 
 export type UserWithStats = User & {
   stats: Stats;
+  isDead?: boolean;
   learnedSkills: LearnedSkillWithSkill[];
 };
 
@@ -85,8 +86,13 @@ export class BattleInstance {
   get isMonsterAlive() {
     return this.monsters[0].health > 0;
   }
-  get isPlayerAlive() {
-    return this.users[0].stats.health > 0;
+  get isPlayersAlive() {
+    const aliveUsers = this.users.filter((u) => !u.isDead);
+    if (aliveUsers.length > 0) {
+      return true;
+    } else {
+      return false;
+    }
   }
 
   constructor({ monsters, users, socket }: CreateBattleParams) {
@@ -203,6 +209,13 @@ export class BattleInstance {
       args.user.stats.health = args.user.stats.maxHealth;
     }
   }
+  private async damageUser(args: { user: UserWithStats; amount: number }) {
+    args.user.stats.health -= args.amount;
+    if (args.user.stats.health <= 0) {
+      args.user.stats.health = 0;
+      args.user.isDead = true;
+    }
+  }
 
   private async processMonsterAttack() {
     const attackerList = this.attackerList;
@@ -214,8 +227,9 @@ export class BattleInstance {
 
     if (monster && isMonsterAlive) {
       const monsterDamage = monster.attack;
-      const targetUser = this.users[0];
-      targetUser.stats.health -= monsterDamage;
+      const random = Math.floor(Math.random() * this.users.length);
+      const targetUser = this.users[random];
+      this.damageUser({ user: targetUser, amount: monsterDamage });
 
       this.pushLog({
         log: `${monster.name} Dealt ${monsterDamage} damage to ${targetUser.name}`,

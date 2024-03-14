@@ -178,7 +178,16 @@ export class PartyService {
     if (!args.email) return undefined;
     const userParty = await prisma.party.findFirst({
       where: { members: { some: { email: args.email } } },
-      include: { members: { include: { stats: true, appearance: true } } },
+      include: {
+        members: {
+          include: {
+            stats: true,
+            appearance: true,
+            profession: true,
+            learnedSkills: { include: { skill: true } },
+          },
+        },
+      },
     });
     if (userParty) {
       return userParty;
