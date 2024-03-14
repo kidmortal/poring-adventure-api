@@ -1,4 +1,12 @@
-import { Drop, Item, Monster, Stats, User } from '@prisma/client';
+import {
+  Drop,
+  Item,
+  LearnedSkill,
+  Monster,
+  Skill,
+  Stats,
+  User,
+} from '@prisma/client';
 import { BattleUtils } from '../battleUtils';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import { utils } from 'src/utils';
@@ -13,6 +21,11 @@ export type DropWithItem = Drop & {
 
 export type UserWithStats = User & {
   stats: Stats;
+  learnedSkills: LearnedSkillWithSkill[];
+};
+
+type LearnedSkillWithSkill = LearnedSkill & {
+  skill: Skill;
 };
 
 export type Battle = {
@@ -88,20 +101,40 @@ export class BattleInstance {
   }
 
   async processUserAttack(args: { email: string }) {
-    const user = this.users.find((u) => u.email === args.email);
-    const attackerList = this.attackerList;
-    const attackerIndex = this.attackerTurn;
-    const attacker = attackerList[attackerIndex];
+    const isUserTurn = this.isUserTurn(args);
 
-    if (user && attacker === user.name) {
+    if (isUserTurn) {
+      const user = this.getUserFromBattle(args.email);
       const userDamage = user.stats.attack;
       const targetMonster = this.monsters[0];
       targetMonster.health -= userDamage;
       this.pushLog({
         log: `${user.name} Dealt ${userDamage} damage to ${targetMonster.name}`,
-        icon: 'attack',
+        icon: 'https://kidmortal.sirv.com/skills/attack.webp',
       });
 
+      this.processNextTurn();
+      this.notifyUsers();
+      return true;
+    }
+    return false;
+  }
+
+  async processUserCast(args: { email: string; skillId: number }) {
+    const isUserTurn = this.isUserTurn(args);
+    if (isUserTurn) {
+      const user = this.getUserFromBattle(args.email);
+      const skill = this.getSkillFromUser(args);
+      const userAttribute: number = user.stats[skill.skill.attribute];
+      const multiplier = skill.skill.multiplier * skill.masteryLevel;
+      const userDamage = user.stats.attack + userAttribute * multiplier;
+      const targetMonster = this.monsters[0];
+      user.stats.mana -= skill.skill.manaCost;
+      targetMonster.health -= userDamage;
+      this.pushLog({
+        log: `${user.name} Dealt ${userDamage} damage to ${targetMonster.name}`,
+        icon: skill.skill.image,
+      });
       this.processNextTurn();
       this.notifyUsers();
       return true;
@@ -124,7 +157,7 @@ export class BattleInstance {
 
       this.pushLog({
         log: `${monster.name} Dealt ${monsterDamage} damage to ${targetUser.name}`,
-        icon: 'attack',
+        icon: 'https://kidmortal.sirv.com/skills/attack.webp',
       });
 
       this.processNextTurn();
@@ -146,6 +179,26 @@ export class BattleInstance {
     } else {
       return this.attackerTurn - 1;
     }
+  }
+
+  private isUserTurn(args: { email: string }) {
+    const user = this.getUserFromBattle(args.email);
+    const attackerList = this.attackerList;
+    const attackerIndex = this.attackerTurn;
+    const attacker = attackerList[attackerIndex];
+
+    return user && attacker === user.name;
+  }
+
+  private getSkillFromUser(args: { email: string; skillId: number }) {
+    const user = this.getUserFromBattle(args.email);
+    const castingSkill = user.learnedSkills.find(
+      (skill) => skill.skillId === args.skillId,
+    );
+    if (castingSkill) {
+      return castingSkill;
+    }
+    return undefined;
   }
 
   toJson() {
