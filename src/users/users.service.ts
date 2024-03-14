@@ -88,6 +88,8 @@ export class UsersService {
         appearance: true,
         inventory: { include: { item: true, marketListing: true } },
         equipment: { include: { item: true } },
+        profession: { include: { skills: true } },
+        learnedSkills: { include: { skill: true } },
         stats: true,
       },
     });
