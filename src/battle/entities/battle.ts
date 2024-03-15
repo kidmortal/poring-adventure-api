@@ -16,6 +16,11 @@ enum SkillCategory {
   TargetAlly = 'target_ally',
 }
 
+enum SkillEffect {
+  Healing = 'healing',
+  Infusion = 'infusion',
+}
+
 export type MonsterWithDrops = Monster & {
   drops: DropWithItem[];
 };
@@ -178,17 +183,45 @@ export class BattleInstance {
   }) {
     const userAttribute: number = args.user.stats[args.skill.skill.attribute];
     const multiplier = args.skill.skill.multiplier * args.skill.masteryLevel;
-    const userHealing = utils.randomDamage(userAttribute * multiplier, 20);
-    const targetAlly = this.getLowestHealthMember();
+    const potency = utils.randomDamage(userAttribute * multiplier, 20);
     args.user.stats.mana -= args.skill.skill.manaCost;
-    this.healUser({ user: targetAlly, amount: userHealing });
-    this.pushLog({
-      log: `${args.user.name} Healed ${targetAlly.name} by ${userHealing} Points`,
-      icon: args.skill.skill.image,
-    });
+    if (args.skill.skill.effect === SkillEffect.Healing) {
+      const targetAlly = this.getLowestHealthMember();
+      this.healUser({ user: targetAlly, amount: potency });
+      this.pushLog({
+        log: `${args.user.name} Healed ${targetAlly.name} by ${potency} Health Points`,
+        icon: args.skill.skill.image,
+      });
+    }
+
+    if (args.skill.skill.effect === SkillEffect.Infusion) {
+      const targetAlly = this.getLowestManaMember();
+      this.infuseUser({ user: targetAlly, amount: potency });
+      this.pushLog({
+        log: `${args.user.name} Infused ${targetAlly.name} by ${potency} Mana Points`,
+        icon: args.skill.skill.image,
+      });
+    }
+
     this.processNextTurn();
     this.notifyUsers();
     return true;
+  }
+
+  private getLowestManaMember() {
+    let lowestUser = this.users[0];
+    this.users.forEach((user) => {
+      const currentLowestPercentage = Math.floor(
+        (lowestUser.stats.mana / lowestUser.stats.maxMana) * 100,
+      );
+      const currentPercentage = Math.floor(
+        (user.stats.mana / user.stats.maxMana) * 100,
+      );
+      if (currentPercentage < currentLowestPercentage) {
+        lowestUser = user;
+      }
+    });
+    return lowestUser;
   }
 
   private getLowestHealthMember() {
@@ -211,6 +244,12 @@ export class BattleInstance {
     args.user.stats.health += args.amount;
     if (args.user.stats.health > args.user.stats.maxHealth) {
       args.user.stats.health = args.user.stats.maxHealth;
+    }
+  }
+  private async infuseUser(args: { user: UserWithStats; amount: number }) {
+    args.user.stats.mana += args.amount;
+    if (args.user.stats.mana > args.user.stats.maxMana) {
+      args.user.stats.mana = args.user.stats.maxMana;
     }
   }
   private async damageUser(args: { user: UserWithStats; amount: number }) {
