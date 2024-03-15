@@ -54,6 +54,13 @@ export class UserGateway {
     return this.userService.create({ ...createUserDto, email: email });
   }
 
+  @SubscribeMessage('delete_user')
+  async remove(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('delete_user');
+    return this.userService.deleteUser(email);
+  }
+
   @SubscribeMessage('get_all_sockets')
   async getAllSockets(@ConnectedSocket() client: Socket) {
     this.logger.debug('get_all_sockets');

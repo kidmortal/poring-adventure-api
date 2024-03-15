@@ -114,7 +114,6 @@ export class BattleService {
       battle.notifyUsers();
       return false;
     }
-    console.log('finished');
     battle.battleFinished = true;
     if (monsterAlive && !userAlive) {
       this.logger.log('User lost battle, skipping updates');
