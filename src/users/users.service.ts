@@ -3,6 +3,8 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { prisma } from 'src/prisma/prisma';
 import { WebsocketService } from 'src/websocket/websocket.service';
+import { UserWithStats } from 'src/battle/entities/battle';
+import { utils } from 'src/utils';
 
 @Injectable()
 export class UsersService {
@@ -223,6 +225,7 @@ export class UsersService {
 
   async increaseUserStats(args: {
     userEmail: string;
+    level?: number;
     health?: number;
     mana?: number;
     attack?: number;
@@ -235,29 +238,19 @@ export class UsersService {
         userEmail: args.userEmail,
       },
       data: {
-        maxHealth: {
-          increment: args.health ?? 0,
-        },
-        maxMana: {
-          increment: args.mana ?? 0,
-        },
-        attack: {
-          increment: args.attack ?? 0,
-        },
-        str: {
-          increment: args.str ?? 0,
-        },
-        agi: {
-          increment: args.agi ?? 0,
-        },
-        int: {
-          increment: args.int ?? 0,
-        },
+        level: { increment: args.level ?? 0 },
+        maxHealth: { increment: args.health ?? 0 },
+        maxMana: { increment: args.mana ?? 0 },
+        attack: { increment: args.attack ?? 0 },
+        str: { increment: args.str ?? 0 },
+        agi: { increment: args.agi ?? 0 },
+        int: { increment: args.int ?? 0 },
       },
     });
   }
   async decreaseUserStats(args: {
     userEmail: string;
+    level?: number;
     health?: number;
     mana?: number;
     attack?: number;
@@ -270,24 +263,13 @@ export class UsersService {
         userEmail: args.userEmail,
       },
       data: {
-        maxHealth: {
-          decrement: args.health ?? 0,
-        },
-        maxMana: {
-          decrement: args.mana ?? 0,
-        },
-        attack: {
-          decrement: args.attack ?? 0,
-        },
-        str: {
-          decrement: args.str ?? 0,
-        },
-        agi: {
-          decrement: args.agi ?? 0,
-        },
-        int: {
-          decrement: args.int ?? 0,
-        },
+        level: { decrement: args.level ?? 0 },
+        maxHealth: { decrement: args.health ?? 0 },
+        maxMana: { decrement: args.mana ?? 0 },
+        attack: { decrement: args.attack ?? 0 },
+        str: { decrement: args.str ?? 0 },
+        agi: { decrement: args.agi ?? 0 },
+        int: { decrement: args.int ?? 0 },
       },
     });
   }
@@ -306,7 +288,17 @@ export class UsersService {
     });
     return deletedUser;
   }
-
+  async addExpSilver(args: { userEmail: string; exp: number; silver: number }) {
+    return prisma.user.update({
+      where: {
+        email: args.userEmail,
+      },
+      data: {
+        silver: { increment: args.silver },
+        stats: { update: { experience: { increment: args.exp } } },
+      },
+    });
+  }
   async addSilverToUser(args: { userEmail: string; amount: number }) {
     return prisma.user.update({
       where: {
@@ -358,6 +350,82 @@ export class UsersService {
       userEmail: args.receiverEmail,
       amount: args.amount,
     });
+  }
+
+  async increaseUserLevel(args: { userEmail: string; amount: number }) {
+    const increaseAmount = args.amount;
+    const user = await prisma.user.findUnique({
+      where: { email: args.userEmail },
+      include: { profession: true },
+    });
+    const profession = user.profession;
+    const healthIncrease = profession.health * increaseAmount;
+    const manaIncrease = profession.mana * increaseAmount;
+    const strIncrease = profession.str * increaseAmount;
+    const agiIncrease = profession.agi * increaseAmount;
+    const intIncrease = profession.int * increaseAmount;
+    await this.increaseUserStats({
+      userEmail: args.userEmail,
+      level: increaseAmount,
+      health: healthIncrease,
+      mana: manaIncrease,
+      str: strIncrease,
+      agi: agiIncrease,
+      int: intIncrease,
+    });
+  }
+
+  async decreaseUserLevel(args: { userEmail: string; amount: number }) {
+    const decreaseAmount = args.amount;
+    const user = await prisma.user.findUnique({
+      where: { email: args.userEmail },
+      include: { profession: true },
+    });
+    const profession = user.profession;
+    const healthIncrease = profession.health * decreaseAmount;
+    const manaIncrease = profession.mana * decreaseAmount;
+    const strIncrease = profession.str * decreaseAmount;
+    const agiIncrease = profession.agi * decreaseAmount;
+    const intIncrease = profession.int * decreaseAmount;
+    await this.decreaseUserStats({
+      userEmail: args.userEmail,
+      level: decreaseAmount,
+      health: healthIncrease,
+      mana: manaIncrease,
+      str: strIncrease,
+      agi: agiIncrease,
+      int: intIncrease,
+    });
+  }
+
+  async levelUpUser({
+    user,
+    expGain,
+  }: {
+    user: UserWithStats;
+    expGain: number;
+  }) {
+    const currentExp = user.stats.experience;
+    const finalExp = currentExp + expGain;
+    const currentLevel = user.stats.level;
+    const correctLevel = utils.getLevelFromExp(finalExp);
+    if (correctLevel > currentLevel) {
+      const levelDiff = correctLevel - currentLevel;
+      await this.increaseUserLevel({
+        userEmail: user.email,
+        amount: levelDiff,
+      });
+      return true;
+    }
+    if (correctLevel < currentLevel) {
+      const levelDiff = correctLevel - correctLevel;
+      await this.decreaseUserLevel({
+        userEmail: user.email,
+        amount: levelDiff,
+      });
+      return true;
+    }
+    return false;
   }
 
   async revalidateUsers() {
