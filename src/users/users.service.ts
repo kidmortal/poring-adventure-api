@@ -64,10 +64,13 @@ export class UsersService {
     return prisma.user.findMany({
       take: 10,
       orderBy: {
-        silver: 'desc',
+        stats: {
+          experience: 'desc',
+        },
       },
       include: {
         appearance: true,
+        stats: true,
       },
     });
   }
