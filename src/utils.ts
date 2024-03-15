@@ -7,6 +7,14 @@ function isSuccess(chance: number): boolean {
   return randomNum < chance;
 }
 
+function randomDamage(value: number, oscillationPercentage: number): number {
+  // Calculate the minimum and maximum values based on the oscillation percentage
+  const min = value - Math.round((value * oscillationPercentage) / 100);
+  const max = value + Math.round((value * oscillationPercentage) / 100);
+
+  // Generate a random number within the range [min, max] and round it
+  return Math.round(Math.random() * (max - min) + min);
+}
 function getRandomNumberBetween(min: number, max: number): number {
   if (min > max) {
     throw new Error('Min number must be less than or equal to max number');
@@ -37,4 +45,5 @@ export const utils = {
   getRandomNumberBetween,
   calculateNextLevelExp,
   getLevelFromExp,
+  randomDamage,
 };

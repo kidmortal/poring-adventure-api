@@ -116,8 +116,9 @@ export class BattleInstance {
 
     if (isUserTurn) {
       const user = this.getUserFromBattle(args.email);
-      const userDamage = user.stats.attack;
+      const userDamage = utils.randomDamage(user.stats.attack, 20);
       const targetMonster = this.monsters[0];
+
       targetMonster.health -= userDamage;
       this.pushLog({
         log: `${user.name} Dealt ${userDamage} damage to ${targetMonster.name}`,
@@ -155,7 +156,10 @@ export class BattleInstance {
   }) {
     const userAttribute: number = args.user.stats[args.skill.skill.attribute];
     const multiplier = args.skill.skill.multiplier * args.skill.masteryLevel;
-    const userDamage = args.user.stats.attack + userAttribute * multiplier;
+    const userDamage = utils.randomDamage(
+      args.user.stats.attack + userAttribute * multiplier,
+      20,
+    );
     const targetMonster = this.monsters[0];
     args.user.stats.mana -= args.skill.skill.manaCost;
     targetMonster.health -= userDamage;
@@ -174,7 +178,7 @@ export class BattleInstance {
   }) {
     const userAttribute: number = args.user.stats[args.skill.skill.attribute];
     const multiplier = args.skill.skill.multiplier * args.skill.masteryLevel;
-    const userHealing = userAttribute * multiplier;
+    const userHealing = utils.randomDamage(userAttribute * multiplier, 20);
     const targetAlly = this.getLowestHealthMember();
     args.user.stats.mana -= args.skill.skill.manaCost;
     this.healUser({ user: targetAlly, amount: userHealing });
@@ -226,7 +230,7 @@ export class BattleInstance {
     const isMonsterAlive = monster?.health > 0;
 
     if (monster && isMonsterAlive) {
-      const monsterDamage = monster.attack;
+      const monsterDamage = utils.randomDamage(monster.attack, 20);
       const random = Math.floor(Math.random() * this.users.length);
       const targetUser = this.users[random];
       this.damageUser({ user: targetUser, amount: monsterDamage });
