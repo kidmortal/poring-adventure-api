@@ -23,16 +23,15 @@ function getRandomNumberBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function calculateNextLevelExp(level: number) {
-  return level * 100 * 1.2;
-}
 function getLevelFromExp(exp: number) {
-  let level = 0;
+  let level = 1;
   let expNeeded = 0;
+  let currentExp = 0;
 
-  while (exp >= expNeeded) {
-    expNeeded = calculateNextLevelExp(level);
-    if (exp >= expNeeded) {
+  while (exp >= currentExp) {
+    expNeeded = level * 100;
+    currentExp += expNeeded;
+    if (exp >= currentExp) {
       level++;
     }
   }
@@ -43,7 +42,6 @@ function getLevelFromExp(exp: number) {
 export const utils = {
   isSuccess,
   getRandomNumberBetween,
-  calculateNextLevelExp,
   getLevelFromExp,
   randomDamage,
 };
