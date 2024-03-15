@@ -364,11 +364,13 @@ export class UsersService {
     const profession = user.profession;
     const healthIncrease = profession.health * increaseAmount;
     const manaIncrease = profession.mana * increaseAmount;
+    const attackIncrease = profession.attack * increaseAmount;
     const strIncrease = profession.str * increaseAmount;
     const agiIncrease = profession.agi * increaseAmount;
     const intIncrease = profession.int * increaseAmount;
     await this.increaseUserStats({
       userEmail: args.userEmail,
+      attack: attackIncrease,
       level: increaseAmount,
       health: healthIncrease,
       mana: manaIncrease,
@@ -385,19 +387,21 @@ export class UsersService {
       include: { profession: true },
     });
     const profession = user.profession;
-    const healthIncrease = profession.health * decreaseAmount;
-    const manaIncrease = profession.mana * decreaseAmount;
-    const strIncrease = profession.str * decreaseAmount;
-    const agiIncrease = profession.agi * decreaseAmount;
-    const intIncrease = profession.int * decreaseAmount;
+    const healthDecrease = profession.health * decreaseAmount;
+    const manaDecrease = profession.mana * decreaseAmount;
+    const attackDecrease = profession.attack * decreaseAmount;
+    const strDecrease = profession.str * decreaseAmount;
+    const agiDecrease = profession.agi * decreaseAmount;
+    const intDecrease = profession.int * decreaseAmount;
     await this.decreaseUserStats({
       userEmail: args.userEmail,
       level: decreaseAmount,
-      health: healthIncrease,
-      mana: manaIncrease,
-      str: strIncrease,
-      agi: agiIncrease,
-      int: intIncrease,
+      health: healthDecrease,
+      mana: manaDecrease,
+      attack: attackDecrease,
+      str: strDecrease,
+      agi: agiDecrease,
+      int: intDecrease,
     });
   }
 
