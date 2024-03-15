@@ -143,6 +143,7 @@ model Profession {
   id      Int     @id @default(autoincrement())
   name    String
   costume String  @default("none")
+  attack  Int     @default(1)
   health  Int     @default(1)
   mana    Int     @default(1)
   str     Int     @default(1)
