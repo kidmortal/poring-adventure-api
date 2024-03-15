@@ -123,13 +123,15 @@ model Drop {
 }
 
 model Monster {
-  id     Int    @id @default(autoincrement())
+  id     Int     @id @default(autoincrement())
   name   String
   image  String
-  attack Int    @default(1)
-  health Int    @default(1)
-  silver Int    @default(1)
-  exp    Int    @default(1)
+  level  Int     @default(1)
+  boss   Boolean @default(false)
+  attack Int     @default(1)
+  health Int     @default(1)
+  silver Int     @default(1)
+  exp    Int     @default(1)
   drops  Drop[]
 }
 
