@@ -23,6 +23,7 @@ export class SkillsGateway {
     this.logger.debug('learn_skill');
     return this.skillsService.learn({ email, skillId });
   }
+
   @SubscribeMessage('equip_skill')
   async equip(
     @MessageBody() skillId: number,
@@ -32,6 +33,7 @@ export class SkillsGateway {
     this.logger.debug('equip_skill');
     return this.skillsService.equip({ email, skillId });
   }
+
   @SubscribeMessage('unequip_skill')
   async unequip(
     @MessageBody() skillId: number,
