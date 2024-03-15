@@ -424,8 +424,8 @@ export class UsersService {
       });
       return true;
     }
-    if (correctLevel < currentLevel) {
-      const levelDiff = correctLevel - correctLevel;
+    if (currentLevel > correctLevel) {
+      const levelDiff = currentLevel - correctLevel;
       await this.decreaseUserLevel({
         userEmail: user.email,
         amount: levelDiff,
