@@ -1,14 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { prisma } from 'src/prisma/prisma';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class SkillsService {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async learn(args: { email: string; skillId: number }) {
     try {
-      await prisma.learnedSkill.create({
+      await this.prisma.learnedSkill.create({
         data: {
           user: { connect: { email: args.email } },
           skill: { connect: { id: args.skillId } },
@@ -26,7 +29,7 @@ export class SkillsService {
   }
   async equip(args: { email: string; skillId: number }) {
     try {
-      await prisma.learnedSkill.update({
+      await this.prisma.learnedSkill.update({
         where: {
           userEmail_skillId: { userEmail: args.email, skillId: args.skillId },
         },
@@ -44,7 +47,7 @@ export class SkillsService {
   }
   async unequip(args: { email: string; skillId: number }) {
     try {
-      await prisma.learnedSkill.update({
+      await this.prisma.learnedSkill.update({
         where: {
           userEmail_skillId: { userEmail: args.email, skillId: args.skillId },
         },

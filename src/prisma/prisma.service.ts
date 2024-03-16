@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaLibSQL } from '@prisma/adapter-libsql';
 import { createClient } from '@libsql/client';
@@ -8,4 +9,10 @@ const libsql = createClient({
 });
 
 const adapter = new PrismaLibSQL(libsql);
-export const prisma = new PrismaClient({ adapter });
+
+@Injectable()
+export class PrismaService extends PrismaClient {
+  constructor() {
+    super({ adapter });
+  }
+}

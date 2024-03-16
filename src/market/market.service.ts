@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { CreateMarketDto } from './dto/create-market.dto';
 // import { UpdateMarketDto } from './dto/update-market.dto';
-import { prisma } from 'src/prisma/prisma';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { ItemsService } from 'src/items/items.service';
 import { UsersService } from 'src/users/users.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
@@ -17,10 +17,11 @@ export class MarketService {
     private readonly itemService: ItemsService,
     private readonly userService: UsersService,
     private readonly websocket: WebsocketService,
+    private readonly prisma: PrismaService,
   ) {}
   async addItemToMarket(createMarketDto: CreateMarketDto, sellerEmail: string) {
     console.log(createMarketDto);
-    const inventoryItem = await prisma.inventoryItem.findUnique({
+    const inventoryItem = await this.prisma.inventoryItem.findUnique({
       where: {
         userEmail_itemId: {
           itemId: createMarketDto.itemId,
@@ -74,13 +75,13 @@ export class MarketService {
     buyerEmail: string;
     stacks: number;
   }) {
-    const purchasingUser = await prisma.user.findUnique({
+    const purchasingUser = await this.prisma.user.findUnique({
       where: { email: args.buyerEmail },
     });
     if (!purchasingUser) {
       throw new BadRequestException('User not registered');
     }
-    const marketListing = await prisma.marketListing.findUnique({
+    const marketListing = await this.prisma.marketListing.findUnique({
       where: { id: args.marketListingId },
       include: {
         inventory: true,
@@ -122,7 +123,7 @@ export class MarketService {
     inventoryId: number;
     sellerEmail: string;
   }) {
-    return prisma.marketListing.upsert({
+    return this.prisma.marketListing.upsert({
       where: {
         sellerEmail: args.sellerEmail,
         inventoryId: args.inventoryId,
@@ -155,7 +156,7 @@ export class MarketService {
     decrementStacks: number;
   }) {
     if (args.decrementStacks < args.currentStacks) {
-      return await prisma.marketListing.update({
+      return await this.prisma.marketListing.update({
         where: {
           id: args.marketListingId,
         },
@@ -167,7 +168,7 @@ export class MarketService {
       });
     }
     if (args.decrementStacks === args.currentStacks) {
-      return await prisma.marketListing.delete({
+      return await this.prisma.marketListing.delete({
         where: {
           id: args.marketListingId,
         },
@@ -179,7 +180,7 @@ export class MarketService {
   }
 
   findAll() {
-    return prisma.marketListing.findMany({
+    return this.prisma.marketListing.findMany({
       take: 10,
       include: {
         inventory: {
@@ -201,7 +202,7 @@ export class MarketService {
   // }
 
   async remove(id: number, authEmail: string) {
-    const marketListing = await prisma.marketListing.findUnique({
+    const marketListing = await this.prisma.marketListing.findUnique({
       where: { id },
     });
 
@@ -216,7 +217,9 @@ export class MarketService {
     }
 
     try {
-      const deletedItem = await prisma.marketListing.delete({ where: { id } });
+      const deletedItem = await this.prisma.marketListing.delete({
+        where: { id },
+      });
       return deletedItem;
     } catch (error) {
       throw new InternalServerErrorException(error);

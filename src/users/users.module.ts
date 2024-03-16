@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { UserGateway } from './users.gateway';
+import { UsersGateway } from './users.gateway';
 import { WebsocketModule } from 'src/websocket/websocket.module';
 
 @Module({
   controllers: [],
-  providers: [UsersService, UserGateway],
+  providers: [UsersService, UsersGateway],
   exports: [UsersService],
   imports: [WebsocketModule],
 })

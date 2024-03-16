@@ -1,16 +1,19 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateItemDto } from './dto/create-item.dto';
 // import { UpdateItemDto } from './dto/update-item.dto';
-import { prisma } from 'src/prisma/prisma';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { UsersService } from 'src/users/users.service';
 import { EQUIPABLE_CATEGORIES } from './entities/categories';
 import { Item } from '@prisma/client';
 
 @Injectable()
 export class ItemsService {
-  constructor(private readonly userService: UsersService) {}
+  constructor(
+    private readonly userService: UsersService,
+    private readonly prisma: PrismaService,
+  ) {}
   create(createItemDto: CreateItemDto) {
-    return prisma.item.create({ data: createItemDto });
+    return this.prisma.item.create({ data: createItemDto });
   }
 
   async removeItemFromUser(args: {
@@ -27,7 +30,7 @@ export class ItemsService {
     }
 
     if (userHasItem.stack === args.stack) {
-      const updateAmount = await prisma.inventoryItem.delete({
+      const updateAmount = await this.prisma.inventoryItem.delete({
         where: {
           userEmail_itemId: {
             userEmail: args.userEmail,
@@ -39,7 +42,7 @@ export class ItemsService {
     }
 
     if (userHasItem.stack > args.stack) {
-      const updateAmount = await prisma.inventoryItem.update({
+      const updateAmount = await this.prisma.inventoryItem.update({
         where: {
           userEmail_itemId: {
             userEmail: args.userEmail,
@@ -96,7 +99,7 @@ export class ItemsService {
     const userHasItem = await this.userHasItem(args);
 
     if (userHasItem) {
-      const updateAmount = await prisma.inventoryItem.update({
+      const updateAmount = await this.prisma.inventoryItem.update({
         where: {
           userEmail_itemId: {
             userEmail: args.userEmail,
@@ -113,7 +116,7 @@ export class ItemsService {
     }
 
     try {
-      const createNewItem = await prisma.inventoryItem.create({
+      const createNewItem = await this.prisma.inventoryItem.create({
         data: {
           userEmail: args.userEmail,
           itemId: args.itemId,
@@ -154,7 +157,7 @@ export class ItemsService {
         throw new BadRequestException('This item is not equipable');
       }
 
-      const equippedItems = await prisma.equippedItem.findMany({
+      const equippedItems = await this.prisma.equippedItem.findMany({
         where: {
           userEmail: args.userEmail,
         },
@@ -205,7 +208,7 @@ export class ItemsService {
       int: args.itemInfo.int,
     });
 
-    return prisma.equippedItem.create({
+    return this.prisma.equippedItem.create({
       data: {
         userEmail: args.userEmail,
         itemId: args.itemId,
@@ -227,7 +230,7 @@ export class ItemsService {
       int: args.itemInfo.int,
     });
 
-    return prisma.equippedItem.delete({
+    return this.prisma.equippedItem.delete({
       where: {
         userEmail_itemId: {
           userEmail: args.userEmail,
@@ -242,7 +245,7 @@ export class ItemsService {
   }
 
   async userHasItem(args: { userEmail: string; itemId: number }) {
-    const userHasItem = await prisma.inventoryItem.findUnique({
+    const userHasItem = await this.prisma.inventoryItem.findUnique({
       where: {
         userEmail_itemId: {
           userEmail: args.userEmail,
@@ -258,7 +261,7 @@ export class ItemsService {
   }
 
   async getInventoryItem(args: { userEmail: string; itemId: number }) {
-    const inventoryItem = await prisma.inventoryItem.findUnique({
+    const inventoryItem = await this.prisma.inventoryItem.findUnique({
       where: {
         userEmail_itemId: {
           userEmail: args.userEmail,
@@ -277,7 +280,7 @@ export class ItemsService {
   }
 
   async getEquippedItem(args: { userEmail: string; itemId: number }) {
-    return prisma.equippedItem.findUnique({
+    return this.prisma.equippedItem.findUnique({
       where: {
         userEmail_itemId: {
           userEmail: args.userEmail,
