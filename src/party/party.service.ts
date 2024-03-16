@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { Party } from '@prisma/client';
-import { prisma } from 'src/prisma/prisma';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
 
 @Injectable()
 export class PartyService {
-  constructor(private readonly websocket: WebsocketService) {}
+  constructor(
+    private readonly websocket: WebsocketService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async sendPartyInviteNotification(args: { party: Party; email: string }) {
     if (args.party) {
@@ -63,7 +66,7 @@ export class PartyService {
     if (userHasParty) return false;
 
     try {
-      await prisma.party.create({
+      await this.prisma.party.create({
         data: {
           leaderEmail: args.email,
           members: { connect: { email: args.email } },
@@ -86,7 +89,7 @@ export class PartyService {
   }
 
   async invite(args: { leaderEmail: string; invitedEmail: string }) {
-    const ownedParty = await prisma.party.findUnique({
+    const ownedParty = await this.prisma.party.findUnique({
       where: {
         leaderEmail: args.leaderEmail,
       },
@@ -105,7 +108,7 @@ export class PartyService {
 
   async joinParty(args: { email: string; partyId: number }) {
     try {
-      const result = await prisma.user.update({
+      const result = await this.prisma.user.update({
         where: { email: args.email },
         data: { partyId: args.partyId },
       });
@@ -123,13 +126,13 @@ export class PartyService {
   }
 
   async kick(args: { leaderEmail: string; kickedEmail: string }) {
-    const ownedParty = await prisma.party.findUnique({
+    const ownedParty = await this.prisma.party.findUnique({
       where: {
         leaderEmail: args.leaderEmail,
       },
     });
     if (ownedParty) {
-      await prisma.user.update({
+      await this.prisma.user.update({
         where: { email: args.kickedEmail },
         data: { partyId: null },
       });
@@ -141,7 +144,7 @@ export class PartyService {
   }
 
   async remove(args: { email: string }) {
-    const ownedParty = await prisma.party.findUnique({
+    const ownedParty = await this.prisma.party.findUnique({
       where: {
         leaderEmail: args.email,
       },
@@ -150,7 +153,7 @@ export class PartyService {
       },
     });
     if (ownedParty) {
-      await prisma.party.delete({
+      await this.prisma.party.delete({
         where: {
           leaderEmail: args.email,
         },
@@ -165,7 +168,7 @@ export class PartyService {
 
   private async userHasParty(args: { email?: string }) {
     if (!args.email) return false;
-    const userParty = await prisma.party.findFirst({
+    const userParty = await this.prisma.party.findFirst({
       where: { members: { some: { email: args.email } } },
     });
     if (userParty) {
@@ -176,7 +179,7 @@ export class PartyService {
 
   private async getUserParty(args: { email?: string }) {
     if (!args.email) return undefined;
-    const userParty = await prisma.party.findFirst({
+    const userParty = await this.prisma.party.findFirst({
       where: { members: { some: { email: args.email } } },
       include: {
         members: {

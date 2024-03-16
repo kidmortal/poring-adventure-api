@@ -1,14 +1,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { prisma } from 'src/prisma/prisma';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import { UserWithStats } from 'src/battle/entities/battle';
 import { utils } from 'src/utils';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly websocket: WebsocketService) {}
+  constructor(
+    private readonly websocket: WebsocketService,
+    private readonly prisma: PrismaService,
+  ) {}
   async notifyUserUpdate(args: { email: string; payload: any }) {
     return this.websocket.sendMessageToSocket({
       email: args.email,
@@ -40,7 +43,7 @@ export class UsersService {
   }
 
   async create(createUserDto: CreateUserDto) {
-    const newUser = await prisma.user.create({
+    const newUser = await this.prisma.user.create({
       data: {
         name: createUserDto.name,
         email: createUserDto.email,
@@ -61,7 +64,7 @@ export class UsersService {
   }
 
   findAll() {
-    return prisma.user.findMany({
+    return this.prisma.user.findMany({
       take: 10,
       orderBy: {
         stats: {
@@ -76,7 +79,7 @@ export class UsersService {
   }
 
   getAllProfessions() {
-    return prisma.profession.findMany({
+    return this.prisma.profession.findMany({
       include: {
         skills: true,
       },
@@ -84,7 +87,7 @@ export class UsersService {
   }
 
   async getFullParty(leaderEmail: string) {
-    return prisma.party.findUnique({
+    return this.prisma.party.findUnique({
       where: {
         leaderEmail: leaderEmail,
       },
@@ -104,7 +107,7 @@ export class UsersService {
     if (!email) {
       throw new BadRequestException('No email provided');
     }
-    const user = await prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { email },
       include: {
         appearance: true,
@@ -123,7 +126,7 @@ export class UsersService {
     if (!email) {
       throw new BadRequestException('No email provided');
     }
-    const user = await prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
@@ -135,7 +138,7 @@ export class UsersService {
     health: number;
     mana: number;
   }) {
-    return prisma.stats.update({
+    return this.prisma.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -147,7 +150,7 @@ export class UsersService {
   }
 
   async decrementUserHealth(args: { userEmail: string; amount: number }) {
-    return prisma.stats.update({
+    return this.prisma.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -160,7 +163,7 @@ export class UsersService {
   }
 
   async incrementUserHealth(args: { userEmail: string; amount: number }) {
-    const currentStats = await prisma.stats.findUnique({
+    const currentStats = await this.prisma.stats.findUnique({
       where: {
         userEmail: args.userEmail,
       },
@@ -173,7 +176,7 @@ export class UsersService {
       if (finalHealth > maxHealth) {
         finalHealth = maxHealth;
       }
-      return prisma.stats.update({
+      return this.prisma.stats.update({
         where: {
           userEmail: args.userEmail,
         },
@@ -187,7 +190,7 @@ export class UsersService {
   }
 
   async decrementUserMana(args: { userEmail: string; amount: number }) {
-    return prisma.stats.update({
+    return this.prisma.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -200,7 +203,7 @@ export class UsersService {
   }
 
   async incrementUserMana(args: { userEmail: string; amount: number }) {
-    const currentStats = await prisma.stats.findUnique({
+    const currentStats = await this.prisma.stats.findUnique({
       where: {
         userEmail: args.userEmail,
       },
@@ -213,7 +216,7 @@ export class UsersService {
       if (finalMana > maxMana) {
         finalMana = maxMana;
       }
-      return prisma.stats.update({
+      return this.prisma.stats.update({
         where: {
           userEmail: args.userEmail,
         },
@@ -236,7 +239,7 @@ export class UsersService {
     int?: number;
     agi?: number;
   }) {
-    return prisma.stats.update({
+    return this.prisma.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -261,7 +264,7 @@ export class UsersService {
     int?: number;
     agi?: number;
   }) {
-    return prisma.stats.update({
+    return this.prisma.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -283,7 +286,7 @@ export class UsersService {
   }
 
   async deleteUser(email: string) {
-    const deletedUser = await prisma.user.delete({
+    const deletedUser = await this.prisma.user.delete({
       where: { email },
       include: {
         appearance: true,
@@ -292,7 +295,7 @@ export class UsersService {
     return deletedUser;
   }
   async addExpSilver(args: { userEmail: string; exp: number; silver: number }) {
-    return prisma.user.update({
+    return this.prisma.user.update({
       where: {
         email: args.userEmail,
       },
@@ -303,7 +306,7 @@ export class UsersService {
     });
   }
   async addSilverToUser(args: { userEmail: string; amount: number }) {
-    return prisma.user.update({
+    return this.prisma.user.update({
       where: {
         email: args.userEmail,
       },
@@ -315,7 +318,7 @@ export class UsersService {
     });
   }
   async addExpToUser(args: { userEmail: string; amount: number }) {
-    return prisma.stats.update({
+    return this.prisma.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -328,7 +331,7 @@ export class UsersService {
   }
 
   async removeSilverFromUser(args: { userEmail: string; amount: number }) {
-    return prisma.user.update({
+    return this.prisma.user.update({
       where: {
         email: args.userEmail,
       },
@@ -357,7 +360,7 @@ export class UsersService {
 
   async increaseUserLevel(args: { userEmail: string; amount: number }) {
     const increaseAmount = args.amount;
-    const user = await prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { email: args.userEmail },
       include: { profession: true },
     });
@@ -382,7 +385,7 @@ export class UsersService {
 
   async decreaseUserLevel(args: { userEmail: string; amount: number }) {
     const decreaseAmount = args.amount;
-    const user = await prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { email: args.userEmail },
       include: { profession: true },
     });
@@ -437,13 +440,13 @@ export class UsersService {
   }
 
   async revalidateUsers() {
-    const invalidUsers = await prisma.user.findMany({
+    const invalidUsers = await this.prisma.user.findMany({
       where: {
         stats: null,
       },
     });
     for await (const user of invalidUsers) {
-      await prisma.stats.create({
+      await this.prisma.stats.create({
         data: {
           userEmail: user.email,
         },

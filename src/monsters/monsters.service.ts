@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 
-import { prisma } from 'src/prisma/prisma';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class MonstersService {
+  constructor(private readonly prisma: PrismaService) {}
   findAll() {
-    return prisma.monster.findMany({
+    return this.prisma.monster.findMany({
       include: {
         drops: {
           include: {
@@ -17,9 +18,9 @@ export class MonstersService {
   }
 
   async findOne() {
-    const monsterCount = await prisma.monster.count();
+    const monsterCount = await this.prisma.monster.count();
     const skip = Math.floor(Math.random() * monsterCount);
-    return prisma.monster.findFirst({
+    return this.prisma.monster.findFirst({
       skip,
       include: {
         drops: {

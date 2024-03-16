@@ -12,7 +12,7 @@ import { WebsocketService } from 'src/websocket/websocket.service';
 import { CreateUserDto } from './dto/create-user.dto';
 
 @WebSocketGateway({ cors: true })
-export class UserGateway {
+export class UsersGateway {
   constructor(
     private readonly userService: UsersService,
     private readonly websocket: WebsocketService,
