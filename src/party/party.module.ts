@@ -6,5 +6,6 @@ import { WebsocketModule } from 'src/websocket/websocket.module';
 @Module({
   imports: [WebsocketModule],
   providers: [PartyGateway, PartyService],
+  exports: [PartyService],
 })
 export class PartyModule {}
