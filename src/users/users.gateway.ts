@@ -23,9 +23,8 @@ export class UsersGateway {
   async findOne(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug(`'get_user' ${email}`);
-    if (!email) {
-      return false;
-    }
+    if (!email) return false;
+
     const user = await this.userService.findOne(email);
     if (!user) {
       return false;
@@ -50,6 +49,7 @@ export class UsersGateway {
     @ConnectedSocket() client: Socket,
   ) {
     const email = client.handshake.auth.email;
+    if (!email) return false;
     this.logger.debug('create_user');
     return this.userService.create({ ...createUserDto, email: email });
   }
@@ -57,6 +57,7 @@ export class UsersGateway {
   @SubscribeMessage('delete_user')
   async remove(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
+    if (!email) return false;
     this.logger.debug('delete_user');
     return this.userService.deleteUser(email);
   }
