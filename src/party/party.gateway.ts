@@ -52,10 +52,10 @@ export class PartyGateway {
   }
 
   @SubscribeMessage('quit_party')
-  quit(@MessageBody() kickedEmail: string, @ConnectedSocket() client: Socket) {
+  quit(@MessageBody() partyId: number, @ConnectedSocket() client: Socket) {
     this.logger.debug('quit_party');
     const email = client.handshake.auth.email;
-    return this.partyService.kick({ leaderEmail: email, kickedEmail });
+    return this.partyService.quitParty({ email: email, partyId });
   }
 
   @SubscribeMessage('join_party')
