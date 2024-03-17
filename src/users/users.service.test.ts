@@ -2,21 +2,18 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
-import { UsersGateway } from './users.gateway';
 
-describe('User Gateway', () => {
+describe('User Service', () => {
   let service: UsersService;
-  let gateway: UsersGateway;
   let prisma: PrismaService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [UsersGateway, UsersService, PrismaService, WebsocketService],
+      providers: [UsersService, PrismaService, WebsocketService],
     }).compile();
 
     prisma = module.get<PrismaService>(PrismaService);
     service = module.get<UsersService>(UsersService);
-    gateway = module.get<UsersGateway>(UsersGateway);
   });
 
   describe('get_user', () => {
@@ -36,23 +33,9 @@ describe('User Gateway', () => {
       const fakeUser = { email: authEmail } as any;
       const findUnique = jest.fn().mockResolvedValue(fakeUser);
       prisma.user.findUnique = findUnique;
-      const returnUser = await gateway.findOne({
-        // @ts-expect-error this value can be anything
-        handshake: { auth: { email: authEmail } },
-      });
+      const returnUser = await service.findOne(authEmail);
       expect(findUnique).toHaveBeenCalledWith(fullUserparams);
       expect(returnUser).toBe(fakeUser);
-    });
-
-    it('should return false when not providing an email on handshake auth ', async () => {
-      const findOne = jest.fn();
-      jest.spyOn(service, 'findOne').mockImplementation(findOne);
-      const gatewayResponse = await gateway.findOne({
-        // @ts-expect-error this value can be anything
-        handshake: { auth: { email: undefined } },
-      });
-      expect(gatewayResponse).toBe(false);
-      expect(findOne).not.toHaveBeenCalled();
     });
   });
 
@@ -61,7 +44,7 @@ describe('User Gateway', () => {
       const fakeUsers = [{ email: 'test@test.com' }] as any;
       const findMany = jest.fn().mockResolvedValue(fakeUsers);
       prisma.user.findMany = findMany;
-      const returnUsers = await gateway.findAll();
+      const returnUsers = await service.findAll();
       expect(findMany).toHaveBeenCalled();
       expect(returnUsers).toBe(fakeUsers);
     });
@@ -96,10 +79,7 @@ describe('User Gateway', () => {
       const fakeNewUser = { email: 'test@test.com' } as any;
       const create = jest.fn().mockResolvedValue(fakeNewUser);
       prisma.user.create = create;
-      const returnUser = await gateway.create(createUserDto, {
-        // @ts-expect-error this value can be anything
-        handshake: { auth: { email: authEmail } },
-      });
+      const returnUser = await service.create(createUserDto);
       expect(create).toHaveBeenCalledWith(createUserQuery);
       expect(returnUser).toBe(fakeNewUser);
     });
@@ -113,10 +93,7 @@ describe('User Gateway', () => {
       const fakeDeletedUser = { email: 'test@test.com' } as any;
       const deleteFn = jest.fn().mockResolvedValue(fakeDeletedUser);
       prisma.user.delete = deleteFn;
-      const returnUser = await gateway.remove({
-        // @ts-expect-error this value can be anything
-        handshake: { auth: { email: authEmail } },
-      });
+      const returnUser = await service.deleteUser(authEmail);
       expect(deleteFn).toHaveBeenCalledWith(deleteUserQuery);
       expect(returnUser).toBe(fakeDeletedUser);
     });
@@ -127,7 +104,7 @@ describe('User Gateway', () => {
       const fakeProfessionList = [{ name: 'priest' }] as any;
       const findMany = jest.fn().mockResolvedValue(fakeProfessionList);
       prisma.profession.findMany = findMany;
-      const returnProfessions = await gateway.getAllClasses();
+      const returnProfessions = await service.getAllProfessions();
       expect(findMany).toHaveBeenCalledWith(dbQuery);
       expect(returnProfessions).toBe(fakeProfessionList);
     });

@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import { UserWithStats } from 'src/battle/entities/battle';
 import { utils } from 'src/utils';
@@ -278,11 +277,6 @@ export class UsersService {
         int: { decrement: args.int ?? 0 },
       },
     });
-  }
-
-  updateUser(id: number, updateUserDto: UpdateUserDto) {
-    console.log(updateUserDto);
-    return `This action updates a #${id} user`;
   }
 
   async deleteUser(email: string) {

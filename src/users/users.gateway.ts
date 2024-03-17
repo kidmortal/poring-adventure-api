@@ -62,38 +62,9 @@ export class UsersGateway {
     return this.userService.deleteUser(email);
   }
 
-  @SubscribeMessage('get_all_sockets')
-  async getAllSockets(@ConnectedSocket() client: Socket) {
-    this.logger.debug('get_all_sockets');
-    const email = client.handshake.auth.email;
-    const isAdmin = await this.userService.isAdmin(email);
-    if (!isAdmin) {
-      return this.websocket.breakUserConnection(email);
-    }
-    return this.websocket.getAllSockets();
-  }
-
   @SubscribeMessage('get_all_professions')
   async getAllClasses() {
     this.logger.debug('get_all_professions');
     return this.userService.getAllProfessions();
-  }
-
-  @SubscribeMessage('message_socket')
-  async sendMessage(
-    @MessageBody()
-    args: {
-      to: string;
-      message: string;
-    },
-    @ConnectedSocket() client: Socket,
-  ) {
-    this.logger.debug('message_socket');
-    const email = client.handshake.auth.email;
-    const isAdmin = await this.userService.isAdmin(email);
-    if (!isAdmin) {
-      return this.websocket.breakUserConnection(email);
-    }
-    return this.websocket.sendTextNotification(args.to, args.message);
   }
 }
