@@ -8,17 +8,7 @@ CREATE TABLE IF NOT EXISTS "Appearance" (
     "userEmail" TEXT NOT NULL,
     CONSTRAINT "Appearance_userEmail_fkey" FOREIGN KEY ("userEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE
 );
-INSERT INTO Appearance VALUES(32,'2','male','rune_knight','kidmortal@gmail.com');
-INSERT INTO Appearance VALUES(37,'1','female','priest','isaacalvesx7@gmail.com');
-INSERT INTO Appearance VALUES(39,'cat','female','knight','aenf2027@gmail.com');
-INSERT INTO Appearance VALUES(44,'cat','female','priest','amanda96akiau@gmail.com');
-INSERT INTO Appearance VALUES(47,'1','male','knight','xxdennyxpvpxx@gmail.com');
-INSERT INTO Appearance VALUES(48,'cat','female','priest','paloma.santos@amopromo.com');
-INSERT INTO Appearance VALUES(49,'1','female','mage','leoviggiano1@gmail.com');
-INSERT INTO Appearance VALUES(59,'1','male','priest','leoslimaxv@gmail.com');
-INSERT INTO Appearance VALUES(60,'1','female','mage','skoczencezary@gmail.com');
-INSERT INTO Appearance VALUES(63,'1','male','assassin','jarukitsun@gmail.com');
-INSERT INTO Appearance VALUES(64,'1','male','mage','allan.oliveira@amopromo.com');
+
 CREATE TABLE IF NOT EXISTS "Item" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL,
@@ -67,7 +57,6 @@ CREATE TABLE IF NOT EXISTS "Party" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "leaderEmail" TEXT NOT NULL
 );
-INSERT INTO Party VALUES(10,'kidmortal@gmail.com');
 CREATE TABLE IF NOT EXISTS "Stats" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "level" INTEGER NOT NULL DEFAULT 1,
@@ -83,17 +72,7 @@ CREATE TABLE IF NOT EXISTS "Stats" (
     "userEmail" TEXT NOT NULL,
     CONSTRAINT "Stats_userEmail_fkey" FOREIGN KEY ("userEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE
 );
-INSERT INTO Stats VALUES(2,6,2021,149,155,17,35,13,18,6,8,'kidmortal@gmail.com');
-INSERT INTO Stats VALUES(3,1,1,11,20,20,20,1,1,1,1,'isaacalvesx7@gmail.com');
-INSERT INTO Stats VALUES(4,1,9,30,30,20,20,7,1,1,1,'aenf2027@gmail.com');
-INSERT INTO Stats VALUES(8,1,18,150,150,20,20,6,1,1,1,'amanda96akiau@gmail.com');
-INSERT INTO Stats VALUES(11,1,1,11,20,20,20,1,1,1,1,'xxdennyxpvpxx@gmail.com');
-INSERT INTO Stats VALUES(12,20,20229,215,258,467,130,70,20,20,65,'paloma.santos@amopromo.com');
-INSERT INTO Stats VALUES(13,1,1,25,25,20,20,4,1,1,1,'leoviggiano1@gmail.com');
-INSERT INTO Stats VALUES(23,3,247,24,24,22,40,5,3,3,12,'leoslimaxv@gmail.com');
-INSERT INTO Stats VALUES(24,1,82,12,40,13,25,1,1,1,4,'skoczencezary@gmail.com');
-INSERT INTO Stats VALUES(27,2,101,22,42,18,27,9,7,4,4,'jarukitsun@gmail.com');
-INSERT INTO Stats VALUES(28,1,1,20,20,20,20,1,1,1,1,'allan.oliveira@amopromo.com');
+
 CREATE TABLE IF NOT EXISTS "Notification" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "content" TEXT NOT NULL,
@@ -129,24 +108,7 @@ CREATE TABLE IF NOT EXISTS "EquippedItem" (
     CONSTRAINT "EquippedItem_userEmail_fkey" FOREIGN KEY ("userEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "EquippedItem_itemId_fkey" FOREIGN KEY ("itemId") REFERENCES "Item" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
-INSERT INTO EquippedItem VALUES(23,'leoviggiano1@gmail.com',12);
-INSERT INTO EquippedItem VALUES(25,'amanda96akiau@gmail.com',16);
-INSERT INTO EquippedItem VALUES(44,'kidmortal@gmail.com',12);
-INSERT INTO EquippedItem VALUES(46,'leoslimaxv@gmail.com',16);
-INSERT INTO EquippedItem VALUES(47,'amanda96akiau@gmail.com',20);
-INSERT INTO EquippedItem VALUES(48,'amanda96akiau@gmail.com',22);
-INSERT INTO EquippedItem VALUES(49,'amanda96akiau@gmail.com',21);
-INSERT INTO EquippedItem VALUES(52,'paloma.santos@amopromo.com',23);
-INSERT INTO EquippedItem VALUES(53,'paloma.santos@amopromo.com',24);
-INSERT INTO EquippedItem VALUES(54,'paloma.santos@amopromo.com',25);
-INSERT INTO EquippedItem VALUES(55,'kidmortal@gmail.com',20);
-INSERT INTO EquippedItem VALUES(56,'kidmortal@gmail.com',21);
-INSERT INTO EquippedItem VALUES(58,'paloma.santos@amopromo.com',18);
-INSERT INTO EquippedItem VALUES(59,'kidmortal@gmail.com',25);
-INSERT INTO EquippedItem VALUES(60,'skoczencezary@gmail.com',23);
-INSERT INTO EquippedItem VALUES(62,'jarukitsun@gmail.com',12);
-INSERT INTO EquippedItem VALUES(63,'jarukitsun@gmail.com',25);
-INSERT INTO EquippedItem VALUES(64,'aenf2027@gmail.com',12);
+
 CREATE TABLE IF NOT EXISTS "InventoryItem" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "stack" INTEGER NOT NULL,
@@ -155,41 +117,7 @@ CREATE TABLE IF NOT EXISTS "InventoryItem" (
     CONSTRAINT "InventoryItem_userEmail_fkey" FOREIGN KEY ("userEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "InventoryItem_itemId_fkey" FOREIGN KEY ("itemId") REFERENCES "Item" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
-INSERT INTO InventoryItem VALUES(1,166,'kidmortal@gmail.com',11);
-INSERT INTO InventoryItem VALUES(2,5,'kidmortal@gmail.com',13);
-INSERT INTO InventoryItem VALUES(17,1,'amanda96akiau@gmail.com',13);
-INSERT INTO InventoryItem VALUES(20,10,'kidmortal@gmail.com',12);
-INSERT INTO InventoryItem VALUES(23,87,'amanda96akiau@gmail.com',11);
-INSERT INTO InventoryItem VALUES(24,31,'amanda96akiau@gmail.com',12);
-INSERT INTO InventoryItem VALUES(34,1,'xxdennyxpvpxx@gmail.com',11);
-INSERT INTO InventoryItem VALUES(35,4,'aenf2027@gmail.com',11);
-INSERT INTO InventoryItem VALUES(46,19,'paloma.santos@amopromo.com',16);
-INSERT INTO InventoryItem VALUES(51,1,'leoviggiano1@gmail.com',12);
-INSERT INTO InventoryItem VALUES(52,1,'leoviggiano1@gmail.com',11);
-INSERT INTO InventoryItem VALUES(54,12,'kidmortal@gmail.com',16);
-INSERT INTO InventoryItem VALUES(55,1,'aenf2027@gmail.com',12);
-INSERT INTO InventoryItem VALUES(57,2,'amanda96akiau@gmail.com',16);
-INSERT INTO InventoryItem VALUES(73,6,'leoslimaxv@gmail.com',11);
-INSERT INTO InventoryItem VALUES(75,3,'leoslimaxv@gmail.com',16);
-INSERT INTO InventoryItem VALUES(83,61,'paloma.santos@amopromo.com',12);
-INSERT INTO InventoryItem VALUES(93,256,'paloma.santos@amopromo.com',11);
-INSERT INTO InventoryItem VALUES(94,8,'paloma.santos@amopromo.com',23);
-INSERT INTO InventoryItem VALUES(95,12,'paloma.santos@amopromo.com',25);
-INSERT INTO InventoryItem VALUES(96,14,'paloma.santos@amopromo.com',24);
-INSERT INTO InventoryItem VALUES(97,35,'paloma.santos@amopromo.com',13);
-INSERT INTO InventoryItem VALUES(98,42,'paloma.santos@amopromo.com',14);
-INSERT INTO InventoryItem VALUES(99,93,'paloma.santos@amopromo.com',26);
-INSERT INTO InventoryItem VALUES(101,20,'kidmortal@gmail.com',26);
-INSERT INTO InventoryItem VALUES(102,5,'kidmortal@gmail.com',14);
-INSERT INTO InventoryItem VALUES(103,1,'kidmortal@gmail.com',24);
-INSERT INTO InventoryItem VALUES(105,1,'kidmortal@gmail.com',22);
-INSERT INTO InventoryItem VALUES(108,9,'skoczencezary@gmail.com',26);
-INSERT INTO InventoryItem VALUES(110,1,'aenf2027@gmail.com',24);
-INSERT INTO InventoryItem VALUES(114,15,'jarukitsun@gmail.com',11);
-INSERT INTO InventoryItem VALUES(115,8,'jarukitsun@gmail.com',26);
-INSERT INTO InventoryItem VALUES(116,3,'jarukitsun@gmail.com',12);
-INSERT INTO InventoryItem VALUES(118,1,'kidmortal@gmail.com',25);
-INSERT INTO InventoryItem VALUES(119,1,'aenf2027@gmail.com',16);
+
 CREATE TABLE IF NOT EXISTS "MarketListing" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "price" INTEGER NOT NULL,
@@ -202,16 +130,7 @@ CREATE TABLE IF NOT EXISTS "MarketListing" (
     CONSTRAINT "MarketListing_inventoryId_fkey" FOREIGN KEY ("inventoryId") REFERENCES "InventoryItem" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "MarketListing_sellerEmail_fkey" FOREIGN KEY ("sellerEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE
 );
-INSERT INTO MarketListing VALUES(74,15,6,95,'paloma.santos@amopromo.com','2024-03-15T19:49:00.820+00:00','2024-03-16T11:27:34.618+00:00',NULL);
-INSERT INTO MarketListing VALUES(75,18,7,96,'paloma.santos@amopromo.com','2024-03-15T19:49:11.937+00:00','2024-03-15T19:49:11.937+00:00',NULL);
-INSERT INTO MarketListing VALUES(76,20,5,94,'paloma.santos@amopromo.com','2024-03-15T19:49:24.906+00:00','2024-03-16T00:43:42.952+00:00',NULL);
-INSERT INTO MarketListing VALUES(77,25,15,46,'paloma.santos@amopromo.com','2024-03-15T19:49:40.606+00:00','2024-03-16T01:56:07.394+00:00',NULL);
-INSERT INTO MarketListing VALUES(80,25,55,83,'paloma.santos@amopromo.com','2024-03-15T19:50:15.884+00:00','2024-03-15T19:50:15.884+00:00',NULL);
-INSERT INTO MarketListing VALUES(81,8,209,93,'paloma.santos@amopromo.com','2024-03-15T19:50:26.721+00:00','2024-03-15T19:50:26.721+00:00',NULL);
-INSERT INTO MarketListing VALUES(82,25,35,98,'paloma.santos@amopromo.com','2024-03-15T19:56:54.784+00:00','2024-03-15T20:22:46.097+00:00',NULL);
-INSERT INTO MarketListing VALUES(83,25,25,97,'paloma.santos@amopromo.com','2024-03-15T19:57:04.566+00:00','2024-03-15T19:57:04.566+00:00',NULL);
-INSERT INTO MarketListing VALUES(84,10,46,99,'paloma.santos@amopromo.com','2024-03-15T19:57:16.421+00:00','2024-03-15T19:57:16.421+00:00',NULL);
-INSERT INTO MarketListing VALUES(85,5,1,116,'jarukitsun@gmail.com','2024-03-16T11:27:42.370+00:00','2024-03-16T11:27:42.370+00:00',NULL);
+
 CREATE TABLE IF NOT EXISTS "User" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "email" TEXT NOT NULL,
@@ -223,17 +142,7 @@ CREATE TABLE IF NOT EXISTS "User" (
     CONSTRAINT "User_professionId_fkey" FOREIGN KEY ("professionId") REFERENCES "Profession" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "User_partyId_fkey" FOREIGN KEY ("partyId") REFERENCES "Party" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
-INSERT INTO User VALUES(1,'kidmortal@gmail.com','Kidmortal',2592,'true',1,10);
-INSERT INTO User VALUES(6,'isaacalvesx7@gmail.com','Teste',30,0,NULL,NULL);
-INSERT INTO User VALUES(8,'aenf2027@gmail.com','Catnip',20,0,2,NULL);
-INSERT INTO User VALUES(10,'amanda96akiau@gmail.com','Amanda Akiau',893,0,2,NULL);
-INSERT INTO User VALUES(13,'xxdennyxpvpxx@gmail.com','fala_dele',30,0,NULL,NULL);
-INSERT INTO User VALUES(14,'paloma.santos@amopromo.com','Luazinha00',25214,0,2,NULL);
-INSERT INTO User VALUES(15,'leoviggiano1@gmail.com','Jihuh',15,0,NULL,NULL);
-INSERT INTO User VALUES(25,'leoslimaxv@gmail.com','Rarcelo Mossi',1462,0,2,NULL);
-INSERT INTO User VALUES(26,'skoczencezary@gmail.com','Marcik',145,0,3,NULL);
-INSERT INTO User VALUES(29,'jarukitsun@gmail.com','Sunshinezxc',180,0,5,NULL);
-INSERT INTO User VALUES(30,'allan.oliveira@amopromo.com','Rafaela',20,0,3,10);
+
 CREATE TABLE IF NOT EXISTS "LearnedSkill" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "userEmail" TEXT NOT NULL,
@@ -243,24 +152,7 @@ CREATE TABLE IF NOT EXISTS "LearnedSkill" (
     CONSTRAINT "LearnedSkill_userEmail_fkey" FOREIGN KEY ("userEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "LearnedSkill_skillId_fkey" FOREIGN KEY ("skillId") REFERENCES "Skill" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
-INSERT INTO LearnedSkill VALUES(1,'kidmortal@gmail.com',1,1,1);
-INSERT INTO LearnedSkill VALUES(2,'amanda96akiau@gmail.com',2,1,'true');
-INSERT INTO LearnedSkill VALUES(3,'paloma.santos@amopromo.com',2,1,1);
-INSERT INTO LearnedSkill VALUES(4,'kidmortal@gmail.com',2,1,1);
-INSERT INTO LearnedSkill VALUES(5,'paloma.santos@amopromo.com',3,1,1);
-INSERT INTO LearnedSkill VALUES(6,'aenf2027@gmail.com',5,1,'true');
-INSERT INTO LearnedSkill VALUES(7,'aenf2027@gmail.com',6,1,'true');
-INSERT INTO LearnedSkill VALUES(8,'kidmortal@gmail.com',4,1,1);
-INSERT INTO LearnedSkill VALUES(12,'leoslimaxv@gmail.com',2,1,1);
-INSERT INTO LearnedSkill VALUES(13,'leoslimaxv@gmail.com',3,1,1);
-INSERT INTO LearnedSkill VALUES(14,'leoslimaxv@gmail.com',7,1,1);
-INSERT INTO LearnedSkill VALUES(15,'paloma.santos@amopromo.com',7,1,1);
-INSERT INTO LearnedSkill VALUES(16,'skoczencezary@gmail.com',5,1,1);
-INSERT INTO LearnedSkill VALUES(17,'skoczencezary@gmail.com',6,1,1);
-INSERT INTO LearnedSkill VALUES(18,'aenf2027@gmail.com',2,1,1);
-INSERT INTO LearnedSkill VALUES(19,'aenf2027@gmail.com',3,1,1);
-INSERT INTO LearnedSkill VALUES(20,'aenf2027@gmail.com',7,1,1);
-INSERT INTO LearnedSkill VALUES(22,'jarukitsun@gmail.com',8,1,1);
+
 CREATE TABLE IF NOT EXISTS "Profession" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL,
