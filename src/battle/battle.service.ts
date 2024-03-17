@@ -6,12 +6,14 @@ import { UsersService } from 'src/users/users.service';
 import { ItemsService } from 'src/items/items.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import { Cron } from '@nestjs/schedule';
+import { PartyService } from 'src/party/party.service';
 
 @Injectable()
 export class BattleService {
   constructor(
     private readonly monsterService: MonstersService,
     private readonly userService: UsersService,
+    private readonly partyService: PartyService,
     private readonly itemService: ItemsService,
     private readonly socket: WebsocketService,
   ) {}
@@ -40,7 +42,7 @@ export class BattleService {
       let users: UserWithStats[] = [];
       const userData = await this.userService.findOne(userEmail);
       if (userData.partyId) {
-        const fullPartyInfo = await this.userService.getFullParty(
+        const fullPartyInfo = await this.partyService.getFullParty(
           userData.email,
         );
         const partyMembers = fullPartyInfo.members;

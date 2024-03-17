@@ -6,6 +6,7 @@ import { WebsocketService } from 'src/websocket/websocket.service';
 describe('User Service', () => {
   let service: UsersService;
   let prisma: PrismaService;
+  let socket: WebsocketService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -14,9 +15,10 @@ describe('User Service', () => {
 
     prisma = module.get<PrismaService>(PrismaService);
     service = module.get<UsersService>(UsersService);
+    socket = module.get<WebsocketService>(WebsocketService);
   });
 
-  describe('get_user', () => {
+  describe('findOne', () => {
     it('should query for a full user and return value when passing email on handshake auth ', async () => {
       const authEmail = 'auth@email.com';
       const fullUserparams = {
@@ -39,7 +41,7 @@ describe('User Service', () => {
     });
   });
 
-  describe('get_all_user', () => {
+  describe('findAll', () => {
     it('should return value when passing email on handshake auth ', async () => {
       const fakeUsers = [{ email: 'test@test.com' }] as any;
       const findMany = jest.fn().mockResolvedValue(fakeUsers);
@@ -49,7 +51,7 @@ describe('User Service', () => {
       expect(returnUsers).toBe(fakeUsers);
     });
   });
-  describe('create_user', () => {
+  describe('create', () => {
     it('should create user when passing email on handshake auth ', async () => {
       const authEmail = 'auth@email.com';
       const createUserDto = {
@@ -84,8 +86,8 @@ describe('User Service', () => {
       expect(returnUser).toBe(fakeNewUser);
     });
   });
-  describe('delete_user', () => {
-    it('should delete user when passing email on handshake auth ', async () => {
+  describe('deleteUser', () => {
+    it('should delete user', async () => {
       const authEmail = 'auth@email.com';
       const deleteUserQuery = {
         where: { email: authEmail },
@@ -98,15 +100,225 @@ describe('User Service', () => {
       expect(returnUser).toBe(fakeDeletedUser);
     });
   });
-  describe('get_all_professions', () => {
-    it('should fetch all professions ', async () => {
-      const dbQuery = { include: { skills: true } };
-      const fakeProfessionList = [{ name: 'priest' }] as any;
-      const findMany = jest.fn().mockResolvedValue(fakeProfessionList);
+  describe('getAllProfessions', () => {
+    it('should return list of professions', async () => {
+      const fakeReturn = {} as any;
+      const findMany = jest.fn().mockResolvedValue(fakeReturn);
       prisma.profession.findMany = findMany;
-      const returnProfessions = await service.getAllProfessions();
-      expect(findMany).toHaveBeenCalledWith(dbQuery);
-      expect(returnProfessions).toBe(fakeProfessionList);
+      const result = await service.getAllProfessions();
+      expect(findMany).toHaveBeenCalled();
+      expect(result).toBe(fakeReturn);
+    });
+  });
+  describe('notifyUserUpdate', () => {
+    it('should notify user', async () => {
+      const args = { email: 'test@test.com', payload: { message: 'yes' } };
+      const sendMessageToSocket = jest.fn().mockResolvedValue(true);
+      socket.sendMessageToSocket = sendMessageToSocket;
+      const result = await service.notifyUserUpdate(args);
+      expect(sendMessageToSocket).toHaveBeenCalledWith({
+        email: args.email,
+        event: 'user_update',
+        payload: args.payload,
+      });
+      expect(result).toBe(true);
+    });
+  });
+  describe('notifyUserError', () => {
+    it('should notify user with error', async () => {
+      const args = { email: 'test@test.com', errorMessage: 'its bug' };
+      const sendMessageToSocket = jest.fn().mockResolvedValue(true);
+      socket.sendMessageToSocket = sendMessageToSocket;
+      const result = await service.notifyUserError(args);
+      expect(sendMessageToSocket).toHaveBeenCalledWith({
+        email: args.email,
+        event: 'error_notification',
+        payload: args.errorMessage,
+      });
+      expect(result).toBe(true);
+    });
+  });
+  describe('updateUserHealthMana', () => {
+    it('should update user health and mana but dont allow it', async () => {
+      const args = {
+        userEmail: 'test@test.com',
+        health: 25,
+        mana: 25,
+      };
+      const fakeReturn = {} as any;
+      const update = jest.fn().mockResolvedValue(fakeReturn);
+      prisma.stats.update = update;
+      const result = await service.updateUserHealthMana(args);
+      expect(update).toHaveBeenCalledWith({
+        where: {
+          userEmail: args.userEmail,
+        },
+        data: {
+          health: args.health,
+          mana: args.mana,
+        },
+      });
+      expect(result).toBe(fakeReturn);
+    });
+  });
+  describe('incrementUserHealth', () => {
+    it('should update user health', async () => {
+      const args = {
+        userEmail: 'test@test.com',
+        amount: 10,
+      };
+      const fakeUpdate = {} as any;
+      const fakeStats = { maxHealth: 50, health: 30 } as any;
+      const update = jest.fn().mockResolvedValue(fakeUpdate);
+      const findUniqueStats = jest.fn().mockResolvedValue(fakeStats);
+      prisma.stats.findUnique = findUniqueStats;
+      prisma.stats.update = update;
+      const result = await service.incrementUserHealth(args);
+      expect(findUniqueStats).toHaveBeenCalled();
+      expect(update).toHaveBeenCalledWith({
+        where: { userEmail: args.userEmail },
+        //  40, because 30 + 10
+        data: { health: { set: 40 } },
+      });
+      expect(result).toBe(fakeUpdate);
+    });
+    it('should update user health but dont allow it to overflow the max cap', async () => {
+      const args = {
+        userEmail: 'test@test.com',
+        amount: 25,
+      };
+      const fakeUpdate = {} as any;
+      const fakeStats = { maxHealth: 50, health: 40 } as any;
+      const update = jest.fn().mockResolvedValue(fakeUpdate);
+      const findUniqueStats = jest.fn().mockResolvedValue(fakeStats);
+      prisma.stats.findUnique = findUniqueStats;
+      prisma.stats.update = update;
+      const result = await service.incrementUserHealth(args);
+      expect(findUniqueStats).toHaveBeenCalled();
+      expect(update).toHaveBeenCalledWith({
+        where: { userEmail: args.userEmail },
+        // only 50, because 40 + 25 would overflow to 65
+        data: { health: { set: 50 } },
+      });
+      expect(result).toBe(fakeUpdate);
+    });
+  });
+  describe('decrementUserHealth', () => {
+    it('should update user health', async () => {
+      const args = { userEmail: '', amount: 20 };
+      const fakeUpdate = {} as any;
+      const fakeStats = { health: 30 } as any;
+      const update = jest.fn().mockResolvedValue(fakeUpdate);
+      const findUniqueStats = jest.fn().mockResolvedValue(fakeStats);
+      prisma.stats.findUnique = findUniqueStats;
+      prisma.stats.update = update;
+      const result = await service.decrementUserHealth(args);
+      expect(findUniqueStats).toHaveBeenCalled();
+      expect(update).toHaveBeenCalledWith({
+        where: { userEmail: args.userEmail },
+        // should set to 10, because 30 - 20 is 10
+        data: { health: { set: 10 } },
+      });
+      expect(result).toBe(fakeUpdate);
+    });
+
+    it('should update user health but dont allow it to go below 0', async () => {
+      const args = { userEmail: '', amount: 25 };
+      const fakeUpdate = {} as any;
+      const fakeStats = { maxHealth: 20, health: 15 } as any;
+      const update = jest.fn().mockResolvedValue(fakeUpdate);
+      const findUniqueStats = jest.fn().mockResolvedValue(fakeStats);
+      prisma.stats.findUnique = findUniqueStats;
+      prisma.stats.update = update;
+      const result = await service.decrementUserHealth(args);
+      expect(findUniqueStats).toHaveBeenCalled();
+      expect(update).toHaveBeenCalledWith({
+        where: { userEmail: args.userEmail },
+        // should set to 0, because 15 - 25 is -15, which isnt allowed
+        data: { health: { set: 0 } },
+      });
+      expect(result).toBe(fakeUpdate);
+    });
+  });
+
+  describe('incrementUserMana', () => {
+    it('should update user mana', async () => {
+      const args = {
+        userEmail: 'test@test.com',
+        amount: 10,
+      };
+      const fakeUpdate = {} as any;
+      const fakeStats = { maxMana: 50, mana: 30 } as any;
+      const update = jest.fn().mockResolvedValue(fakeUpdate);
+      const findUniqueStats = jest.fn().mockResolvedValue(fakeStats);
+      prisma.stats.findUnique = findUniqueStats;
+      prisma.stats.update = update;
+      const result = await service.incrementUserMana(args);
+      expect(findUniqueStats).toHaveBeenCalled();
+      expect(update).toHaveBeenCalledWith({
+        where: { userEmail: args.userEmail },
+        // 40, because 30 + 10
+        data: { mana: { set: 40 } },
+      });
+      expect(result).toBe(fakeUpdate);
+    });
+
+    it('should update user mana but dont allow it to overflow the max cap', async () => {
+      const args = {
+        userEmail: 'test@test.com',
+        amount: 25,
+      };
+      const fakeUpdate = {} as any;
+      const fakeStats = { maxMana: 50, mana: 40 } as any;
+      const update = jest.fn().mockResolvedValue(fakeUpdate);
+      const findUniqueStats = jest.fn().mockResolvedValue(fakeStats);
+      prisma.stats.findUnique = findUniqueStats;
+      prisma.stats.update = update;
+      const result = await service.incrementUserMana(args);
+      expect(findUniqueStats).toHaveBeenCalled();
+      expect(update).toHaveBeenCalledWith({
+        where: { userEmail: args.userEmail },
+        // only 50, because 40 + 25 would overflow to 65
+        data: { mana: { set: 50 } },
+      });
+      expect(result).toBe(fakeUpdate);
+    });
+  });
+  describe('decrementUserMana', () => {
+    it('should update user mana', async () => {
+      const args = { userEmail: '', amount: 20 };
+      const fakeUpdate = {} as any;
+      const fakeStats = { mana: 30 } as any;
+      const update = jest.fn().mockResolvedValue(fakeUpdate);
+      const findUniqueStats = jest.fn().mockResolvedValue(fakeStats);
+      prisma.stats.findUnique = findUniqueStats;
+      prisma.stats.update = update;
+      const result = await service.decrementUserMana(args);
+      expect(findUniqueStats).toHaveBeenCalled();
+      expect(update).toHaveBeenCalledWith({
+        where: { userEmail: args.userEmail },
+        // should set to 10, because 30 - 20 is 10
+        data: { mana: { set: 10 } },
+      });
+      expect(result).toBe(fakeUpdate);
+    });
+
+    it('should update user mana but dont allow it to go below 0', async () => {
+      const args = { userEmail: '', amount: 25 };
+      const fakeUpdate = {} as any;
+      const fakeStats = { maxMana: 20, mana: 15 } as any;
+      const update = jest.fn().mockResolvedValue(fakeUpdate);
+      const findUniqueStats = jest.fn().mockResolvedValue(fakeStats);
+      prisma.stats.findUnique = findUniqueStats;
+      prisma.stats.update = update;
+      const result = await service.decrementUserMana(args);
+      expect(findUniqueStats).toHaveBeenCalled();
+      expect(update).toHaveBeenCalledWith({
+        where: { userEmail: args.userEmail },
+        // should set to 0, because 15 - 25 is -15, which isnt allowed
+        data: { mana: { set: 0 } },
+      });
+      expect(result).toBe(fakeUpdate);
     });
   });
 });

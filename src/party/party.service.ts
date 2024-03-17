@@ -103,6 +103,23 @@ export class PartyService {
     return true;
   }
 
+  async getFullParty(leaderEmail: string) {
+    return this.prisma.party.findUnique({
+      where: {
+        leaderEmail: leaderEmail,
+      },
+      include: {
+        members: {
+          include: {
+            appearance: true,
+            stats: true,
+            learnedSkills: { include: { skill: true } },
+          },
+        },
+      },
+    });
+  }
+
   async invite(args: { leaderEmail: string; invitedEmail: string }) {
     const ownedParty = await this.prisma.party.findUnique({
       where: {

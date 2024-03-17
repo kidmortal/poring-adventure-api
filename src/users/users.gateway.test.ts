@@ -22,12 +22,15 @@ describe('User Gateway', () => {
       const authEmail = 'auth@email.com';
       const fakeUser = { email: authEmail } as any;
       const findOne = jest.fn().mockReturnValue(fakeUser);
+      const notify = jest.fn().mockReturnValue(fakeUser);
       jest.spyOn(service, 'findOne').mockImplementation(findOne);
+      jest.spyOn(service, 'notifyUserUpdate').mockImplementation(notify);
       const returnUser = await gateway.findOne({
         // @ts-expect-error this value can be anything
         handshake: { auth: { email: authEmail } },
       });
       expect(findOne).toHaveBeenCalledWith(authEmail);
+      expect(notify).toHaveBeenCalled();
       expect(returnUser).toBe(fakeUser);
     });
 
@@ -41,6 +44,22 @@ describe('User Gateway', () => {
         handshake: { auth: { email: undefined } },
       });
       expect(findOne).not.toHaveBeenCalled();
+      expect(returnUser).toBe(false);
+    });
+
+    it('should return false when no user has been found ', async () => {
+      const authEmail = 'auth@email.com';
+      const fakeUser = undefined as any;
+      const findOne = jest.fn().mockReturnValue(fakeUser);
+      const notify = jest.fn().mockReturnValue(fakeUser);
+      jest.spyOn(service, 'findOne').mockImplementation(findOne);
+      jest.spyOn(service, 'notifyUserUpdate').mockImplementation(notify);
+      const returnUser = await gateway.findOne({
+        // @ts-expect-error this value can be anything
+        handshake: { auth: { email: authEmail } },
+      });
+      expect(findOne).toHaveBeenCalledWith(authEmail);
+      expect(notify).not.toHaveBeenCalled();
       expect(returnUser).toBe(false);
     });
   });

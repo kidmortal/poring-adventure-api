@@ -85,23 +85,6 @@ export class UsersService {
     });
   }
 
-  async getFullParty(leaderEmail: string) {
-    return this.prisma.party.findUnique({
-      where: {
-        leaderEmail: leaderEmail,
-      },
-      include: {
-        members: {
-          include: {
-            appearance: true,
-            stats: true,
-            learnedSkills: { include: { skill: true } },
-          },
-        },
-      },
-    });
-  }
-
   async findOne(email: string) {
     if (!email) {
       throw new BadRequestException('No email provided');
@@ -149,16 +132,29 @@ export class UsersService {
   }
 
   async decrementUserHealth(args: { userEmail: string; amount: number }) {
-    return this.prisma.stats.update({
+    const currentStats = await this.prisma.stats.findUnique({
       where: {
         userEmail: args.userEmail,
       },
-      data: {
-        health: {
-          decrement: args.amount,
-        },
-      },
     });
+
+    if (currentStats) {
+      const currentHealth = currentStats.health;
+      let finalHealth = currentHealth - args.amount;
+      if (finalHealth < 0) {
+        finalHealth = 0;
+      }
+      return this.prisma.stats.update({
+        where: {
+          userEmail: args.userEmail,
+        },
+        data: {
+          health: {
+            set: finalHealth,
+          },
+        },
+      });
+    }
   }
 
   async incrementUserHealth(args: { userEmail: string; amount: number }) {
@@ -189,16 +185,29 @@ export class UsersService {
   }
 
   async decrementUserMana(args: { userEmail: string; amount: number }) {
-    return this.prisma.stats.update({
+    const currentStats = await this.prisma.stats.findUnique({
       where: {
         userEmail: args.userEmail,
       },
-      data: {
-        mana: {
-          decrement: args.amount,
-        },
-      },
     });
+
+    if (currentStats) {
+      const currentMana = currentStats.mana;
+      let finalMana = currentMana - args.amount;
+      if (finalMana < 0) {
+        finalMana = 0;
+      }
+      return this.prisma.stats.update({
+        where: {
+          userEmail: args.userEmail,
+        },
+        data: {
+          mana: {
+            set: finalMana,
+          },
+        },
+      });
+    }
   }
 
   async incrementUserMana(args: { userEmail: string; amount: number }) {
