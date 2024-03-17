@@ -321,4 +321,156 @@ describe('User Service', () => {
       expect(result).toBe(fakeUpdate);
     });
   });
+
+  describe('increaseUserStats', () => {
+    it('should increase user stats received by params, and add 0 when no value is passed', async () => {
+      const args = {
+        userEmail: '',
+        level: 1,
+        health: 1,
+        mana: 1,
+        attack: 1,
+        // str: 1,
+        // int: 1,
+        // agi: 1,
+      };
+      const fakeUpdate = {} as any;
+      const update = jest.fn().mockResolvedValue(fakeUpdate);
+      prisma.stats.update = update;
+      const result = await service.increaseUserStats(args);
+      expect(update).toHaveBeenCalledWith({
+        where: {
+          userEmail: args.userEmail,
+        },
+        data: {
+          level: { increment: args.level },
+          maxHealth: { increment: args.health },
+          maxMana: { increment: args.mana },
+          attack: { increment: args.attack },
+          str: { increment: 0 },
+          agi: { increment: 0 },
+          int: { increment: 0 },
+        },
+      });
+      expect(result).toBe(fakeUpdate);
+    });
+  });
+
+  describe('decreaseUserStats', () => {
+    it('should decrease user stats received by params, and add 0 when no value is passed', async () => {
+      const args = {
+        userEmail: '',
+        level: 1,
+        health: 1,
+        mana: 1,
+        attack: 1,
+        // str: 1,
+        // int: 1,
+        // agi: 1,
+      };
+      const fakeUpdate = {} as any;
+      const update = jest.fn().mockResolvedValue(fakeUpdate);
+      prisma.stats.update = update;
+      const result = await service.decreaseUserStats(args);
+      expect(update).toHaveBeenCalledWith({
+        where: {
+          userEmail: args.userEmail,
+        },
+        data: {
+          level: { decrement: args.level },
+          maxHealth: { decrement: args.health },
+          maxMana: { decrement: args.mana },
+          attack: { decrement: args.attack },
+          str: { decrement: 0 },
+          agi: { decrement: 0 },
+          int: { decrement: 0 },
+        },
+      });
+      expect(result).toBe(fakeUpdate);
+    });
+  });
+
+  describe('increaseUserLevel', () => {
+    it('should increase user level and stats based on user profession', async () => {
+      const args = {
+        userEmail: 'email',
+        amount: 10,
+      };
+      const fakeUpdate = {} as any;
+      const fakeUser = {
+        profession: {
+          health: 10,
+          mana: 10,
+          attack: 10,
+          str: 10,
+          agi: 10,
+          int: 10,
+        },
+      } as any;
+
+      const increaseUserStats = jest.fn().mockResolvedValue(fakeUpdate);
+      const findUnique = jest.fn().mockResolvedValue(fakeUser);
+      prisma.user.findUnique = findUnique;
+      service.increaseUserStats = increaseUserStats;
+
+      await service.increaseUserLevel(args);
+      expect(findUnique).toHaveBeenCalledWith({
+        where: { email: args.userEmail },
+        include: { profession: true },
+      });
+
+      expect(increaseUserStats).toHaveBeenCalledWith({
+        userEmail: args.userEmail,
+        level: args.amount,
+        health: args.amount * fakeUser.profession.health,
+        attack: args.amount * fakeUser.profession.attack,
+        mana: args.amount * fakeUser.profession.mana,
+        str: args.amount * fakeUser.profession.str,
+        agi: args.amount * fakeUser.profession.agi,
+        int: args.amount * fakeUser.profession.int,
+      });
+    });
+  });
+
+  describe('decreaseUserLevel', () => {
+    it('should decrease user level and stats based on user profession', async () => {
+      const args = {
+        userEmail: 'email',
+        amount: 10,
+      };
+      const fakeUpdate = {} as any;
+      const fakeUser = {
+        profession: {
+          health: 10,
+          mana: 10,
+          attack: 10,
+          str: 10,
+          agi: 10,
+          int: 10,
+        },
+      } as any;
+
+      const decreaseUserStats = jest.fn().mockResolvedValue(fakeUpdate);
+      const findUnique = jest.fn().mockResolvedValue(fakeUser);
+      prisma.user.findUnique = findUnique;
+      service.decreaseUserStats = decreaseUserStats;
+
+      await service.decreaseUserLevel(args);
+      expect(findUnique).toHaveBeenCalledWith({
+        where: { email: args.userEmail },
+        include: { profession: true },
+      });
+
+      expect(decreaseUserStats).toHaveBeenCalledWith({
+        userEmail: args.userEmail,
+        level: args.amount,
+        health: args.amount * fakeUser.profession.health,
+        attack: args.amount * fakeUser.profession.attack,
+        mana: args.amount * fakeUser.profession.mana,
+        str: args.amount * fakeUser.profession.str,
+        agi: args.amount * fakeUser.profession.agi,
+        int: args.amount * fakeUser.profession.int,
+      });
+    });
+  });
 });
