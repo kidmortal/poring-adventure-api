@@ -61,6 +61,21 @@ export class PartyService {
     return false;
   }
 
+  async notifyPartyLeftMember(args: { email: string; leftPlayerName: string }) {
+    const party = await this.getUserParty(args);
+    if (party) {
+      party.members.forEach((member) => {
+        this.websocket.sendMessageToSocket({
+          email: member.email,
+          event: 'notification',
+          payload: `${args.leftPlayerName} Left the party`,
+        });
+      });
+      return party;
+    }
+    return false;
+  }
+
   async create(args: { email: string }) {
     const userHasParty = await this.userHasParty({ email: args.email });
     if (userHasParty) return false;
@@ -118,6 +133,28 @@ export class PartyService {
           joinedPlayerName: result.name,
         });
         this.notifyPartyWithData({ email: args.email });
+        return true;
+      }
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async quitParty(args: { email: string; partyId }) {
+    try {
+      const result = await this.prisma.user.update({
+        where: { email: args.email },
+        data: { partyId: undefined },
+      });
+      const remainingParty = await this.prisma.party.findUnique({
+        where: { id: args.partyId },
+      });
+      if (result) {
+        this.notifyPartyLeftMember({
+          email: remainingParty.leaderEmail,
+          leftPlayerName: result.name,
+        });
+        this.notifyUserWithNoParty({ email: args.email });
         return true;
       }
     } catch (error) {

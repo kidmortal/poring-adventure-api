@@ -65,7 +65,7 @@ export class UsersService {
 
   findAll() {
     return this.prisma.user.findMany({
-      take: 10,
+      take: 20,
       orderBy: {
         stats: {
           experience: 'desc',

@@ -24,7 +24,7 @@ export class UsersGateway {
     const email = client.handshake.auth.email;
     this.logger.debug(`'get_user' ${email}`);
     if (!email) {
-      return;
+      return false;
     }
     const user = await this.userService.findOne(email);
     if (!user) {
