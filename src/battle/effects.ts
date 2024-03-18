@@ -15,7 +15,7 @@ const effects = {
       params.dmgStep.skipDamageStep = true;
       params.battle.pushLog({
         icon: params.image,
-        log: `${params.dmgStep.user.name} Cannot be damaged by ${params.dmgStep.monster.name}'`,
+        log: `${params.dmgStep.user.name} Cannot be damaged by ${params.dmgStep.monster.name}`,
       });
       // console.log('reducing damage');
       // params.dmgStep.damage.value *= 0.5;
