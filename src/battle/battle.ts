@@ -456,11 +456,13 @@ export class BattleInstance {
     const userAlive = this.isPlayersAlive;
     if (monsterAlive && userAlive) {
       this.notifyUsers();
+      return;
     }
     this.battleFinished = true;
     if (monsterAlive && !userAlive) {
       this.userLost = true;
       this.notifyUsers();
+      return;
     }
     this.generateBattleDrops();
     await this.updateUsers(this);

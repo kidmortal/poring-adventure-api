@@ -70,6 +70,7 @@ export class BattleService {
   }
 
   async remove(userEmail: string) {
+    console.log(this.battleList);
     const battleIndex = this.battleList.findIndex((battle) =>
       battle.hasUser(userEmail),
     );
@@ -90,12 +91,14 @@ export class BattleService {
     if (!battle) return false;
     if (battle.battleFinished) return false;
     battle.processUserAttack({ email: userEmail });
+    return true;
   }
   async cast(args: { email: string; skillId: number }) {
     const battle = this.getUserBattle(args.email);
     if (!battle) return false;
     if (battle.battleFinished) return false;
     battle.processUserCast(args);
+    return true;
   }
 
   private async updateStatsAndRewards(battle: BattleInstance) {
