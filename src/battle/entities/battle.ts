@@ -1,4 +1,5 @@
 import {
+  Buff,
   Drop,
   Item,
   LearnedSkill,
@@ -6,10 +7,12 @@ import {
   Skill,
   Stats,
   User,
+  UserBuff,
 } from '@prisma/client';
 import { BattleUtils } from '../battleUtils';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import { utils } from 'src/utils';
+import { runEffect } from '../effects';
 
 enum SkillCategory {
   TargetEnemy = 'target_enemy',
@@ -20,6 +23,21 @@ enum SkillEffect {
   Healing = 'healing',
   Infusion = 'infusion',
 }
+
+type DamageInfo = {
+  image: string;
+  name: string;
+  skill?: LearnedSkillWithSkill;
+  value: number;
+};
+
+export type DamageStepParams = {
+  attacker: 'user' | 'monster';
+  user: UserWithStats;
+  monster: MonsterWithDrops;
+  damage: DamageInfo;
+  skipDamageStep?: boolean;
+};
 
 export type MonsterWithDrops = Monster & {
   drops: DropWithItem[];
@@ -33,6 +51,10 @@ export type UserWithStats = User & {
   stats: Stats;
   isDead?: boolean;
   learnedSkills: LearnedSkillWithSkill[];
+  buffs: UserBuffWithBuff[];
+};
+type UserBuffWithBuff = UserBuff & {
+  buff: Buff;
 };
 
 type LearnedSkillWithSkill = LearnedSkill & {
@@ -121,18 +143,19 @@ export class BattleInstance {
 
     if (isUserTurn) {
       const user = this.getUserFromBattle(args.email);
-      const userDamage = utils.randomDamage(user.stats.attack, 20);
+      const userDamage = user.stats.attack;
       const targetMonster = this.monsters[0];
 
-      targetMonster.health -= userDamage;
-      this.pushLog({
-        log: `${user.name} Dealt ${userDamage} damage to ${targetMonster.name}`,
-        icon: 'https://kidmortal.sirv.com/skills/attack.webp',
+      return this.beforeDamageStep({
+        attacker: 'user',
+        monster: targetMonster,
+        user: user,
+        damage: {
+          image: 'https://kidmortal.sirv.com/skills/attack.webp',
+          name: '',
+          value: userDamage,
+        },
       });
-
-      this.processNextTurn();
-      this.notifyUsers();
-      return true;
     }
     return false;
   }
@@ -161,20 +184,20 @@ export class BattleInstance {
   }) {
     const userAttribute: number = args.user.stats[args.skill.skill.attribute];
     const multiplier = args.skill.skill.multiplier * args.skill.masteryLevel;
-    const userDamage = utils.randomDamage(
-      args.user.stats.attack + userAttribute * multiplier,
-      20,
-    );
     const targetMonster = this.monsters[0];
-    args.user.stats.mana -= args.skill.skill.manaCost;
-    targetMonster.health -= userDamage;
-    this.pushLog({
-      log: `${args.user.name} Dealt ${userDamage} damage to ${targetMonster.name}`,
-      icon: args.skill.skill.image,
+    const userDamage = args.user.stats.attack + userAttribute * multiplier;
+
+    return this.beforeDamageStep({
+      attacker: 'user',
+      monster: targetMonster,
+      user: args.user,
+      damage: {
+        image: args.skill.skill.image,
+        name: '',
+        value: userDamage,
+        skill: args.skill,
+      },
     });
-    this.processNextTurn();
-    this.notifyUsers();
-    return true;
   }
 
   private async processCastTargetAlly(args: {
@@ -269,19 +292,19 @@ export class BattleInstance {
     const isMonsterAlive = monster?.health > 0;
 
     if (monster && isMonsterAlive) {
-      const monsterDamage = utils.randomDamage(monster.attack, 20);
+      const monsterDamage = monster.attack;
       const random = Math.floor(Math.random() * this.users.length);
       const targetUser = this.users[random];
-      this.damageUser({ user: targetUser, amount: monsterDamage });
-
-      this.pushLog({
-        log: `${monster.name} Dealt ${monsterDamage} damage to ${targetUser.name}`,
-        icon: 'https://kidmortal.sirv.com/skills/attack.webp',
+      return this.beforeDamageStep({
+        attacker: 'monster',
+        monster: monster,
+        user: targetUser,
+        damage: {
+          image: 'https://kidmortal.sirv.com/skills/attack.webp',
+          name: '',
+          value: monsterDamage,
+        },
       });
-
-      this.processNextTurn();
-      this.notifyUsers();
-      return true;
     }
     return false;
   }
@@ -318,6 +341,64 @@ export class BattleInstance {
       return castingSkill;
     }
     return undefined;
+  }
+
+  private beforeDamageStep(args: DamageStepParams) {
+    if (args.attacker === 'monster') {
+      if (args.user.buffs.length > 0) {
+        args.user.buffs.forEach(({ buff }) => {
+          runEffect({
+            effect: buff.effect,
+            dmgStep: args,
+            role: 'defender',
+            battle: this,
+          });
+        });
+      }
+    }
+    if (args.attacker === 'user') {
+      if (args.damage.skill) {
+        const userSkill = args.damage.skill;
+        args.user.stats.mana -= userSkill.skill.manaCost;
+      }
+    }
+    if (!args.skipDamageStep) {
+      console.log('run dmg');
+      return this.startDamageStep(args);
+    } else {
+      console.log('skip dmg');
+      return this.afterDamageStep();
+    }
+  }
+
+  private startDamageStep({
+    attacker,
+    damage,
+    user,
+    monster,
+  }: DamageStepParams) {
+    const randomDmg = utils.randomDamage(damage.value, 20);
+    if (attacker === 'user') {
+      monster.health -= randomDmg;
+      this.pushLog({
+        log: `${user.name} Dealt ${randomDmg} damage to ${monster.name}`,
+        icon: damage.image,
+      });
+    }
+    if (attacker === 'monster') {
+      this.damageUser({ user: user, amount: randomDmg });
+      this.pushLog({
+        log: `${monster.name} Dealt ${randomDmg} damage to ${user.name}`,
+        icon: damage.image,
+      });
+    }
+    this.afterDamageStep();
+  }
+
+  private afterDamageStep() {
+    this.processNextTurn();
+    this.notifyUsers();
+    return true;
   }
 
   toJson() {

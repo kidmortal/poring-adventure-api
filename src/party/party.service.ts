@@ -113,6 +113,7 @@ export class PartyService {
           include: {
             appearance: true,
             stats: true,
+            buffs: { include: { buff: true } },
             learnedSkills: { include: { skill: true } },
           },
         },
