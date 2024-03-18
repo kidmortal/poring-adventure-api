@@ -24,13 +24,14 @@ model User {
   stats         Stats?
   profession    Profession?     @relation(fields: [professionId], references: [id])
   professionId  Int?
+  Party         Party?          @relation(fields: [partyId], references: [id])
+  partyId       Int?
   equipment     EquippedItem[]
   inventory     InventoryItem[]
   market        MarketListing[]
-  Party         Party?          @relation(fields: [partyId], references: [id])
-  partyId       Int?
   notifications Notification[]
   learnedSkills LearnedSkill[]
+  buffs         UserBuff[]
 }
 
 model Stats {
@@ -188,4 +189,25 @@ model Notification {
   visualized Boolean
   user       User    @relation(fields: [userId], references: [id])
   userId     Int
+}
+
+model UserBuff {
+  id       Int   @id @default(autoincrement())
+  buff     Buff  @relation(fields: [buffId], references: [id])
+  buffId   Int
+  user     User? @relation(fields: [userId], references: [id])
+  userId   Int?
+  duration Int
+}
+
+model Buff {
+  id       Int        @id @default(autoincrement())
+  name     String     @unique
+  effect   String     @default("none")
+  duration Int
+  image    String
+  pose     String     @default("default")
+  persist  Boolean    @default(false)
+  maxStack Int        @default(1)
+  UserBuff UserBuff[]
 }
