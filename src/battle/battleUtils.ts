@@ -1,4 +1,4 @@
-import { MonsterWithDrops, UserWithStats } from './entities/battle';
+import { MonsterWithDrops, UserWithStats } from './battle';
 
 function generateBattleAttackOrder(
   users: UserWithStats[],

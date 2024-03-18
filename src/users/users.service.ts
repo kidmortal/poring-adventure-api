@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { WebsocketService } from 'src/websocket/websocket.service';
-import { UserWithStats } from 'src/battle/entities/battle';
+import { UserWithStats } from 'src/battle/battle';
 import { utils } from 'src/utils';
 import { PrismaService } from 'src/prisma/prisma.service';
 
