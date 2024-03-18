@@ -97,6 +97,7 @@ export class UsersService {
         equipment: { include: { item: true } },
         profession: { include: { skills: true } },
         learnedSkills: { include: { skill: true } },
+        buffs: { include: { buff: true } },
         stats: true,
       },
     });
