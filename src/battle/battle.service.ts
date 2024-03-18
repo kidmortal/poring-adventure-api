@@ -57,6 +57,7 @@ export class BattleService {
         socket: this.socket,
         users: users,
         monsters: monsters,
+        updateUsers: (b) => this.updateStatsAndRewards(b),
       });
 
       newBattleInstance.notifyUsers();
@@ -88,47 +89,13 @@ export class BattleService {
     const battle = this.getUserBattle(userEmail);
     if (!battle) return false;
     if (battle.battleFinished) return false;
-    const didAttack = await battle.processUserAttack({
-      email: userEmail,
-    });
-    if (didAttack) {
-      const didBattleFinish = await this.settleBattleAndProcessRewards(battle);
-      if (didBattleFinish) return true;
-    }
-    return false;
+    battle.processUserAttack({ email: userEmail });
   }
   async cast(args: { email: string; skillId: number }) {
     const battle = this.getUserBattle(args.email);
     if (!battle) return false;
     if (battle.battleFinished) return false;
-    const didAttack = await battle.processUserCast(args);
-    if (didAttack) {
-      const didBattleFinish = await this.settleBattleAndProcessRewards(battle);
-      if (didBattleFinish) return true;
-    }
-    return false;
-  }
-
-  private async settleBattleAndProcessRewards(battle: BattleInstance) {
-    const monsterAlive = battle.isMonsterAlive;
-    const userAlive = battle.isPlayersAlive;
-    if (monsterAlive && userAlive) {
-      battle.notifyUsers();
-      return false;
-    }
-    battle.battleFinished = true;
-    if (monsterAlive && !userAlive) {
-      this.logger.log('User lost battle, skipping updates');
-      battle.userLost = true;
-      battle.notifyUsers();
-      return true;
-    }
-
-    battle.generateBattleDrops();
-
-    await this.updateStatsAndRewards(battle);
-    battle.notifyUsers();
-    return true;
+    battle.processUserCast(args);
   }
 
   private async updateStatsAndRewards(battle: BattleInstance) {
@@ -156,8 +123,7 @@ export class BattleService {
       }
       await this.userService.notifyUserUpdateWithProfile({ email: userEmail });
     }
-
-    return true;
+    battle.notifyUsers();
   }
 
   private getUserBattle(userEmail: string): BattleInstance | undefined {

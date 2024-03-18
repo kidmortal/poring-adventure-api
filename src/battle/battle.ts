@@ -76,6 +76,7 @@ type CreateBattleParams = {
   users: UserWithStats[];
   monsters: MonsterWithDrops[];
   socket: WebsocketService;
+  updateUsers: (battle: BattleInstance) => Promise<void>;
 };
 
 export type BattleLog = {
@@ -103,6 +104,7 @@ export class BattleInstance {
   private attackerList: string[] = [];
   battleFinished: boolean = false;
   userLost: boolean = false;
+  updateUsers: (battle: BattleInstance) => Promise<void>;
   private log: BattleLog[] = [];
   private drops: BattleDrop[] = [];
 
@@ -122,11 +124,12 @@ export class BattleInstance {
     }
   }
 
-  constructor({ monsters, users, socket }: CreateBattleParams) {
+  constructor({ monsters, users, socket, updateUsers }: CreateBattleParams) {
     this.socket = socket;
     this.users = users;
     this.monsters = monsters;
     this.attackerList = BattleUtils.generateBattleAttackOrder(users, monsters);
+    this.updateUsers = updateUsers;
   }
 
   // Functions that round be called periodically
@@ -397,6 +400,7 @@ export class BattleInstance {
   }
 
   private afterDamageStep() {
+    this.settleBattleAndProcessRewards();
     this.processNextTurn();
     this.notifyUsers();
     return true;
@@ -445,6 +449,21 @@ export class BattleInstance {
 
   getUserFromBattle(email: string) {
     return this.users.find((u) => u.email === email);
+  }
+
+  private async settleBattleAndProcessRewards() {
+    const monsterAlive = this.isMonsterAlive;
+    const userAlive = this.isPlayersAlive;
+    if (monsterAlive && userAlive) {
+      this.notifyUsers();
+    }
+    this.battleFinished = true;
+    if (monsterAlive && !userAlive) {
+      this.userLost = true;
+      this.notifyUsers();
+    }
+    this.generateBattleDrops();
+    await this.updateUsers(this);
   }
 
   generateBattleDrops() {
