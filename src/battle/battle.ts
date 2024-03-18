@@ -9,10 +9,10 @@ import {
   User,
   UserBuff,
 } from '@prisma/client';
-import { BattleUtils } from '../battleUtils';
+import { BattleUtils } from './battleUtils';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import { utils } from 'src/utils';
-import { runEffect } from '../effects';
+import { runEffect } from './effects';
 
 enum SkillCategory {
   TargetEnemy = 'target_enemy',
@@ -351,6 +351,7 @@ export class BattleInstance {
             effect: buff.effect,
             dmgStep: args,
             role: 'defender',
+            image: buff.image,
             battle: this,
           });
         });

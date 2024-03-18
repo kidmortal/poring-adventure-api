@@ -1,8 +1,9 @@
-import { BattleInstance, DamageStepParams } from './entities/battle';
+import { BattleInstance, DamageStepParams } from './battle';
 
 const effects = {
   power_up: (params: {
     dmgStep: DamageStepParams;
+    image: string;
     battle: BattleInstance;
     role: 'attacker' | 'defender';
   }) => {
@@ -13,7 +14,7 @@ const effects = {
     if (params.role === 'defender') {
       params.dmgStep.skipDamageStep = true;
       params.battle.pushLog({
-        icon: 'https://cdn.discordapp.com/emojis/1167895403761520652.webp?size=96&quality=lossless',
+        icon: params.image,
         log: `${params.dmgStep.user.name} Used hack and stopped ${params.dmgStep.monster.name}'s Attack`,
       });
       // console.log('reducing damage');
@@ -28,6 +29,7 @@ export function runEffect({
 }: {
   effect: string;
   dmgStep: DamageStepParams;
+  image: string;
   battle: BattleInstance;
   role: 'attacker' | 'defender';
 }) {

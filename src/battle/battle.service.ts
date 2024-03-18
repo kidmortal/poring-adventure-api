@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { BattleInstance, UserWithStats } from './entities/battle';
+import { BattleInstance, UserWithStats } from './battle';
 import { MonstersService } from 'src/monsters/monsters.service';
 import { UsersService } from 'src/users/users.service';
 import { ItemsService } from 'src/items/items.service';
