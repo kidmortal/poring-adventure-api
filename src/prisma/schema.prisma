@@ -196,8 +196,10 @@ model UserBuff {
   buff      Buff   @relation(fields: [buffId], references: [id])
   buffId    Int
   user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
-  userEmail String @unique
+  userEmail String
   duration  Int
+
+  @@unique([userEmail, buffId])
 }
 
 model Buff {
