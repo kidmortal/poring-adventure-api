@@ -28,7 +28,8 @@ describe('User Service', () => {
           inventory: { include: { item: true, marketListing: true } },
           equipment: { include: { item: true } },
           profession: { include: { skills: true } },
-          learnedSkills: { include: { skill: true } },
+          learnedSkills: { include: { skill: { include: { buff: true } } } },
+          buffs: { include: { buff: true } },
           stats: true,
         },
       };

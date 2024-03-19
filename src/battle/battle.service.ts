@@ -70,7 +70,6 @@ export class BattleService {
   }
 
   async remove(userEmail: string) {
-    console.log(this.battleList);
     const battleIndex = this.battleList.findIndex((battle) =>
       battle.hasUser(userEmail),
     );

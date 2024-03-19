@@ -160,7 +160,7 @@ model Skill {
   id            Int            @id @default(autoincrement())
   requiredLevel Int            @default(1)
   manaCost      Int            @default(1)
-  category      String         @default("targetEnemy")
+  category      String         @default("target_enemy")
   effect        String?
   name          String
   image         String
@@ -169,6 +169,8 @@ model Skill {
   profession    Profession     @relation(fields: [professionId], references: [id])
   professionId  Int
   learnedSkill  LearnedSkill[]
+  buff          Buff?          @relation(fields: [buffId], references: [id])
+  buffId        Int?
 }
 
 model LearnedSkill {
@@ -212,4 +214,5 @@ model Buff {
   persist  Boolean    @default(false)
   maxStack Int        @default(1)
   UserBuff UserBuff[]
+  Skill    Skill[]
 }

@@ -16,11 +16,19 @@ type EffectMap = {
 const effects: EffectMap = {
   power_up: (params) => {
     return {
-      onAttack: () => {
-        params.dmgStep.damage.value *= 1.5;
-      },
+      onAttack: () => (params.dmgStep.damage.value *= 1.5),
+      onDefense: () => (params.dmgStep.damage.value *= 0.5),
+    };
+  },
+  parry: (params) => {
+    return {
+      onAttack: () => {},
       onDefense: () => {
-        params.dmgStep.damage.value *= 0.5;
+        params.battle.pushLog({
+          icon: params.image,
+          log: `${params.dmgStep.user.name} Reflected ${params.dmgStep.damage.value} back to ${params.dmgStep.monster.name}`,
+        });
+        params.dmgStep.skipDamageStep = true;
       },
     };
   },

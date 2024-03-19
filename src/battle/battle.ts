@@ -17,6 +17,7 @@ import { runEffect } from './effects';
 enum SkillCategory {
   TargetEnemy = 'target_enemy',
   TargetAlly = 'target_ally',
+  BuffSelf = 'buff_self',
 }
 
 enum SkillEffect {
@@ -58,7 +59,10 @@ type UserBuffWithBuff = UserBuff & {
 };
 
 type LearnedSkillWithSkill = LearnedSkill & {
-  skill: Skill;
+  skill: SkillWithBuff;
+};
+type SkillWithBuff = Skill & {
+  buff?: Buff;
 };
 
 export type Battle = {
@@ -173,6 +177,8 @@ export class BattleInstance {
           return this.processCastTargetEnemy({ user, skill });
         case SkillCategory.TargetAlly:
           return this.processCastTargetAlly({ user, skill });
+        case SkillCategory.BuffSelf:
+          return this.processCastBuffSelf({ user, skill });
 
         default:
           return this.processCastTargetEnemy({ user, skill });
@@ -228,10 +234,29 @@ export class BattleInstance {
         icon: args.skill.skill.image,
       });
     }
+    return this.afterDamageStep();
+  }
 
-    this.processNextTurn();
-    this.notifyUsers();
-    return true;
+  private async processCastBuffSelf(args: {
+    user: UserWithStats;
+    skill: LearnedSkillWithSkill;
+  }) {
+    args.user.stats.mana -= args.skill.skill.manaCost;
+    if (args.skill.skill.buff) {
+      const buff = args.skill.skill.buff;
+      args.user.buffs.push({
+        duration: 1,
+        id: 0,
+        userEmail: args.user.email,
+        buffId: buff.id,
+        buff,
+      });
+      this.pushLog({
+        log: `${args.user.name} Casted ${buff.name} on himself`,
+        icon: args.skill.skill.image,
+      });
+    }
+    return this.afterDamageStep();
   }
 
   private getLowestManaMember() {
@@ -401,9 +426,25 @@ export class BattleInstance {
 
   private afterDamageStep() {
     this.settleBattleAndProcessRewards();
+    this.decreaseOrRemoveBuffs();
     this.processNextTurn();
     this.notifyUsers();
     return true;
+  }
+
+  private decreaseOrRemoveBuffs() {
+    const currentTurn = this.attackerList[this.attackerTurn];
+    const user = this.users.find((u) => u.name === currentTurn);
+    if (user) {
+      user.buffs.forEach(({ buff }) => (buff.duration -= 1));
+      user.buffs = user.buffs.filter(({ buff }) => buff.duration >= 1);
+      return;
+    }
+    const monster = this.monsters.find((m) => m.name === currentTurn);
+    if (monster) {
+      console.log('monster');
+      return;
+    }
   }
 
   toJson() {
