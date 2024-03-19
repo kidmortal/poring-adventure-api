@@ -30,6 +30,7 @@ type DamageInfo = {
   name: string;
   skill?: LearnedSkillWithSkill;
   value: number;
+  aggro: number;
 };
 
 export type DamageStepParams = {
@@ -51,6 +52,7 @@ export type DropWithItem = Drop & {
 export type UserWithStats = User & {
   stats: Stats;
   isDead?: boolean;
+  aggro?: number;
   learnedSkills: LearnedSkillWithSkill[];
   buffs: UserBuffWithBuff[];
 };
@@ -130,7 +132,7 @@ export class BattleInstance {
 
   constructor({ monsters, users, socket, updateUsers }: CreateBattleParams) {
     this.socket = socket;
-    this.users = users;
+    this.users = users.map((u) => ({ ...u, aggro: 0 }));
     this.monsters = monsters;
     this.attackerList = BattleUtils.generateBattleAttackOrder(users, monsters);
     this.updateUsers = updateUsers;
@@ -161,6 +163,7 @@ export class BattleInstance {
           image: 'https://kidmortal.sirv.com/skills/attack.webp',
           name: '',
           value: userDamage,
+          aggro: userDamage,
         },
       });
     }
@@ -205,6 +208,7 @@ export class BattleInstance {
         name: '',
         value: userDamage,
         skill: args.skill,
+        aggro: userDamage,
       },
     });
   }
@@ -291,6 +295,22 @@ export class BattleInstance {
     return lowestUser;
   }
 
+  private getHighestAggroPlayer() {
+    let highestUser = this.users[0];
+    this.users.forEach((user) => {
+      if (user.aggro > highestUser.aggro) {
+        highestUser = user;
+      }
+    });
+    return highestUser;
+  }
+
+  private decreasePlayersAggro() {
+    this.users.forEach((user) => {
+      user.aggro = Math.floor(user.aggro * 0.8);
+    });
+  }
+
   private async healUser(args: { user: UserWithStats; amount: number }) {
     args.user.stats.health += args.amount;
     if (args.user.stats.health > args.user.stats.maxHealth) {
@@ -321,8 +341,7 @@ export class BattleInstance {
 
     if (monster && isMonsterAlive) {
       const monsterDamage = monster.attack;
-      const random = Math.floor(Math.random() * this.users.length);
-      const targetUser = this.users[random];
+      const targetUser = this.getHighestAggroPlayer();
       return this.beforeDamageStep({
         attacker: 'monster',
         monster: monster,
@@ -331,6 +350,7 @@ export class BattleInstance {
           image: 'https://kidmortal.sirv.com/skills/attack.webp',
           name: '',
           value: monsterDamage,
+          aggro: 0,
         },
       });
     }
@@ -408,6 +428,7 @@ export class BattleInstance {
   }: DamageStepParams) {
     const randomDmg = utils.randomDamage(damage.value, 20);
     if (attacker === 'user') {
+      user.aggro += damage.aggro;
       monster.health -= randomDmg;
       this.pushLog({
         log: `${user.name} Dealt ${randomDmg} damage to ${monster.name}`,
@@ -427,6 +448,7 @@ export class BattleInstance {
   private afterDamageStep() {
     this.settleBattleAndProcessRewards();
     this.decreaseOrRemoveBuffs();
+    this.decreasePlayersAggro();
     this.processNextTurn();
     this.notifyUsers();
     return true;
