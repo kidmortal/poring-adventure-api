@@ -458,7 +458,7 @@ export class BattleInstance {
       this.notifyUsers();
       return;
     }
-    this.battleFinished = true;
+    this.battleFinished = false;
     if (monsterAlive && !userAlive) {
       this.userLost = true;
       this.notifyUsers();
@@ -466,6 +466,8 @@ export class BattleInstance {
     }
     this.generateBattleDrops();
     await this.updateUsers(this);
+    this.battleFinished = true;
+    this.notifyUsers();
   }
 
   generateBattleDrops() {
