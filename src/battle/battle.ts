@@ -406,6 +406,17 @@ export class BattleInstance {
       }
     }
     if (args.attacker === 'user') {
+      if (args.user.buffs.length > 0) {
+        args.user.buffs.forEach(({ buff }) => {
+          runEffect({
+            effect: buff.effect,
+            dmgStep: args,
+            role: 'attacker',
+            image: buff.image,
+            battle: this,
+          });
+        });
+      }
       if (args.damage.skill) {
         const userSkill = args.damage.skill;
         args.user.stats.mana -= userSkill.skill.manaCost;
@@ -429,6 +440,7 @@ export class BattleInstance {
     const randomDmg = utils.randomDamage(damage.value, 20);
     if (attacker === 'user') {
       user.aggro += damage.aggro;
+      console.log(damage.aggro);
       monster.health -= randomDmg;
       this.pushLog({
         log: `${user.name} Dealt ${randomDmg} damage to ${monster.name}`,

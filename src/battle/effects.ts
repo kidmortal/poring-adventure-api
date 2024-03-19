@@ -17,10 +17,10 @@ const effects: EffectMap = {
   power_up: (params) => {
     return {
       onAttack: () => {
-        params.dmgStep.damage.value *= 1.5;
+        params.dmgStep.damage.value *= 1.2;
         params.dmgStep.damage.aggro *= 3;
       },
-      onDefense: () => (params.dmgStep.damage.value *= 0.5),
+      onDefense: () => (params.dmgStep.damage.value *= 0.8),
     };
   },
   parry: (params) => {
