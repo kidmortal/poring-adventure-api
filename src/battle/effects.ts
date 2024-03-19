@@ -1,30 +1,46 @@
 import { BattleInstance, DamageStepParams } from './battle';
 
-const effects = {
-  power_up: (params: {
-    dmgStep: DamageStepParams;
-    image: string;
-    battle: BattleInstance;
-    role: 'attacker' | 'defender';
-  }) => {
-    if (params.role === 'attacker') {
-      console.log('increasing damage');
-      params.dmgStep.damage.value *= 1.5;
-    }
-    if (params.role === 'defender') {
-      params.dmgStep.skipDamageStep = true;
-      params.battle.pushLog({
-        icon: params.image,
-        log: `${params.dmgStep.user.name} Cannot be damaged by ${params.dmgStep.monster.name}`,
-      });
-      // console.log('reducing damage');
-      // params.dmgStep.damage.value *= 0.5;
-    }
+type Effect = (params: {
+  dmgStep: DamageStepParams;
+  image: string;
+  battle: BattleInstance;
+}) => {
+  onAttack: () => void;
+  onDefense: () => void;
+};
+
+type EffectMap = {
+  [effect: string]: Effect;
+};
+
+const effects: EffectMap = {
+  power_up: (params) => {
+    return {
+      onAttack: () => {
+        params.dmgStep.damage.value *= 1.5;
+      },
+      onDefense: () => {
+        params.dmgStep.damage.value *= 0.5;
+      },
+    };
+  },
+  invincible: (params) => {
+    return {
+      onAttack: () => {},
+      onDefense: () => {
+        params.dmgStep.skipDamageStep = true;
+        params.battle.pushLog({
+          icon: params.image,
+          log: `${params.dmgStep.user.name} Negated ${params.dmgStep.damage.value} damage from ${params.dmgStep.monster.name}`,
+        });
+      },
+    };
   },
 };
 
 export function runEffect({
   effect,
+  role,
   ...rest
 }: {
   effect: string;
@@ -33,6 +49,9 @@ export function runEffect({
   battle: BattleInstance;
   role: 'attacker' | 'defender';
 }) {
-  console.log(effect);
-  effects[effect](rest);
+  const effectFuntion = effects[effect];
+  if (effectFuntion) {
+    if (role === 'attacker') effectFuntion(rest).onAttack();
+    if (role === 'defender') effectFuntion(rest).onDefense();
+  }
 }

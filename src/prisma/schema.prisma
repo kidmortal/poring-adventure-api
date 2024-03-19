@@ -187,17 +187,17 @@ model Notification {
   id         Int     @id @default(autoincrement())
   content    String
   visualized Boolean
-  user       User    @relation(fields: [userId], references: [id])
-  userId     Int
+  user       User    @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  userEmail  String  @unique
 }
 
 model UserBuff {
-  id       Int   @id @default(autoincrement())
-  buff     Buff  @relation(fields: [buffId], references: [id])
-  buffId   Int
-  user     User? @relation(fields: [userId], references: [id])
-  userId   Int?
-  duration Int
+  id        Int    @id @default(autoincrement())
+  buff      Buff   @relation(fields: [buffId], references: [id])
+  buffId    Int
+  user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  userEmail String @unique
+  duration  Int
 }
 
 model Buff {

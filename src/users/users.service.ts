@@ -409,6 +409,17 @@ export class UsersService {
     });
   }
 
+  async decreaseUserBuffs(args: { userEmail: string }) {
+    await this.prisma.userBuff.updateMany({
+      where: { userEmail: args.userEmail },
+      data: { duration: { decrement: 1 } },
+    });
+    await this.prisma.userBuff.deleteMany({
+      where: { userEmail: args.userEmail, duration: { lte: 0 } },
+    });
+    return true;
+  }
+
   async levelUpUser({
     user,
     expGain,
