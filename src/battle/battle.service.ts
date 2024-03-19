@@ -113,6 +113,7 @@ export class BattleService {
       const rewardUser = battle.getUserFromBattle(userEmail);
       const remainingHealth = rewardUser.stats.health;
       const remainingMana = rewardUser.stats.mana;
+      await this.userService.decreaseUserBuffs({ userEmail });
       await this.userService.addExpSilver({ userEmail, silver, exp });
       await this.userService.levelUpUser({ user: rewardUser, expGain: exp });
       await this.userService.updateUserHealthMana({
@@ -126,7 +127,6 @@ export class BattleService {
       }
       await this.userService.notifyUserUpdateWithProfile({ email: userEmail });
     }
-    battle.notifyUsers();
   }
 
   private getUserBattle(userEmail: string): BattleInstance | undefined {
