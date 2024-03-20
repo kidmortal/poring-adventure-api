@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS "Appearance" (
     "userEmail" TEXT NOT NULL,
     CONSTRAINT "Appearance_userEmail_fkey" FOREIGN KEY ("userEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE
 );
-
 CREATE TABLE IF NOT EXISTS "Item" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL,
@@ -72,35 +71,6 @@ CREATE TABLE IF NOT EXISTS "Stats" (
     "userEmail" TEXT NOT NULL,
     CONSTRAINT "Stats_userEmail_fkey" FOREIGN KEY ("userEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE
 );
-
-CREATE TABLE IF NOT EXISTS "Notification" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "content" TEXT NOT NULL,
-    "visualized" BOOLEAN NOT NULL,
-    "userId" INTEGER NOT NULL,
-    CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
-);
-CREATE TABLE IF NOT EXISTS "Skill" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "requiredLevel" INTEGER NOT NULL DEFAULT 1,
-    "manaCost" INTEGER NOT NULL DEFAULT 1,
-    "category" TEXT NOT NULL DEFAULT 'targetEnemy',
-    "effect" TEXT,
-    "name" TEXT NOT NULL,
-    "image" TEXT NOT NULL,
-    "attribute" TEXT NOT NULL,
-    "multiplier" INTEGER NOT NULL DEFAULT 1,
-    "professionId" INTEGER NOT NULL,
-    CONSTRAINT "Skill_professionId_fkey" FOREIGN KEY ("professionId") REFERENCES "Profession" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
-);
-INSERT INTO Skill VALUES(1,1,2,'target_enemy','','Fire Slash','https://kidmortal.sirv.com/skills/fire_slash.webp','str',2,1);
-INSERT INTO Skill VALUES(2,1,3,'target_ally','healing','Light Healing','https://kidmortal.sirv.com/skills/healing.webp','int',3,2);
-INSERT INTO Skill VALUES(3,1,2,'target_enemy',NULL,'Light Missile','https://kidmortal.sirv.com/skills/light_missile.webp','int',2,2);
-INSERT INTO Skill VALUES(4,3,5,'target_enemy',NULL,'Water Flash','https://kidmortal.sirv.com/skills/water_slash.webp','int',3,1);
-INSERT INTO Skill VALUES(5,1,2,'target_enemy',NULL,'Fireball','https://kidmortal.sirv.com/skills/fireball.webp','int',2,3);
-INSERT INTO Skill VALUES(6,1,5,'target_enemy',NULL,'Icicle','https://kidmortal.sirv.com/skills/ice_shards.webp','int',4,3);
-INSERT INTO Skill VALUES(7,1,0,'target_ally','infusion','Mana Infusion','https://kidmortal.sirv.com/skills/infusion.webp','int',2,2);
-INSERT INTO Skill VALUES(8,1,2,'target_enemy',NULL,'Backstab','https://kidmortal.sirv.com/skills/backstab.webp','agi',4,5);
 CREATE TABLE IF NOT EXISTS "EquippedItem" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "userEmail" TEXT NOT NULL,
@@ -108,7 +78,6 @@ CREATE TABLE IF NOT EXISTS "EquippedItem" (
     CONSTRAINT "EquippedItem_userEmail_fkey" FOREIGN KEY ("userEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "EquippedItem_itemId_fkey" FOREIGN KEY ("itemId") REFERENCES "Item" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
-
 CREATE TABLE IF NOT EXISTS "InventoryItem" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "stack" INTEGER NOT NULL,
@@ -117,7 +86,6 @@ CREATE TABLE IF NOT EXISTS "InventoryItem" (
     CONSTRAINT "InventoryItem_userEmail_fkey" FOREIGN KEY ("userEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "InventoryItem_itemId_fkey" FOREIGN KEY ("itemId") REFERENCES "Item" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
-
 CREATE TABLE IF NOT EXISTS "MarketListing" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "price" INTEGER NOT NULL,
@@ -130,7 +98,6 @@ CREATE TABLE IF NOT EXISTS "MarketListing" (
     CONSTRAINT "MarketListing_inventoryId_fkey" FOREIGN KEY ("inventoryId") REFERENCES "InventoryItem" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "MarketListing_sellerEmail_fkey" FOREIGN KEY ("sellerEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE
 );
-
 CREATE TABLE IF NOT EXISTS "User" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "email" TEXT NOT NULL,
@@ -142,7 +109,6 @@ CREATE TABLE IF NOT EXISTS "User" (
     CONSTRAINT "User_professionId_fkey" FOREIGN KEY ("professionId") REFERENCES "Profession" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "User_partyId_fkey" FOREIGN KEY ("partyId") REFERENCES "Party" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
-
 CREATE TABLE IF NOT EXISTS "LearnedSkill" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "userEmail" TEXT NOT NULL,
@@ -152,7 +118,6 @@ CREATE TABLE IF NOT EXISTS "LearnedSkill" (
     CONSTRAINT "LearnedSkill_userEmail_fkey" FOREIGN KEY ("userEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "LearnedSkill_skillId_fkey" FOREIGN KEY ("skillId") REFERENCES "Skill" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
-
 CREATE TABLE IF NOT EXISTS "Profession" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL,
@@ -184,20 +149,75 @@ INSERT INTO Monster VALUES(1,'Poring','https://kidmortal.sirv.com/monsters/porin
 INSERT INTO Monster VALUES(2,'Fire Poring','https://kidmortal.sirv.com/monsters/fire_poring.gif',1,0,2,25,15,8);
 INSERT INTO Monster VALUES(3,'Lunatic','https://kidmortal.sirv.com/monsters/lunatic.gif',1,0,5,50,25,14);
 INSERT INTO Monster VALUES(4,'King Poring','https://kidmortal.sirv.com/monsters/king_poring.gif?w=120&h=120',10,'true',10,850,220,200);
+CREATE TABLE IF NOT EXISTS "Buff" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "name" TEXT NOT NULL,
+    "effect" TEXT NOT NULL DEFAULT 'none',
+    "duration" INTEGER NOT NULL,
+    "image" TEXT NOT NULL,
+    "pose" TEXT NOT NULL DEFAULT 'default',
+    "persist" BOOLEAN NOT NULL DEFAULT false,
+    "maxStack" INTEGER NOT NULL DEFAULT 1
+);
+INSERT INTO Buff VALUES(1,'Power up','power_up',5,'https://kidmortal.sirv.com/buffs/powerup.webp','enhanced','false',1);
+INSERT INTO Buff VALUES(2,'Invincible','invincible',1,'https://kidmortal.sirv.com/buffs/invincible.webp','enhanced','false',1);
+INSERT INTO Buff VALUES(3,'Admin Invincible','invincible',99,'https://kidmortal.sirv.com/buffs/invincible.webp','enhanced','true',1);
+CREATE TABLE IF NOT EXISTS "UserBuff" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "buffId" INTEGER NOT NULL,
+    "userEmail" TEXT NOT NULL,
+    "duration" INTEGER NOT NULL,
+    CONSTRAINT "UserBuff_buffId_fkey" FOREIGN KEY ("buffId") REFERENCES "Buff" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "UserBuff_userEmail_fkey" FOREIGN KEY ("userEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE TABLE IF NOT EXISTS "Notification" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "content" TEXT NOT NULL,
+    "visualized" BOOLEAN NOT NULL,
+    "userEmail" TEXT NOT NULL,
+    CONSTRAINT "Notification_userEmail_fkey" FOREIGN KEY ("userEmail") REFERENCES "User" ("email") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE TABLE IF NOT EXISTS "Skill" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "requiredLevel" INTEGER NOT NULL DEFAULT 1,
+    "manaCost" INTEGER NOT NULL DEFAULT 1,
+    "category" TEXT NOT NULL DEFAULT 'target_enemy',
+    "effect" TEXT,
+    "name" TEXT NOT NULL,
+    "image" TEXT NOT NULL,
+    "attribute" TEXT NOT NULL,
+    "multiplier" INTEGER NOT NULL DEFAULT 1,
+    "professionId" INTEGER NOT NULL,
+    "buffId" INTEGER,
+    CONSTRAINT "Skill_professionId_fkey" FOREIGN KEY ("professionId") REFERENCES "Profession" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Skill_buffId_fkey" FOREIGN KEY ("buffId") REFERENCES "Buff" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+INSERT INTO Skill VALUES(1,1,2,'target_enemy','','Fire Slash','https://kidmortal.sirv.com/skills/fire_slash.webp','str',2,1,NULL);
+INSERT INTO Skill VALUES(2,1,3,'target_ally','healing','Light Healing','https://kidmortal.sirv.com/skills/healing.webp','int',3,2,NULL);
+INSERT INTO Skill VALUES(3,1,2,'target_enemy',NULL,'Light Missile','https://kidmortal.sirv.com/skills/light_missile.webp','int',2,2,NULL);
+INSERT INTO Skill VALUES(4,3,5,'target_enemy',NULL,'Water Flash','https://kidmortal.sirv.com/skills/water_slash.webp','int',3,1,NULL);
+INSERT INTO Skill VALUES(5,1,2,'target_enemy',NULL,'Fireball','https://kidmortal.sirv.com/skills/fireball.webp','int',2,3,NULL);
+INSERT INTO Skill VALUES(6,1,5,'target_enemy',NULL,'Icicle','https://kidmortal.sirv.com/skills/ice_shards.webp','int',4,3,NULL);
+INSERT INTO Skill VALUES(7,1,0,'target_ally','infusion','Mana Infusion','https://kidmortal.sirv.com/skills/infusion.webp','int',2,2,NULL);
+INSERT INTO Skill VALUES(8,1,2,'target_enemy',NULL,'Backstab','https://kidmortal.sirv.com/skills/backstab.webp','agi',4,5,NULL);
+INSERT INTO Skill VALUES(9,1,5,'buff_self','','Power up','https://kidmortal.sirv.com/buffs/powerup.webp','str',1,1,1);
 DELETE FROM sqlite_sequence;
-INSERT INTO sqlite_sequence VALUES('Appearance',64);
+INSERT INTO sqlite_sequence VALUES('Appearance',65);
 INSERT INTO sqlite_sequence VALUES('Item',26);
 INSERT INTO sqlite_sequence VALUES('Drop',11);
 INSERT INTO sqlite_sequence VALUES('Party',11);
-INSERT INTO sqlite_sequence VALUES('Stats',28);
-INSERT INTO sqlite_sequence VALUES('Skill',8);
-INSERT INTO sqlite_sequence VALUES('EquippedItem',64);
-INSERT INTO sqlite_sequence VALUES('InventoryItem',119);
+INSERT INTO sqlite_sequence VALUES('Stats',29);
+INSERT INTO sqlite_sequence VALUES('EquippedItem',71);
+INSERT INTO sqlite_sequence VALUES('InventoryItem',133);
 INSERT INTO sqlite_sequence VALUES('MarketListing',85);
-INSERT INTO sqlite_sequence VALUES('User',30);
-INSERT INTO sqlite_sequence VALUES('LearnedSkill',22);
+INSERT INTO sqlite_sequence VALUES('User',31);
+INSERT INTO sqlite_sequence VALUES('LearnedSkill',27);
 INSERT INTO sqlite_sequence VALUES('Profession',5);
 INSERT INTO sqlite_sequence VALUES('Monster',4);
+INSERT INTO sqlite_sequence VALUES('Buff',3);
+INSERT INTO sqlite_sequence VALUES('UserBuff',6);
+INSERT INTO sqlite_sequence VALUES('Notification',0);
+INSERT INTO sqlite_sequence VALUES('Skill',9);
 CREATE UNIQUE INDEX "Appearance_userEmail_key" ON "Appearance" ("userEmail");
 CREATE UNIQUE INDEX "Drop_monsterId_itemId_key" ON "Drop" ("monsterId", "itemId");
 CREATE UNIQUE INDEX "Party_leaderEmail_key" ON "Party" ("leaderEmail");
@@ -207,4 +227,7 @@ CREATE UNIQUE INDEX "InventoryItem_userEmail_itemId_key" ON "InventoryItem" ("us
 CREATE UNIQUE INDEX "MarketListing_inventoryId_key" ON "MarketListing" ("inventoryId");
 CREATE UNIQUE INDEX "User_email_key" ON "User" ("email");
 CREATE UNIQUE INDEX "LearnedSkill_userEmail_skillId_key" ON "LearnedSkill" ("userEmail", "skillId");
+CREATE UNIQUE INDEX "Buff_name_key" ON "Buff" ("name");
+CREATE UNIQUE INDEX "Notification_userEmail_key" ON "Notification" ("userEmail");
+CREATE UNIQUE INDEX "UserBuff_userEmail_buffId_key" ON "UserBuff" ("userEmail", "buffId");
 COMMIT;
