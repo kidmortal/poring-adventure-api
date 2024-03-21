@@ -134,6 +134,15 @@ model Monster {
   silver Int     @default(1)
   exp    Int     @default(1)
   drops  Drop[]
+  map    Map     @relation(fields: [mapId], references: [id])
+  mapId  Int     @default(1)
+}
+
+model Map {
+  id      Int       @id @default(autoincrement())
+  name    String
+  image   String
+  monster Monster[]
 }
 
 model Party {
@@ -164,6 +173,7 @@ model Skill {
   effect        String?
   name          String
   image         String
+  description   String         @default("Skill Description")
   attribute     String
   multiplier    Int            @default(1)
   profession    Profession     @relation(fields: [professionId], references: [id])
@@ -186,11 +196,12 @@ model LearnedSkill {
 }
 
 model Notification {
-  id         Int     @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   content    String
   visualized Boolean
-  user       User    @relation(fields: [userEmail], references: [email], onDelete: Cascade)
-  userEmail  String  @unique
+  user       User     @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  userEmail  String   @unique
+  createdAt  DateTime @default(now())
 }
 
 model UserBuff {

@@ -14,10 +14,13 @@ export class BattleGateway {
   private logger = new Logger('Websocket');
 
   @SubscribeMessage('battle_create')
-  async create(@ConnectedSocket() client: Socket) {
+  async create(
+    @MessageBody() mapId: number,
+    @ConnectedSocket() client: Socket,
+  ) {
     const email = client.handshake.auth.email;
     this.logger.debug(`battle_create ${email}`);
-    return this.battleService.create(email);
+    return this.battleService.create({ userEmail: email, mapId });
   }
 
   @SubscribeMessage('battle_update')
