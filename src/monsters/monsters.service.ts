@@ -32,7 +32,28 @@ export class MonstersService {
     });
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} monster`;
+  async findOneFromMap(mapId: number) {
+    const mapMonsters = await this.prisma.monster.findMany({
+      where: { mapId: mapId },
+      include: {
+        drops: {
+          include: {
+            item: true,
+          },
+        },
+      },
+    });
+
+    const monsterCount = mapMonsters.length;
+    if (monsterCount > 0) {
+      const random = Math.floor(Math.random() * monsterCount);
+      return mapMonsters[random];
+    }
+  }
+
+  getAllMaps() {
+    return this.prisma.map.findMany({
+      include: { monster: true },
+    });
   }
 }

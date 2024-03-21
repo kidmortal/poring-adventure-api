@@ -35,12 +35,12 @@ export class BattleService {
     return false;
   }
 
-  async create(userEmail: string) {
-    const battle = this.getUserBattle(userEmail);
+  async create(args: { userEmail: string; mapId: number }) {
+    const battle = this.getUserBattle(args.userEmail);
 
     if (!battle) {
       let users: UserWithStats[] = [];
-      const userData = await this.userService.findOne(userEmail);
+      const userData = await this.userService.findOne(args.userEmail);
       if (userData.partyId) {
         const fullPartyInfo = await this.partyService.getFullParty(
           userData.email,
@@ -50,7 +50,7 @@ export class BattleService {
       } else {
         users = [userData];
       }
-      const monsterData = await this.monsterService.findOne();
+      const monsterData = await this.monsterService.findOneFromMap(args.mapId);
 
       const monsters = [monsterData];
       const newBattleInstance: BattleInstance = new BattleInstance({
