@@ -130,7 +130,7 @@ export class PartyService {
         members: true,
       },
     });
-    if (ownedParty) {
+    if (ownedParty && ownedParty.members.length < 4) {
       this.sendPartyInviteNotification({
         email: args.invitedEmail,
         party: ownedParty,
@@ -140,22 +140,26 @@ export class PartyService {
   }
 
   async joinParty(args: { email: string; partyId: number }) {
-    try {
-      const result = await this.prisma.user.update({
-        where: { email: args.email },
-        data: { partyId: args.partyId },
-      });
-      if (result) {
-        this.notifyPartyJoinMember({
-          email: args.email,
-          joinedPlayerName: result.name,
+    const joiningParty = await this.getPartyFromId({ partyId: args.partyId });
+    if (joiningParty && joiningParty.members.length < 4) {
+      try {
+        const result = await this.prisma.user.update({
+          where: { email: args.email },
+          data: { partyId: args.partyId },
         });
-        this.notifyPartyWithData({ email: args.email });
-        return true;
+        if (result) {
+          this.notifyPartyJoinMember({
+            email: args.email,
+            joinedPlayerName: result.name,
+          });
+          this.notifyPartyWithData({ email: args.email });
+          return true;
+        }
+      } catch (error) {
+        return false;
       }
-    } catch (error) {
-      return false;
     }
+    return false;
   }
 
   async quitParty(args: { email: string; partyId }) {
@@ -251,5 +255,12 @@ export class PartyService {
       return userParty;
     }
     return undefined;
+  }
+
+  private async getPartyFromId(args: { partyId?: number }) {
+    return this.prisma.party.findUnique({
+      where: { id: args.partyId },
+      include: { members: true },
+    });
   }
 }
