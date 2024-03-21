@@ -169,6 +169,7 @@ model Skill {
   id            Int            @id @default(autoincrement())
   requiredLevel Int            @default(1)
   manaCost      Int            @default(1)
+  cooldown      Int            @default(1)
   category      String         @default("target_enemy")
   effect        String?
   name          String

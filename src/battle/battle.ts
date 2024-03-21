@@ -62,6 +62,7 @@ type UserBuffWithBuff = UserBuff & {
 
 type LearnedSkillWithSkill = LearnedSkill & {
   skill: SkillWithBuff;
+  cooldown?: number;
 };
 type SkillWithBuff = Skill & {
   buff?: Buff;
@@ -132,7 +133,7 @@ export class BattleInstance {
 
   constructor({ monsters, users, socket, updateUsers }: CreateBattleParams) {
     this.socket = socket;
-    this.users = users.map((u) => ({ ...u, aggro: 0 }));
+    this.users = this.generateUserBattleValues(users);
     this.monsters = monsters;
     this.attackerList = BattleUtils.generateBattleAttackOrder(users, monsters);
     this.updateUsers = updateUsers;
@@ -175,6 +176,9 @@ export class BattleInstance {
     if (isUserTurn) {
       const user = this.getUserFromBattle(args.email);
       const skill = this.getSkillFromUser(args);
+      if (skill.cooldown > 0) return false;
+      skill.cooldown += skill.skill.cooldown;
+      console.log('icnrease cd');
       switch (skill.skill.category) {
         case SkillCategory.TargetEnemy:
           return this.processCastTargetEnemy({ user, skill });
@@ -310,6 +314,19 @@ export class BattleInstance {
       user.aggro = Math.floor(user.aggro * 0.8);
     });
   }
+  private decreasePlayerCooldown() {
+    const currentTurn = this.attackerList[this.attackerTurn];
+    const user = this.users.find((u) => u.name === currentTurn);
+    if (user) {
+      user.learnedSkills.forEach((ls) => {
+        if (ls.cooldown && ls.cooldown > 0) {
+          ls.cooldown -= 1;
+          console.log(`decrease ${ls.skill.name} cooldown`);
+        }
+      });
+      return;
+    }
+  }
 
   private async healUser(args: { user: UserWithStats; amount: number }) {
     args.user.stats.health += args.amount;
@@ -423,10 +440,8 @@ export class BattleInstance {
       }
     }
     if (!args.skipDamageStep) {
-      console.log('run dmg');
       return this.startDamageStep(args);
     } else {
-      console.log('skip dmg');
       return this.afterDamageStep();
     }
   }
@@ -440,7 +455,6 @@ export class BattleInstance {
     const randomDmg = utils.randomDamage(damage.value, 20);
     if (attacker === 'user') {
       user.aggro += damage.aggro;
-      console.log(damage.aggro);
       monster.health -= randomDmg;
       this.pushLog({
         log: `${user.name} Dealt ${randomDmg} damage to ${monster.name}`,
@@ -461,6 +475,7 @@ export class BattleInstance {
     this.settleBattleAndProcessRewards();
     this.decreaseOrRemoveBuffs();
     this.decreasePlayersAggro();
+    this.decreasePlayerCooldown();
     this.processNextTurn();
     this.notifyUsers();
     return true;
@@ -573,5 +588,14 @@ export class BattleInstance {
 
       this.drops.push(battleDrop);
     });
+  }
+  private generateUserBattleValues(users: UserWithStats[]) {
+    users.forEach((user) => {
+      user.aggro = 0;
+      user.learnedSkills.forEach((ls) => {
+        ls.cooldown = 0;
+      });
+    });
+    return users;
   }
 }
