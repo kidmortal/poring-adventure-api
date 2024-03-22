@@ -70,4 +70,163 @@ describe('Party Gateway', () => {
       expect(response).toBe(false);
     });
   });
+  describe('remove_party', () => {
+    it('should call getParty service when passing email on handshake auth ', async () => {
+      const authEmail = 'auth@email.com';
+      const fakeReturn = {} as any;
+      const remove = jest.fn().mockReturnValue(fakeReturn);
+      jest.spyOn(service, 'remove').mockImplementation(remove);
+      const response = await gateway.remove({
+        // @ts-expect-error this value can be anything
+        handshake: { auth: { email: authEmail } },
+      });
+      expect(remove).toHaveBeenCalledWith({ email: authEmail });
+      expect(response).toBe(fakeReturn);
+    });
+    it('should not call service and return false when not passing email on handshake auth ', async () => {
+      const authEmail = undefined;
+      const fakeReturn = {} as any;
+      const remove = jest.fn().mockReturnValue(fakeReturn);
+      jest.spyOn(service, 'remove').mockImplementation(remove);
+      const response = await gateway.remove({
+        // @ts-expect-error this value can be anything
+        handshake: { auth: { email: authEmail } },
+      });
+      expect(remove).not.toHaveBeenCalledWith({ email: authEmail });
+      expect(response).toBe(false);
+    });
+  });
+  describe('invite_to_party', () => {
+    it('should call invite service when passing email on handshake auth ', async () => {
+      const authEmail = 'auth@email.com';
+      const invitedEmail = 'invited@email.com';
+      const fakeReturn = {} as any;
+      const invite = jest.fn().mockReturnValue(fakeReturn);
+      jest.spyOn(service, 'invite').mockImplementation(invite);
+      const response = await gateway.invite(invitedEmail, {
+        // @ts-expect-error this value can be anything
+        handshake: { auth: { email: authEmail } },
+      });
+      expect(invite).toHaveBeenCalledWith({
+        leaderEmail: authEmail,
+        invitedEmail,
+      });
+      expect(response).toBe(fakeReturn);
+    });
+    it('should not call service and return false when not passing email on handshake auth ', async () => {
+      const authEmail = undefined;
+      const invitedEmail = 'invited@email.com';
+      const fakeReturn = {} as any;
+      const invite = jest.fn().mockReturnValue(fakeReturn);
+      jest.spyOn(service, 'invite').mockImplementation(invite);
+      const response = await gateway.invite(invitedEmail, {
+        // @ts-expect-error this value can be anything
+        handshake: { auth: { email: authEmail } },
+      });
+      expect(invite).not.toHaveBeenCalledWith({ email: authEmail });
+      expect(response).toBe(false);
+    });
+  });
+  describe('kick_from_party', () => {
+    it('should call kick service when passing email on handshake auth ', async () => {
+      const authEmail = 'auth@email.com';
+      const kickedEmail = 'kicked@email.com';
+      const fakeReturn = {} as any;
+      const kick = jest.fn().mockReturnValue(fakeReturn);
+      jest.spyOn(service, 'kick').mockImplementation(kick);
+      const response = await gateway.kick(kickedEmail, {
+        // @ts-expect-error this value can be anything
+        handshake: { auth: { email: authEmail } },
+      });
+      expect(kick).toHaveBeenCalledWith({
+        leaderEmail: authEmail,
+        kickedEmail,
+      });
+      expect(response).toBe(fakeReturn);
+    });
+    it('should not call service and return false when not passing email on handshake auth ', async () => {
+      const authEmail = undefined;
+      const kickedEmail = 'kicked@email.com';
+      const fakeReturn = {} as any;
+      const kick = jest.fn().mockReturnValue(fakeReturn);
+      jest.spyOn(service, 'kick').mockImplementation(kick);
+      const response = await gateway.kick(kickedEmail, {
+        // @ts-expect-error this value can be anything
+        handshake: { auth: { email: authEmail } },
+      });
+      expect(kick).not.toHaveBeenCalledWith({
+        leaderEmail: authEmail,
+        kickedEmail,
+      });
+      expect(response).toBe(false);
+    });
+  });
+  describe('quit_party', () => {
+    it('should call quit service when passing email on handshake auth ', async () => {
+      const authEmail = 'auth@email.com';
+      const partyId = 0;
+      const fakeReturn = {} as any;
+      const quitParty = jest.fn().mockReturnValue(fakeReturn);
+      jest.spyOn(service, 'quitParty').mockImplementation(quitParty);
+      const response = await gateway.quit(partyId, {
+        // @ts-expect-error this value can be anything
+        handshake: { auth: { email: authEmail } },
+      });
+      expect(quitParty).toHaveBeenCalledWith({
+        email: authEmail,
+        partyId,
+      });
+      expect(response).toBe(fakeReturn);
+    });
+    it('should not call service and return false when not passing email on handshake auth ', async () => {
+      const authEmail = undefined;
+      const partyId = 0;
+      const fakeReturn = {} as any;
+      const quitParty = jest.fn().mockReturnValue(fakeReturn);
+      jest.spyOn(service, 'quitParty').mockImplementation(quitParty);
+      const response = await gateway.quit(partyId, {
+        // @ts-expect-error this value can be anything
+        handshake: { auth: { email: authEmail } },
+      });
+      expect(quitParty).not.toHaveBeenCalledWith({
+        email: authEmail,
+        partyId,
+      });
+      expect(response).toBe(false);
+    });
+  });
+  describe('join_party', () => {
+    it('should call join service when passing email on handshake auth ', async () => {
+      const authEmail = 'auth@email.com';
+      const partyId = 0;
+      const fakeReturn = {} as any;
+      const joinParty = jest.fn().mockReturnValue(fakeReturn);
+      jest.spyOn(service, 'joinParty').mockImplementation(joinParty);
+      const response = await gateway.join(partyId, {
+        // @ts-expect-error this value can be anything
+        handshake: { auth: { email: authEmail } },
+      });
+      expect(joinParty).toHaveBeenCalledWith({
+        email: authEmail,
+        partyId,
+      });
+      expect(response).toBe(fakeReturn);
+    });
+    it('should not call service and return false when not passing email on handshake auth ', async () => {
+      const authEmail = undefined;
+      const partyId = 0;
+      const fakeReturn = {} as any;
+      const joinParty = jest.fn().mockReturnValue(fakeReturn);
+      jest.spyOn(service, 'joinParty').mockImplementation(joinParty);
+      const response = await gateway.join(partyId, {
+        // @ts-expect-error this value can be anything
+        handshake: { auth: { email: authEmail } },
+      });
+      expect(joinParty).not.toHaveBeenCalledWith({
+        email: authEmail,
+        partyId,
+      });
+      expect(response).toBe(false);
+    });
+  });
 });

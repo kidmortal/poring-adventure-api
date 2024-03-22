@@ -17,21 +17,6 @@ export class MonstersService {
     });
   }
 
-  async findOne() {
-    const monsterCount = await this.prisma.monster.count();
-    const skip = Math.floor(Math.random() * monsterCount);
-    return this.prisma.monster.findFirst({
-      skip,
-      include: {
-        drops: {
-          include: {
-            item: true,
-          },
-        },
-      },
-    });
-  }
-
   async findOneFromMap(mapId: number) {
     const mapMonsters = await this.prisma.monster.findMany({
       where: { mapId: mapId },
