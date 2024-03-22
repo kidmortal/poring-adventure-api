@@ -12,12 +12,6 @@ export class MonsterGateway {
   constructor(private readonly monsterService: MonstersService) {}
   private logger = new Logger('Websocket - monsters');
 
-  @SubscribeMessage('get_monster')
-  async getMonster() {
-    this.logger.debug('get_monster');
-    return this.monsterService.findOne();
-  }
-
   @SubscribeMessage('get_monster_from_map')
   async getMonsterFromMap(@MessageBody() mapId: number) {
     this.logger.debug('get_monster_from_map');
