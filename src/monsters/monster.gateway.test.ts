@@ -3,6 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import { MonstersService } from './monsters.service';
 import { MonsterGateway } from './monsters.gateway';
+import { CacheModule } from '@nestjs/cache-manager';
 
 describe('Party Gateway', () => {
   let service: MonstersService;
@@ -10,6 +11,7 @@ describe('Party Gateway', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [CacheModule.register({ ttl: 1000 * 60 * 10 })],
       providers: [
         MonsterGateway,
         MonstersService,
