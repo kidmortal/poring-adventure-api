@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateItemDto } from './dto/create-item.dto';
-// import { UpdateItemDto } from './dto/update-item.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UsersService } from 'src/users/users.service';
-import { EQUIPABLE_CATEGORIES } from './entities/categories';
 import { Item } from '@prisma/client';
+import { PrismaTransactionContext } from 'src/prisma/types/prisma';
+import { ItemsValidator } from './items.validator';
 
 @Injectable()
 export class ItemsService {
@@ -16,12 +16,16 @@ export class ItemsService {
     return this.prisma.item.create({ data: createItemDto });
   }
 
-  async removeItemFromUser(args: {
-    userEmail: string;
-    itemId: number;
-    stack: number;
-  }) {
-    const userHasItem = await this.userHasItem(args);
+  async removeItemFromUser(
+    args: {
+      userEmail: string;
+      itemId: number;
+      stack: number;
+    },
+    transaction?: PrismaTransactionContext,
+  ) {
+    const ctx = transaction || this.prisma;
+    const userHasItem = await this.userHasItem(args, transaction);
 
     if (userHasItem && userHasItem.stack < args.stack) {
       throw new BadRequestException(
@@ -30,7 +34,7 @@ export class ItemsService {
     }
 
     if (userHasItem.stack === args.stack) {
-      const updateAmount = await this.prisma.inventoryItem.delete({
+      const updateAmount = await ctx.inventoryItem.delete({
         where: {
           userEmail_itemId: {
             userEmail: args.userEmail,
@@ -42,7 +46,7 @@ export class ItemsService {
     }
 
     if (userHasItem.stack > args.stack) {
-      const updateAmount = await this.prisma.inventoryItem.update({
+      const updateAmount = await ctx.inventoryItem.update({
         where: {
           userEmail_itemId: {
             userEmail: args.userEmail,
@@ -151,32 +155,29 @@ export class ItemsService {
   }
 
   async equipItem(args: { itemId: number; userEmail: string }) {
-    const inventoryItem = await this.getInventoryItem(args);
-    if (inventoryItem) {
-      if (!EQUIPABLE_CATEGORIES.includes(inventoryItem.item.category)) {
-        throw new BadRequestException('This item is not equipable');
-      }
+    await this.prisma.$transaction(async (ctx) => {
+      const inventoryItem = await this.getInventoryItem(args, ctx);
 
-      const equippedItems = await this.prisma.equippedItem.findMany({
-        where: {
-          userEmail: args.userEmail,
-        },
-        include: {
-          item: true,
-        },
-      });
+      if (!inventoryItem) return false;
+
+      ItemsValidator.isEquippable({ category: inventoryItem.item.category });
+
+      const equippedItems = await this.getEquippedItems(args, ctx);
 
       equippedItems.forEach((equip) => {
-        if (equip.item.category === inventoryItem.item.category) {
-          throw new BadRequestException(
-            'You cannot equip two of the same kind of equipment',
-          );
-        }
+        ItemsValidator.isSameCategory({
+          categoryItem: inventoryItem.item.category,
+          categoryEquipped: equip.item.category,
+        });
       });
+      await this.removeItemFromUser({ ...args, stack: 1 }, ctx);
+      await this.addEquipmentToUser(
+        { ...args, itemInfo: inventoryItem.item },
+        ctx,
+      );
+      return true;
+    });
 
-      await this.removeItemFromUser({ ...args, stack: 1 });
-      await this.addEquipmentToUser({ ...args, itemInfo: inventoryItem.item });
-    }
     return false;
   }
 
@@ -193,22 +194,30 @@ export class ItemsService {
     return false;
   }
 
-  async addEquipmentToUser(args: {
-    itemId: number;
-    userEmail: string;
-    itemInfo: Item;
-  }) {
-    await this.userService.increaseUserStats({
-      userEmail: args.userEmail,
-      health: args.itemInfo.health,
-      attack: args.itemInfo.attack,
-      mana: args.itemInfo.mana,
-      str: args.itemInfo.str,
-      agi: args.itemInfo.agi,
-      int: args.itemInfo.int,
-    });
+  async addEquipmentToUser(
+    args: {
+      itemId: number;
+      userEmail: string;
+      itemInfo: Item;
+    },
+    transaction?: PrismaTransactionContext,
+  ) {
+    const ctx = transaction || this.prisma;
 
-    return this.prisma.equippedItem.create({
+    await this.userService.increaseUserStats(
+      {
+        userEmail: args.userEmail,
+        health: args.itemInfo.health,
+        attack: args.itemInfo.attack,
+        mana: args.itemInfo.mana,
+        str: args.itemInfo.str,
+        agi: args.itemInfo.agi,
+        int: args.itemInfo.int,
+      },
+      ctx,
+    );
+
+    return ctx.equippedItem.create({
       data: {
         userEmail: args.userEmail,
         itemId: args.itemId,
@@ -244,8 +253,13 @@ export class ItemsService {
     return `This action returns all items`;
   }
 
-  async userHasItem(args: { userEmail: string; itemId: number }) {
-    const userHasItem = await this.prisma.inventoryItem.findUnique({
+  async userHasItem(
+    args: { userEmail: string; itemId: number },
+    transaction?: PrismaTransactionContext,
+  ) {
+    const ctx = transaction || this.prisma;
+
+    const userHasItem = await ctx.inventoryItem.findUnique({
       where: {
         userEmail_itemId: {
           userEmail: args.userEmail,
@@ -260,23 +274,20 @@ export class ItemsService {
     return userHasItem;
   }
 
-  async getInventoryItem(args: { userEmail: string; itemId: number }) {
-    const inventoryItem = await this.prisma.inventoryItem.findUnique({
+  async getInventoryItem(
+    args: { userEmail: string; itemId: number },
+    transaction?: PrismaTransactionContext,
+  ) {
+    const ctx = transaction || this.prisma;
+    return ctx.inventoryItem.findUnique({
       where: {
         userEmail_itemId: {
           userEmail: args.userEmail,
           itemId: args.itemId,
         },
       },
-      include: {
-        item: true,
-      },
+      include: { item: true },
     });
-
-    if (!inventoryItem) {
-      false;
-    }
-    return inventoryItem;
   }
 
   async getEquippedItem(args: { userEmail: string; itemId: number }) {
@@ -290,6 +301,18 @@ export class ItemsService {
       include: {
         item: true,
       },
+    });
+  }
+
+  async getEquippedItems(
+    args: { userEmail: string },
+    transaction?: PrismaTransactionContext,
+  ) {
+    const ctx = transaction || this.prisma;
+
+    return ctx.equippedItem.findMany({
+      where: { userEmail: args.userEmail },
+      include: { item: true },
     });
   }
 
