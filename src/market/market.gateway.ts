@@ -5,11 +5,13 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+import { Logger, UseFilters } from '@nestjs/common';
 import { MarketService } from './market.service';
 import { CreateMarketDto } from './dto/create-market.dto';
 import { PurchaseMarketDto } from './dto/purchase-market.dto';
+import { WebsocketExceptionsFilter } from 'src/websocket/websocketException.filter';
 
+@UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway({ cors: true })
 export class MarketGateway {
   constructor(private readonly marketService: MarketService) {}

@@ -6,11 +6,13 @@ import {
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { Server } from 'http';
-import { Logger } from '@nestjs/common';
+import { Logger, UseFilters } from '@nestjs/common';
 
 import { AuthService } from 'src/auth/auth.service';
 import { WebsocketService } from './websocket.service';
+import { WebsocketExceptionsFilter } from './websocketException.filter';
 
+@UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway({ cors: true })
 export class WebsocketGateway
   implements OnGatewayConnection, OnGatewayDisconnect

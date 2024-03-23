@@ -5,9 +5,11 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+import { Logger, UseFilters } from '@nestjs/common';
 import { BattleService } from './battle.service';
+import { WebsocketExceptionsFilter } from 'src/websocket/websocketException.filter';
 
+@UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway({ cors: true })
 export class BattleGateway {
   constructor(private readonly battleService: BattleService) {}

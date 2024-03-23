@@ -7,8 +7,10 @@ import {
 import { Socket } from 'socket.io';
 import { SkillsService } from './skills.service';
 
-import { Logger } from '@nestjs/common';
+import { Logger, UseFilters } from '@nestjs/common';
+import { WebsocketExceptionsFilter } from 'src/websocket/websocketException.filter';
 
+@UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway()
 export class SkillsGateway {
   private logger = new Logger('Websocket - skills');

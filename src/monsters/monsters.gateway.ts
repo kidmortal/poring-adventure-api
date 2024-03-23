@@ -4,9 +4,11 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 
-import { Logger } from '@nestjs/common';
+import { Logger, UseFilters } from '@nestjs/common';
 import { MonstersService } from './monsters.service';
+import { WebsocketExceptionsFilter } from 'src/websocket/websocketException.filter';
 
+@UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway({ cors: true })
 export class MonsterGateway {
   constructor(private readonly monsterService: MonstersService) {}
