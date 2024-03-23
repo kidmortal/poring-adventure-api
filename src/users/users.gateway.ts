@@ -6,11 +6,13 @@ import {
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 
-import { Logger } from '@nestjs/common';
+import { Logger, UseFilters } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { WebsocketExceptionsFilter } from 'src/websocket/websocketException.filter';
 
+@UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway({ cors: true })
 export class UsersGateway {
   constructor(

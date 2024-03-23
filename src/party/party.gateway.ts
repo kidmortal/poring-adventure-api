@@ -6,8 +6,10 @@ import {
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { PartyService } from './party.service';
-import { Logger } from '@nestjs/common';
+import { Logger, UseFilters } from '@nestjs/common';
+import { WebsocketExceptionsFilter } from 'src/websocket/websocketException.filter';
 
+@UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway()
 export class PartyGateway {
   constructor(private readonly partyService: PartyService) {}

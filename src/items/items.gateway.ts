@@ -6,10 +6,12 @@ import {
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 
-import { Logger } from '@nestjs/common';
+import { Logger, UseFilters } from '@nestjs/common';
 import { ItemsService } from './items.service';
+import { WebsocketExceptionsFilter } from 'src/websocket/websocketException.filter';
 
 @WebSocketGateway({ cors: true })
+@UseFilters(WebsocketExceptionsFilter)
 export class ItemsGateway {
   constructor(private readonly itemService: ItemsService) {}
   private logger = new Logger('Websocket');

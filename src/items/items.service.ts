@@ -191,7 +191,6 @@ export class ItemsService {
       const equippedItem = await this.getEquippedItem({ ...args, ctx });
       if (equippedItem) {
         await this.addItemToUser({ ...args, stack: 1, ctx });
-
         await this.removeEquipmentFromUser({
           ...args,
           itemInfo: equippedItem.item,
