@@ -10,6 +10,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { ItemsService } from 'src/items/items.service';
 import { UsersService } from 'src/users/users.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
+import { TransactionCtx } from 'src/prisma/types/prisma';
 
 @Injectable()
 export class MarketService {
@@ -75,45 +76,49 @@ export class MarketService {
     buyerEmail: string;
     stacks: number;
   }) {
-    const purchasingUser = await this.prisma.user.findUnique({
-      where: { email: args.buyerEmail },
-    });
-    if (!purchasingUser) {
-      throw new BadRequestException('User not registered');
-    }
-    const marketListing = await this.prisma.marketListing.findUnique({
-      where: { id: args.marketListingId },
-      include: {
-        inventory: true,
-      },
-    });
-    if (!marketListing) {
-      throw new BadRequestException('Listing not found');
-    }
-    const purchaseTotalPrice = marketListing.price * args.stacks;
-    if (purchasingUser.silver < purchaseTotalPrice) {
-      throw new BadRequestException('You are too poor for that');
-    }
+    await this.prisma.$transaction(async (ctx) => {
+      const purchasingUser = await ctx.user.findUnique({
+        where: { email: args.buyerEmail },
+      });
+      if (!purchasingUser) {
+        throw new BadRequestException('User not registered');
+      }
+      const marketListing = await ctx.marketListing.findUnique({
+        where: { id: args.marketListingId },
+        include: { inventory: true },
+      });
+      if (!marketListing) {
+        throw new BadRequestException('Listing not found');
+      }
+      const purchaseTotalPrice = marketListing.price * args.stacks;
+      if (purchasingUser.silver < purchaseTotalPrice) {
+        throw new BadRequestException('You are too poor for that');
+      }
 
-    await this.decrementOrRemoveMarketListing({
-      marketListingId: marketListing.id,
-      currentStacks: marketListing.stack,
-      decrementStacks: args.stacks,
-    });
+      await this.decrementOrRemoveMarketListing({
+        marketListingId: marketListing.id,
+        currentStacks: marketListing.stack,
+        decrementStacks: args.stacks,
+        ctx,
+      });
 
-    await this.userService.transferSilverFromUserToUser({
-      senderEmail: purchasingUser.email,
-      receiverEmail: marketListing.sellerEmail,
-      amount: purchaseTotalPrice,
-    });
+      await this.userService.transferSilverFromUserToUser({
+        senderEmail: purchasingUser.email,
+        receiverEmail: marketListing.sellerEmail,
+        amount: purchaseTotalPrice,
+        ctx,
+      });
 
-    await this.itemService.transferItemFromUserToUser({
-      senderEmail: marketListing.sellerEmail,
-      receiverEmail: purchasingUser.email,
-      itemId: marketListing.inventory.itemId,
-      stack: args.stacks,
+      await this.itemService.transferItemFromUserToUser({
+        senderEmail: marketListing.sellerEmail,
+        receiverEmail: purchasingUser.email,
+        itemId: marketListing.inventory.itemId,
+        stack: args.stacks,
+        ctx,
+      });
+      return true;
     });
-    return true;
+    return false;
   }
 
   async createOrIncrementMarketListing(args: {
@@ -154,9 +159,11 @@ export class MarketService {
     marketListingId: number;
     currentStacks: number;
     decrementStacks: number;
+    ctx?: TransactionCtx;
   }) {
+    const ctx = args.ctx || this.prisma;
     if (args.decrementStacks < args.currentStacks) {
-      return await this.prisma.marketListing.update({
+      return await ctx.marketListing.update({
         where: {
           id: args.marketListingId,
         },
@@ -168,7 +175,7 @@ export class MarketService {
       });
     }
     if (args.decrementStacks === args.currentStacks) {
-      return await this.prisma.marketListing.delete({
+      return await ctx.marketListing.delete({
         where: {
           id: args.marketListingId,
         },

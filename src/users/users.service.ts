@@ -4,7 +4,7 @@ import { WebsocketService } from 'src/websocket/websocket.service';
 import { UserWithStats } from 'src/battle/battle';
 import { utils } from 'src/utils';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { PrismaTransactionContext } from 'src/prisma/types/prisma';
+import { TransactionCtx } from 'src/prisma/types/prisma';
 
 @Injectable()
 export class UsersService {
@@ -159,8 +159,13 @@ export class UsersService {
     }
   }
 
-  async incrementUserHealth(args: { userEmail: string; amount: number }) {
-    const currentStats = await this.prisma.stats.findUnique({
+  async incrementUserHealth(args: {
+    userEmail: string;
+    amount: number;
+    ctx?: TransactionCtx;
+  }) {
+    const ctx = args.ctx || this.prisma;
+    const currentStats = await ctx.stats.findUnique({
       where: {
         userEmail: args.userEmail,
       },
@@ -173,7 +178,7 @@ export class UsersService {
       if (finalHealth > maxHealth) {
         finalHealth = maxHealth;
       }
-      return this.prisma.stats.update({
+      return ctx.stats.update({
         where: {
           userEmail: args.userEmail,
         },
@@ -212,8 +217,13 @@ export class UsersService {
     }
   }
 
-  async incrementUserMana(args: { userEmail: string; amount: number }) {
-    const currentStats = await this.prisma.stats.findUnique({
+  async incrementUserMana(args: {
+    userEmail: string;
+    amount: number;
+    ctx?: TransactionCtx;
+  }) {
+    const ctx = args.ctx || this.prisma;
+    const currentStats = await ctx.stats.findUnique({
       where: {
         userEmail: args.userEmail,
       },
@@ -226,7 +236,7 @@ export class UsersService {
       if (finalMana > maxMana) {
         finalMana = maxMana;
       }
-      return this.prisma.stats.update({
+      return ctx.stats.update({
         where: {
           userEmail: args.userEmail,
         },
@@ -239,20 +249,18 @@ export class UsersService {
     }
   }
 
-  async increaseUserStats(
-    args: {
-      userEmail: string;
-      level?: number;
-      health?: number;
-      mana?: number;
-      attack?: number;
-      str?: number;
-      int?: number;
-      agi?: number;
-    },
-    transaction?: PrismaTransactionContext,
-  ) {
-    const ctx = transaction || this.prisma;
+  async increaseUserStats(args: {
+    userEmail: string;
+    level?: number;
+    health?: number;
+    mana?: number;
+    attack?: number;
+    str?: number;
+    int?: number;
+    agi?: number;
+    ctx?: TransactionCtx;
+  }) {
+    const ctx = args.ctx || this.prisma;
     return ctx.stats.update({
       where: {
         userEmail: args.userEmail,
@@ -277,8 +285,10 @@ export class UsersService {
     str?: number;
     int?: number;
     agi?: number;
+    ctx?: TransactionCtx;
   }) {
-    return this.prisma.stats.update({
+    const ctx = args.ctx || this.prisma;
+    return ctx.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -300,8 +310,14 @@ export class UsersService {
     });
     return deletedUser;
   }
-  async addExpSilver(args: { userEmail: string; exp: number; silver: number }) {
-    return this.prisma.user.update({
+  async addExpSilver(args: {
+    userEmail: string;
+    exp: number;
+    silver: number;
+    ctx?: TransactionCtx;
+  }) {
+    const ctx = args.ctx || this.prisma;
+    return ctx.user.update({
       where: {
         email: args.userEmail,
       },
@@ -311,8 +327,13 @@ export class UsersService {
       },
     });
   }
-  async addSilverToUser(args: { userEmail: string; amount: number }) {
-    return this.prisma.user.update({
+  async addSilverToUser(args: {
+    userEmail: string;
+    amount: number;
+    ctx?: TransactionCtx;
+  }) {
+    const ctx = args.ctx || this.prisma;
+    return ctx.user.update({
       where: {
         email: args.userEmail,
       },
@@ -323,8 +344,13 @@ export class UsersService {
       },
     });
   }
-  async addExpToUser(args: { userEmail: string; amount: number }) {
-    return this.prisma.stats.update({
+  async addExpToUser(args: {
+    userEmail: string;
+    amount: number;
+    ctx?: TransactionCtx;
+  }) {
+    const ctx = args.ctx || this.prisma;
+    return ctx.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -336,8 +362,13 @@ export class UsersService {
     });
   }
 
-  async removeSilverFromUser(args: { userEmail: string; amount: number }) {
-    return this.prisma.user.update({
+  async removeSilverFromUser(args: {
+    userEmail: string;
+    amount: number;
+    ctx?: TransactionCtx;
+  }) {
+    const ctx = args.ctx || this.prisma;
+    return ctx.user.update({
       where: {
         email: args.userEmail,
       },
@@ -353,20 +384,29 @@ export class UsersService {
     senderEmail: string;
     receiverEmail: string;
     amount: number;
+    ctx?: TransactionCtx;
   }) {
+    const ctx = args.ctx || this.prisma;
     await this.removeSilverFromUser({
       userEmail: args.senderEmail,
       amount: args.amount,
+      ctx,
     });
     return await this.addSilverToUser({
       userEmail: args.receiverEmail,
       amount: args.amount,
+      ctx,
     });
   }
 
-  async increaseUserLevel(args: { userEmail: string; amount: number }) {
+  async increaseUserLevel(args: {
+    userEmail: string;
+    amount: number;
+    ctx?: TransactionCtx;
+  }) {
+    const ctx = args.ctx || this.prisma;
     const increaseAmount = args.amount;
-    const user = await this.prisma.user.findUnique({
+    const user = await ctx.user.findUnique({
       where: { email: args.userEmail },
       include: { profession: true },
     });
@@ -386,12 +426,18 @@ export class UsersService {
       str: strIncrease,
       agi: agiIncrease,
       int: intIncrease,
+      ctx,
     });
   }
 
-  async decreaseUserLevel(args: { userEmail: string; amount: number }) {
+  async decreaseUserLevel(args: {
+    userEmail: string;
+    amount: number;
+    ctx?: TransactionCtx;
+  }) {
+    const ctx = args.ctx || this.prisma;
     const decreaseAmount = args.amount;
-    const user = await this.prisma.user.findUnique({
+    const user = await ctx.user.findUnique({
       where: { email: args.userEmail },
       include: { profession: true },
     });
@@ -411,6 +457,7 @@ export class UsersService {
       str: strDecrease,
       agi: agiDecrease,
       int: intDecrease,
+      ctx,
     });
   }
 
