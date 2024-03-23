@@ -4,6 +4,7 @@ import { WebsocketService } from 'src/websocket/websocket.service';
 import { UserWithStats } from 'src/battle/battle';
 import { utils } from 'src/utils';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaTransactionContext } from 'src/prisma/types/prisma';
 
 @Injectable()
 export class UsersService {
@@ -238,17 +239,21 @@ export class UsersService {
     }
   }
 
-  async increaseUserStats(args: {
-    userEmail: string;
-    level?: number;
-    health?: number;
-    mana?: number;
-    attack?: number;
-    str?: number;
-    int?: number;
-    agi?: number;
-  }) {
-    return this.prisma.stats.update({
+  async increaseUserStats(
+    args: {
+      userEmail: string;
+      level?: number;
+      health?: number;
+      mana?: number;
+      attack?: number;
+      str?: number;
+      int?: number;
+      agi?: number;
+    },
+    transaction?: PrismaTransactionContext,
+  ) {
+    const ctx = transaction || this.prisma;
+    return ctx.stats.update({
       where: {
         userEmail: args.userEmail,
       },
