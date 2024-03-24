@@ -125,20 +125,7 @@ describe('User Service', () => {
       expect(result).toBe(true);
     });
   });
-  describe('notifyUserError', () => {
-    it('should notify user with error', async () => {
-      const args = { email: 'test@test.com', errorMessage: 'its bug' };
-      const sendMessageToSocket = jest.fn().mockResolvedValue(true);
-      socket.sendMessageToSocket = sendMessageToSocket;
-      const result = await service.notifyUserError(args);
-      expect(sendMessageToSocket).toHaveBeenCalledWith({
-        email: args.email,
-        event: 'error_notification',
-        payload: args.errorMessage,
-      });
-      expect(result).toBe(true);
-    });
-  });
+
   describe('updateUserHealthMana', () => {
     it('should update user health and mana but dont allow it', async () => {
       const args = {

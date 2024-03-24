@@ -163,24 +163,20 @@ export class PartyService {
   }
 
   async quitParty(args: { email: string; partyId }) {
-    try {
-      const result = await this.prisma.user.update({
-        where: { email: args.email },
-        data: { partyId: undefined },
+    const result = await this.prisma.user.update({
+      where: { email: args.email },
+      data: { partyId: undefined },
+    });
+    const remainingParty = await this.prisma.party.findUnique({
+      where: { id: args.partyId },
+    });
+    if (result) {
+      this.notifyPartyLeftMember({
+        email: remainingParty.leaderEmail,
+        leftPlayerName: result.name,
       });
-      const remainingParty = await this.prisma.party.findUnique({
-        where: { id: args.partyId },
-      });
-      if (result) {
-        this.notifyPartyLeftMember({
-          email: remainingParty.leaderEmail,
-          leftPlayerName: result.name,
-        });
-        this.notifyUserWithNoParty({ email: args.email });
-        return true;
-      }
-    } catch (error) {
-      return false;
+      this.notifyUserWithNoParty({ email: args.email });
+      return true;
     }
   }
 

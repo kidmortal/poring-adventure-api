@@ -4,7 +4,7 @@ import { WebsocketService } from 'src/websocket/websocket.service';
 import { UserWithStats } from 'src/battle/battle';
 import { utils } from 'src/utils';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { TransactionCtx } from 'src/prisma/types/prisma';
+import { TransactionContext } from 'src/prisma/types/prisma';
 
 @Injectable()
 export class UsersService {
@@ -17,14 +17,6 @@ export class UsersService {
       email: args.email,
       event: 'user_update',
       payload: args.payload,
-    });
-  }
-
-  async notifyUserError(args: { email: string; errorMessage: any }) {
-    return this.websocket.sendMessageToSocket({
-      email: args.email,
-      event: 'error_notification',
-      payload: args.errorMessage,
     });
   }
 
@@ -162,10 +154,10 @@ export class UsersService {
   async incrementUserHealth(args: {
     userEmail: string;
     amount: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
-    const currentStats = await ctx.stats.findUnique({
+    const tx = args.tx || this.prisma;
+    const currentStats = await tx.stats.findUnique({
       where: {
         userEmail: args.userEmail,
       },
@@ -178,7 +170,7 @@ export class UsersService {
       if (finalHealth > maxHealth) {
         finalHealth = maxHealth;
       }
-      return ctx.stats.update({
+      return tx.stats.update({
         where: {
           userEmail: args.userEmail,
         },
@@ -220,10 +212,10 @@ export class UsersService {
   async incrementUserMana(args: {
     userEmail: string;
     amount: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
-    const currentStats = await ctx.stats.findUnique({
+    const tx = args.tx || this.prisma;
+    const currentStats = await tx.stats.findUnique({
       where: {
         userEmail: args.userEmail,
       },
@@ -236,7 +228,7 @@ export class UsersService {
       if (finalMana > maxMana) {
         finalMana = maxMana;
       }
-      return ctx.stats.update({
+      return tx.stats.update({
         where: {
           userEmail: args.userEmail,
         },
@@ -258,10 +250,10 @@ export class UsersService {
     str?: number;
     int?: number;
     agi?: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
-    return ctx.stats.update({
+    const tx = args.tx || this.prisma;
+    return tx.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -285,10 +277,10 @@ export class UsersService {
     str?: number;
     int?: number;
     agi?: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
-    return ctx.stats.update({
+    const tx = args.tx || this.prisma;
+    return tx.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -314,10 +306,10 @@ export class UsersService {
     userEmail: string;
     exp: number;
     silver: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
-    return ctx.user.update({
+    const tx = args.tx || this.prisma;
+    return tx.user.update({
       where: {
         email: args.userEmail,
       },
@@ -330,10 +322,10 @@ export class UsersService {
   async addSilverToUser(args: {
     userEmail: string;
     amount: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
-    return ctx.user.update({
+    const tx = args.tx || this.prisma;
+    return tx.user.update({
       where: {
         email: args.userEmail,
       },
@@ -347,10 +339,10 @@ export class UsersService {
   async addExpToUser(args: {
     userEmail: string;
     amount: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
-    return ctx.stats.update({
+    const tx = args.tx || this.prisma;
+    return tx.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -365,10 +357,10 @@ export class UsersService {
   async removeSilverFromUser(args: {
     userEmail: string;
     amount: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
-    return ctx.user.update({
+    const tx = args.tx || this.prisma;
+    return tx.user.update({
       where: {
         email: args.userEmail,
       },
@@ -384,29 +376,29 @@ export class UsersService {
     senderEmail: string;
     receiverEmail: string;
     amount: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
+    const tx = args.tx || this.prisma;
     await this.removeSilverFromUser({
       userEmail: args.senderEmail,
       amount: args.amount,
-      ctx,
+      tx,
     });
     return await this.addSilverToUser({
       userEmail: args.receiverEmail,
       amount: args.amount,
-      ctx,
+      tx,
     });
   }
 
   async increaseUserLevel(args: {
     userEmail: string;
     amount: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
+    const tx = args.tx || this.prisma;
     const increaseAmount = args.amount;
-    const user = await ctx.user.findUnique({
+    const user = await tx.user.findUnique({
       where: { email: args.userEmail },
       include: { profession: true },
     });
@@ -426,18 +418,18 @@ export class UsersService {
       str: strIncrease,
       agi: agiIncrease,
       int: intIncrease,
-      ctx,
+      tx,
     });
   }
 
   async decreaseUserLevel(args: {
     userEmail: string;
     amount: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
+    const tx = args.tx || this.prisma;
     const decreaseAmount = args.amount;
-    const user = await ctx.user.findUnique({
+    const user = await tx.user.findUnique({
       where: { email: args.userEmail },
       include: { profession: true },
     });
@@ -457,7 +449,7 @@ export class UsersService {
       str: strDecrease,
       agi: agiDecrease,
       int: intDecrease,
-      ctx,
+      tx,
     });
   }
 
