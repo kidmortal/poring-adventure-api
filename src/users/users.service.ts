@@ -78,6 +78,18 @@ export class UsersService {
     });
   }
 
+  getAllHeads() {
+    return this.prisma.head.findMany({});
+  }
+
+  async updateUserName(args: { email: string; newName: string }) {
+    await this.prisma.user.update({
+      where: { email: args.email },
+      data: { name: args.newName },
+    });
+    return true;
+  }
+
   async findOne(email: string) {
     if (!email) {
       throw new BadRequestException('No email provided');
@@ -485,7 +497,6 @@ export class UsersService {
     }
     if (currentLevel > correctLevel) {
       const levelDiff = currentLevel - correctLevel;
-      console.log(levelDiff);
       await this.decreaseUserLevel({
         userEmail: user.email,
         amount: levelDiff,

@@ -21,7 +21,6 @@ export class MarketService {
     private readonly prisma: PrismaService,
   ) {}
   async addItemToMarket(createMarketDto: CreateMarketDto, sellerEmail: string) {
-    console.log(createMarketDto);
     const inventoryItem = await this.prisma.inventoryItem.findUnique({
       where: {
         userEmail_itemId: {
