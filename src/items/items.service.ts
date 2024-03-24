@@ -3,7 +3,7 @@ import { CreateItemDto } from './dto/create-item.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UsersService } from 'src/users/users.service';
 import { Item } from '@prisma/client';
-import { TransactionCtx } from 'src/prisma/types/prisma';
+import { TransactionContext } from 'src/prisma/types/prisma';
 import { ItemsValidator } from './items.validator';
 
 @Injectable()
@@ -20,9 +20,9 @@ export class ItemsService {
     userEmail: string;
     itemId: number;
     stack: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
+    const tx = args.tx || this.prisma;
     const userHasItem = await this.userHasItem(args);
 
     if (userHasItem && userHasItem.stack < args.stack) {
@@ -32,7 +32,7 @@ export class ItemsService {
     }
 
     if (userHasItem.stack === args.stack) {
-      const updateAmount = await ctx.inventoryItem.delete({
+      const updateAmount = await tx.inventoryItem.delete({
         where: {
           userEmail_itemId: {
             userEmail: args.userEmail,
@@ -44,7 +44,7 @@ export class ItemsService {
     }
 
     if (userHasItem.stack > args.stack) {
-      const updateAmount = await ctx.inventoryItem.update({
+      const updateAmount = await tx.inventoryItem.update({
         where: {
           userEmail_itemId: {
             userEmail: args.userEmail,
@@ -70,9 +70,9 @@ export class ItemsService {
     userEmail: string;
     itemId: number;
     stack: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
+    const tx = args.tx || this.prisma;
     const inventoryItem = await this.getInventoryItem(args);
     if (inventoryItem) {
       const item = inventoryItem.item;
@@ -81,14 +81,14 @@ export class ItemsService {
           await this.userService.incrementUserHealth({
             userEmail: args.userEmail,
             amount: item.health,
-            ctx,
+            tx,
           });
         }
         if (item.mana) {
           await this.userService.incrementUserMana({
             userEmail: args.userEmail,
             amount: item.mana,
-            ctx,
+            tx,
           });
         }
         await this.removeItemFromUser(args);
@@ -101,13 +101,13 @@ export class ItemsService {
     userEmail: string;
     itemId: number;
     stack: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
+    const tx = args.tx || this.prisma;
     const userHasItem = await this.userHasItem(args);
 
     if (userHasItem) {
-      const updateAmount = await ctx.inventoryItem.update({
+      const updateAmount = await tx.inventoryItem.update({
         where: {
           userEmail_itemId: {
             userEmail: args.userEmail,
@@ -124,7 +124,7 @@ export class ItemsService {
     }
 
     try {
-      const createNewItem = await ctx.inventoryItem.create({
+      const createNewItem = await tx.inventoryItem.create({
         data: {
           userEmail: args.userEmail,
           itemId: args.itemId,
@@ -144,41 +144,41 @@ export class ItemsService {
     receiverEmail: string;
     itemId: number;
     stack: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
+    const tx = args.tx || this.prisma;
     await this.removeItemFromUser({
       itemId: args.itemId,
       stack: args.stack,
       userEmail: args.senderEmail,
-      ctx,
+      tx,
     });
 
     return this.addItemToUser({
       itemId: args.itemId,
       stack: args.stack,
       userEmail: args.receiverEmail,
-      ctx,
+      tx,
     });
   }
 
   async equipItem(args: { itemId: number; userEmail: string }) {
-    await this.prisma.$transaction(async (ctx) => {
-      const inventoryItem = await this.getInventoryItem({ ...args, ctx });
+    await this.prisma.$transaction(async (tx) => {
+      const inventoryItem = await this.getInventoryItem({ ...args, tx });
       if (!inventoryItem) return false;
       ItemsValidator.isEquippable({ category: inventoryItem.item.category });
-      const equippedItems = await this.getEquippedItems({ ...args, ctx });
+      const equippedItems = await this.getEquippedItems({ ...args, tx });
       equippedItems.forEach((equip) => {
         ItemsValidator.isSameCategory({
           categoryItem: inventoryItem.item.category,
           categoryEquipped: equip.item.category,
         });
       });
-      await this.removeItemFromUser({ ...args, stack: 1, ctx });
+      await this.removeItemFromUser({ ...args, stack: 1, tx });
       await this.addEquipmentToUser({
         ...args,
         itemInfo: inventoryItem.item,
-        ctx,
+        tx,
       });
       return true;
     });
@@ -187,14 +187,14 @@ export class ItemsService {
   }
 
   async unequipItem(args: { itemId: number; userEmail: string }) {
-    await this.prisma.$transaction(async (ctx) => {
-      const equippedItem = await this.getEquippedItem({ ...args, ctx });
+    await this.prisma.$transaction(async (tx) => {
+      const equippedItem = await this.getEquippedItem({ ...args, tx });
       if (equippedItem) {
-        await this.addItemToUser({ ...args, stack: 1, ctx });
+        await this.addItemToUser({ ...args, stack: 1, tx });
         await this.removeEquipmentFromUser({
           ...args,
           itemInfo: equippedItem.item,
-          ctx,
+          tx,
         });
       }
       return true;
@@ -207,9 +207,9 @@ export class ItemsService {
     itemId: number;
     userEmail: string;
     itemInfo: Item;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
+    const tx = args.tx || this.prisma;
 
     await this.userService.increaseUserStats({
       userEmail: args.userEmail,
@@ -219,10 +219,10 @@ export class ItemsService {
       str: args.itemInfo.str,
       agi: args.itemInfo.agi,
       int: args.itemInfo.int,
-      ctx,
+      tx,
     });
 
-    return ctx.equippedItem.create({
+    return tx.equippedItem.create({
       data: {
         userEmail: args.userEmail,
         itemId: args.itemId,
@@ -233,9 +233,9 @@ export class ItemsService {
     itemId: number;
     userEmail: string;
     itemInfo: Item;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
+    const tx = args.tx || this.prisma;
     await this.userService.decreaseUserStats({
       userEmail: args.userEmail,
       health: args.itemInfo.health,
@@ -244,10 +244,10 @@ export class ItemsService {
       str: args.itemInfo.str,
       agi: args.itemInfo.agi,
       int: args.itemInfo.int,
-      ctx,
+      tx,
     });
 
-    return ctx.equippedItem.delete({
+    return tx.equippedItem.delete({
       where: {
         userEmail_itemId: {
           userEmail: args.userEmail,
@@ -264,11 +264,11 @@ export class ItemsService {
   async userHasItem(args: {
     userEmail: string;
     itemId: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
+    const tx = args.tx || this.prisma;
 
-    const userHasItem = await ctx.inventoryItem.findUnique({
+    return tx.inventoryItem.findUnique({
       where: {
         userEmail_itemId: {
           userEmail: args.userEmail,
@@ -276,20 +276,15 @@ export class ItemsService {
         },
       },
     });
-
-    if (!userHasItem) {
-      false;
-    }
-    return userHasItem;
   }
 
   async getInventoryItem(args: {
     userEmail: string;
     itemId: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
-    return ctx.inventoryItem.findUnique({
+    const tx = args.tx || this.prisma;
+    return tx.inventoryItem.findUnique({
       where: {
         userEmail_itemId: {
           userEmail: args.userEmail,
@@ -303,11 +298,11 @@ export class ItemsService {
   async getEquippedItem(args: {
     userEmail: string;
     itemId: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
+    const tx = args.tx || this.prisma;
 
-    return ctx.equippedItem.findUnique({
+    return tx.equippedItem.findUnique({
       where: {
         userEmail_itemId: {
           userEmail: args.userEmail,
@@ -320,10 +315,10 @@ export class ItemsService {
     });
   }
 
-  async getEquippedItems(args: { userEmail: string; ctx?: TransactionCtx }) {
-    const ctx = args.ctx || this.prisma;
+  async getEquippedItems(args: { userEmail: string; tx?: TransactionContext }) {
+    const tx = args.tx || this.prisma;
 
-    return ctx.equippedItem.findMany({
+    return tx.equippedItem.findMany({
       where: { userEmail: args.userEmail },
       include: { item: true },
     });

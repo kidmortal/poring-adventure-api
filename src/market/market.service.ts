@@ -10,7 +10,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { ItemsService } from 'src/items/items.service';
 import { UsersService } from 'src/users/users.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
-import { TransactionCtx } from 'src/prisma/types/prisma';
+import { TransactionContext } from 'src/prisma/types/prisma';
 
 @Injectable()
 export class MarketService {
@@ -76,14 +76,14 @@ export class MarketService {
     buyerEmail: string;
     stacks: number;
   }) {
-    await this.prisma.$transaction(async (ctx) => {
-      const purchasingUser = await ctx.user.findUnique({
+    await this.prisma.$transaction(async (tx) => {
+      const purchasingUser = await tx.user.findUnique({
         where: { email: args.buyerEmail },
       });
       if (!purchasingUser) {
         throw new BadRequestException('User not registered');
       }
-      const marketListing = await ctx.marketListing.findUnique({
+      const marketListing = await tx.marketListing.findUnique({
         where: { id: args.marketListingId },
         include: { inventory: true },
       });
@@ -99,22 +99,21 @@ export class MarketService {
         marketListingId: marketListing.id,
         currentStacks: marketListing.stack,
         decrementStacks: args.stacks,
-        ctx,
+        tx,
       });
 
       await this.userService.transferSilverFromUserToUser({
         senderEmail: purchasingUser.email,
         receiverEmail: marketListing.sellerEmail,
         amount: purchaseTotalPrice,
-        ctx,
+        tx,
       });
-
       await this.itemService.transferItemFromUserToUser({
         senderEmail: marketListing.sellerEmail,
         receiverEmail: purchasingUser.email,
         itemId: marketListing.inventory.itemId,
         stack: args.stacks,
-        ctx,
+        tx,
       });
       return true;
     });
@@ -159,11 +158,11 @@ export class MarketService {
     marketListingId: number;
     currentStacks: number;
     decrementStacks: number;
-    ctx?: TransactionCtx;
+    tx?: TransactionContext;
   }) {
-    const ctx = args.ctx || this.prisma;
+    const tx = args.tx || this.prisma;
     if (args.decrementStacks < args.currentStacks) {
-      return await ctx.marketListing.update({
+      return await tx.marketListing.update({
         where: {
           id: args.marketListingId,
         },
@@ -175,7 +174,7 @@ export class MarketService {
       });
     }
     if (args.decrementStacks === args.currentStacks) {
-      return await ctx.marketListing.delete({
+      return await tx.marketListing.delete({
         where: {
           id: args.marketListingId,
         },
