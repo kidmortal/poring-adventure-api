@@ -70,31 +70,32 @@ export class ItemsService {
     userEmail: string;
     itemId: number;
     stack: number;
-    tx?: TransactionContext;
   }) {
-    const tx = args.tx || this.prisma;
-    const inventoryItem = await this.getInventoryItem(args);
-    if (inventoryItem) {
-      const item = inventoryItem.item;
-      if (item.category === 'consumable') {
-        if (item.health) {
-          await this.userService.incrementUserHealth({
-            userEmail: args.userEmail,
-            amount: item.health,
-            tx,
-          });
+    await this.prisma.$transaction(async (tx) => {
+      const inventoryItem = await this.getInventoryItem({ ...args, tx });
+      if (inventoryItem) {
+        const item = inventoryItem.item;
+        if (item.category === 'consumable') {
+          if (item.health) {
+            await this.userService.incrementUserHealth({
+              userEmail: args.userEmail,
+              amount: item.health,
+              tx,
+            });
+          }
+          if (item.mana) {
+            await this.userService.incrementUserMana({
+              userEmail: args.userEmail,
+              amount: item.mana,
+              tx,
+            });
+          }
+          await this.removeItemFromUser({ ...args, tx });
+          return true;
         }
-        if (item.mana) {
-          await this.userService.incrementUserMana({
-            userEmail: args.userEmail,
-            amount: item.mana,
-            tx,
-          });
-        }
-        await this.removeItemFromUser(args);
-        return true;
       }
-    }
+    });
+    return false;
   }
 
   async addItemToUser(args: {

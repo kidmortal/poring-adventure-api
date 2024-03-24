@@ -92,7 +92,7 @@ export class BattleService {
     battle.processUserAttack({ email: userEmail });
     return true;
   }
-  async cast(args: { email: string; skillId: number }) {
+  async cast(args: { email: string; skillId: number; targetName: string }) {
     const battle = this.getUserBattle(args.email);
     if (!battle) return false;
     if (battle.battleFinished) return false;

@@ -47,11 +47,15 @@ export class BattleGateway {
   }
   @SubscribeMessage('battle_cast')
   async cast(
-    @MessageBody() skillId: number,
+    @MessageBody() params: { skillId: number; targetName?: string },
     @ConnectedSocket() client: Socket,
   ) {
     const email = client.handshake.auth.email;
     this.logger.debug(`battle_cast ${email}`);
-    return this.battleService.cast({ email, skillId });
+    return this.battleService.cast({
+      email,
+      skillId: params.skillId,
+      targetName: params.targetName,
+    });
   }
 }

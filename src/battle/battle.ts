@@ -171,19 +171,30 @@ export class BattleInstance {
     return false;
   }
 
-  async processUserCast(args: { email: string; skillId: number }) {
+  async processUserCast(args: {
+    email: string;
+    skillId: number;
+    targetName: string;
+  }) {
     const isUserTurn = this.isUserTurn(args);
     if (isUserTurn) {
       const user = this.getUserFromBattle(args.email);
       const skill = this.getSkillFromUser(args);
       if (skill.cooldown > 0) return false;
       skill.cooldown += skill.skill.cooldown;
-      console.log('icnrease cd');
       switch (skill.skill.category) {
         case SkillCategory.TargetEnemy:
-          return this.processCastTargetEnemy({ user, skill });
+          return this.processCastTargetEnemy({
+            user,
+            skill,
+            targetName: args.targetName,
+          });
         case SkillCategory.TargetAlly:
-          return this.processCastTargetAlly({ user, skill });
+          return this.processCastTargetAlly({
+            user,
+            skill,
+            targetName: args.targetName,
+          });
         case SkillCategory.BuffSelf:
           return this.processCastBuffSelf({ user, skill });
 
@@ -197,10 +208,13 @@ export class BattleInstance {
   private async processCastTargetEnemy(args: {
     user: UserWithStats;
     skill: LearnedSkillWithSkill;
+    targetName?: string;
   }) {
     const userAttribute: number = args.user.stats[args.skill.skill.attribute];
     const multiplier = args.skill.skill.multiplier * args.skill.masteryLevel;
-    const targetMonster = this.monsters[0];
+    const targetMonster = args.targetName
+      ? this.getMonsterTarget(args.targetName)
+      : this.monsters[0];
     const userDamage = args.user.stats.attack + userAttribute * multiplier;
 
     return this.beforeDamageStep({
@@ -220,13 +234,17 @@ export class BattleInstance {
   private async processCastTargetAlly(args: {
     user: UserWithStats;
     skill: LearnedSkillWithSkill;
+    targetName?: string;
   }) {
     const userAttribute: number = args.user.stats[args.skill.skill.attribute];
     const multiplier = args.skill.skill.multiplier * args.skill.masteryLevel;
     const potency = utils.randomDamage(userAttribute * multiplier, 20);
     args.user.stats.mana -= args.skill.skill.manaCost;
     if (args.skill.skill.effect === SkillEffect.Healing) {
-      const targetAlly = this.getLowestHealthMember();
+      const targetAlly = args.targetName
+        ? this.getUserTarget(args.targetName)
+        : this.getLowestHealthMember();
+
       this.healUser({ user: targetAlly, amount: potency });
       this.pushLog({
         log: `${args.user.name} Healed ${targetAlly.name} by ${potency} Health Points`,
@@ -235,7 +253,9 @@ export class BattleInstance {
     }
 
     if (args.skill.skill.effect === SkillEffect.Infusion) {
-      const targetAlly = this.getLowestManaMember();
+      const targetAlly = args.targetName
+        ? this.getUserTarget(args.targetName)
+        : this.getLowestManaMember();
       this.infuseUser({ user: targetAlly, amount: potency });
       this.pushLog({
         log: `${args.user.name} Infused ${targetAlly.name} by ${potency} Mana Points`,
@@ -321,7 +341,6 @@ export class BattleInstance {
       user.learnedSkills.forEach((ls) => {
         if (ls.cooldown && ls.cooldown > 0) {
           ls.cooldown -= 1;
-          console.log(`decrease ${ls.skill.name} cooldown`);
         }
       });
       return;
@@ -491,7 +510,6 @@ export class BattleInstance {
     }
     const monster = this.monsters.find((m) => m.name === currentTurn);
     if (monster) {
-      console.log('monster');
       return;
     }
   }
@@ -597,5 +615,12 @@ export class BattleInstance {
       });
     });
     return users;
+  }
+
+  private getMonsterTarget(name: string) {
+    return this.monsters.find((m) => m.name === name);
+  }
+  private getUserTarget(name: string) {
+    return this.users.find((u) => u.name === name);
   }
 }

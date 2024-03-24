@@ -81,6 +81,15 @@ model Appearance {
   userEmail String @unique
 }
 
+model Head {
+  id     Int    @id @default(autoincrement())
+  name   String
+  gender String
+  image  String
+
+  @@unique([name, gender])
+}
+
 model MarketListing {
   id          Int           @id @default(autoincrement())
   price       Int

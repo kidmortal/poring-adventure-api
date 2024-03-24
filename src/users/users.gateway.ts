@@ -56,6 +56,17 @@ export class UsersGateway {
     return this.userService.create({ ...createUserDto, email: email });
   }
 
+  @SubscribeMessage('update_user_name')
+  async updateName(
+    @MessageBody() newName: string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const email = client.handshake.auth.email;
+    if (!email) return false;
+    this.logger.debug('update_user_name');
+    return this.userService.updateUserName({ email: email, newName });
+  }
+
   @SubscribeMessage('delete_user')
   async remove(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
@@ -68,5 +79,10 @@ export class UsersGateway {
   async getAllClasses() {
     this.logger.debug('get_all_professions');
     return this.userService.getAllProfessions();
+  }
+  @SubscribeMessage('get_all_heads')
+  async getAllHeads() {
+    this.logger.debug('get_all_heads');
+    return this.userService.getAllHeads();
   }
 }
