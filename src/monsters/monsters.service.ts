@@ -39,9 +39,15 @@ export class MonstersService {
     }
   }
 
-  getAllMaps() {
-    return this.prisma.map.findMany({
+  async getAllMaps() {
+    const cacheKey = `map_monsters`;
+    const cachedMap = await this.cache.get(cacheKey);
+    if (cachedMap) return cachedMap as any;
+
+    const maps = await this.prisma.map.findMany({
       include: { monster: true },
     });
+    await this.cache.set(cacheKey, maps);
+    return maps;
   }
 }
