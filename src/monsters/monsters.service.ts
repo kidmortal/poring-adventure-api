@@ -45,7 +45,7 @@ export class MonstersService {
     if (cachedMap) return cachedMap as any;
 
     const maps = await this.prisma.map.findMany({
-      include: { monster: true },
+      include: { monster: { include: { drops: { include: { item: true } } } } },
     });
     await this.cache.set(cacheKey, maps);
     return maps;
