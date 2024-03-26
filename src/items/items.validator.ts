@@ -13,9 +13,8 @@ export const ItemsValidator = {
     categoryEquipped: string;
   }) => {
     if (args.categoryItem === args.categoryEquipped) {
-      throw new BadRequestException(
-        'You cannot equip two of the same kind of equipment',
-      );
+      return true;
     }
+    return false;
   },
 };

@@ -16,7 +16,7 @@ export class ItemsService {
     return this.prisma.item.create({ data: createItemDto });
   }
 
-  async removeItemFromUser(args: {
+  async removeItemFromUserInventory(args: {
     userEmail: string;
     itemId: number;
     stack: number;
@@ -90,7 +90,7 @@ export class ItemsService {
               tx,
             });
           }
-          await this.removeItemFromUser({ ...args, tx });
+          await this.removeItemFromUserInventory({ ...args, tx });
           return true;
         }
       }
@@ -148,7 +148,7 @@ export class ItemsService {
     tx?: TransactionContext;
   }) {
     const tx = args.tx || this.prisma;
-    await this.removeItemFromUser({
+    await this.removeItemFromUserInventory({
       itemId: args.itemId,
       stack: args.stack,
       userEmail: args.senderEmail,
@@ -169,16 +169,24 @@ export class ItemsService {
       if (!inventoryItem) return false;
       ItemsValidator.isEquippable({ category: inventoryItem.item.category });
       const equippedItems = await this.getEquippedItems({ ...args, tx });
-      equippedItems.forEach((equip) => {
-        ItemsValidator.isSameCategory({
+      for await (const equip of equippedItems) {
+        const isSameAsEquipped = ItemsValidator.isSameCategory({
           categoryItem: inventoryItem.item.category,
           categoryEquipped: equip.item.category,
         });
-      });
-      await this.removeItemFromUser({ ...args, stack: 1, tx });
-      await this.addEquipmentToUser({
-        ...args,
-        itemInfo: inventoryItem.item,
+        if (isSameAsEquipped) {
+          await this.swapEquippedItem({
+            equipItem: inventoryItem.item,
+            unequipItem: equip.item,
+            userEmail: args.userEmail,
+            tx,
+          });
+          return true;
+        }
+      }
+      await this._equipItem({
+        item: inventoryItem.item,
+        userEmail: args.userEmail,
         tx,
       });
       return true;
@@ -187,14 +195,72 @@ export class ItemsService {
     return false;
   }
 
+  private async _unequipItem(args: {
+    item: Item;
+    userEmail: string;
+    tx?: TransactionContext;
+  }) {
+    const tx = args.tx || this.prisma;
+    await this.removeEquipmentFromUser({
+      userEmail: args.userEmail,
+      itemId: args.item.id,
+      itemInfo: args.item,
+      tx,
+    });
+    await this.addItemToUser({
+      stack: 1,
+      userEmail: args.userEmail,
+      itemId: args.item.id,
+      tx,
+    });
+  }
+
+  private async _equipItem(args: {
+    item: Item;
+    userEmail: string;
+    tx?: TransactionContext;
+  }) {
+    const tx = args.tx || this.prisma;
+    await this.addEquipmentToUser({
+      userEmail: args.userEmail,
+      itemId: args.item.id,
+      itemInfo: args.item,
+      tx,
+    });
+    await this.removeItemFromUserInventory({
+      stack: 1,
+      userEmail: args.userEmail,
+      itemId: args.item.id,
+      tx,
+    });
+  }
+
+  async swapEquippedItem(args: {
+    unequipItem: Item;
+    equipItem: Item;
+    userEmail: string;
+    tx?: TransactionContext;
+  }) {
+    const tx = args.tx || this.prisma;
+    await this._unequipItem({
+      item: args.unequipItem,
+      userEmail: args.userEmail,
+      tx,
+    });
+    await this._equipItem({
+      item: args.equipItem,
+      userEmail: args.userEmail,
+      tx,
+    });
+  }
+
   async unequipItem(args: { itemId: number; userEmail: string }) {
     await this.prisma.$transaction(async (tx) => {
       const equippedItem = await this.getEquippedItem({ ...args, tx });
       if (equippedItem) {
-        await this.addItemToUser({ ...args, stack: 1, tx });
-        await this.removeEquipmentFromUser({
-          ...args,
-          itemInfo: equippedItem.item,
+        await this._unequipItem({
+          item: equippedItem.item,
+          userEmail: args.userEmail,
           tx,
         });
       }
