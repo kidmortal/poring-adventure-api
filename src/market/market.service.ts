@@ -56,18 +56,15 @@ export class MarketService {
       }
     }
 
-    return this.createOrIncrementMarketListing({
+    await this._createOrIncrementMarketListing({
       price: createMarketDto.price,
       stack: createMarketDto.stack,
       currentStacks: inventoryItem.stack,
       inventoryId: inventoryItem.id,
       sellerEmail,
     });
-  }
-
-  async notifyMarketUsers() {
-    const listing = await this.findAll();
-    this.websocket.broadcast('market_update', listing);
+    this._notifyMarketUsers();
+    return true;
   }
 
   async purchase(args: {
@@ -94,7 +91,7 @@ export class MarketService {
         throw new BadRequestException('You are too poor for that');
       }
 
-      await this.decrementOrRemoveMarketListing({
+      await this._decrementOrRemoveMarketListing({
         marketListingId: marketListing.id,
         currentStacks: marketListing.stack,
         decrementStacks: args.stacks,
@@ -114,12 +111,62 @@ export class MarketService {
         stack: args.stacks,
         tx,
       });
+      this._notifyMarketUsers();
       return true;
     });
     return false;
   }
 
-  async createOrIncrementMarketListing(args: {
+  findAll() {
+    return this.prisma.marketListing.findMany({
+      take: 10,
+      include: {
+        inventory: {
+          include: {
+            item: true,
+          },
+        },
+        seller: true,
+      },
+    });
+  }
+
+  findOne(id: number) {
+    return `This action returns a #${id} market`;
+  }
+
+  async remove(id: number, authEmail: string) {
+    const marketListing = await this.prisma.marketListing.findUnique({
+      where: { id },
+    });
+
+    if (!marketListing) {
+      throw new BadRequestException('Listing not found');
+    }
+
+    if (marketListing?.sellerEmail !== authEmail) {
+      throw new UnauthorizedException(
+        `You are signed as ${authEmail}, but the listing number ${id} was made by ${marketListing.sellerEmail}`,
+      );
+    }
+
+    try {
+      const deletedItem = await this.prisma.marketListing.delete({
+        where: { id },
+      });
+      this._notifyMarketUsers();
+      return deletedItem;
+    } catch (error) {
+      throw new InternalServerErrorException(error);
+    }
+  }
+
+  private async _notifyMarketUsers() {
+    const listing = await this.findAll();
+    this.websocket.broadcast('market_update', listing);
+  }
+
+  private async _createOrIncrementMarketListing(args: {
     price: number;
     stack: number;
     currentStacks: number;
@@ -153,7 +200,7 @@ export class MarketService {
     });
   }
 
-  async decrementOrRemoveMarketListing(args: {
+  private async _decrementOrRemoveMarketListing(args: {
     marketListingId: number;
     currentStacks: number;
     decrementStacks: number;
@@ -182,52 +229,5 @@ export class MarketService {
     throw new BadRequestException(
       `Invalid decrement has been provided, you cant remove ${args.decrementStacks} from ${args.currentStacks}`,
     );
-  }
-
-  findAll() {
-    return this.prisma.marketListing.findMany({
-      take: 10,
-      include: {
-        inventory: {
-          include: {
-            item: true,
-          },
-        },
-        seller: true,
-      },
-    });
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} market`;
-  }
-
-  // update(id: number, updateMarketDto: UpdateMarketDto) {
-  //   return `This action updates a #${id} market`;
-  // }
-
-  async remove(id: number, authEmail: string) {
-    const marketListing = await this.prisma.marketListing.findUnique({
-      where: { id },
-    });
-
-    if (!marketListing) {
-      throw new BadRequestException('Listing not found');
-    }
-
-    if (marketListing?.sellerEmail !== authEmail) {
-      throw new UnauthorizedException(
-        `You are signed as ${authEmail}, but the listing number ${id} was made by ${marketListing.sellerEmail}`,
-      );
-    }
-
-    try {
-      const deletedItem = await this.prisma.marketListing.delete({
-        where: { id },
-      });
-      return deletedItem;
-    } catch (error) {
-      throw new InternalServerErrorException(error);
-    }
   }
 }
