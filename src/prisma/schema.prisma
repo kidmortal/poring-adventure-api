@@ -21,6 +21,7 @@ model User {
   silver        Int             @default(20)
   admin         Boolean         @default(false)
   appearance    Appearance?
+  guildMember   GuildMember?
   stats         Stats?
   profession    Profession?     @relation(fields: [professionId], references: [id])
   professionId  Int?
@@ -148,10 +149,11 @@ model Monster {
 }
 
 model Map {
-  id      Int       @id @default(autoincrement())
-  name    String
-  image   String
-  monster Monster[]
+  id        Int         @id @default(autoincrement())
+  name      String
+  image     String
+  monster   Monster[]
+  guildTask GuildTask[]
 }
 
 model Party {
@@ -236,4 +238,48 @@ model Buff {
   maxStack Int        @default(1)
   UserBuff UserBuff[]
   Skill    Skill[]
+}
+
+model Guild {
+  id               Int               @id @default(autoincrement())
+  name             String            @unique
+  leaderEmail      String            @unique
+  imageUrl         String            @default("https://kidmortal.sirv.com/misc/guild_image.png")
+  level            Int               @default(1)
+  experience       Int               @default(0)
+  taskPoints       Int               @default(0)
+  members          GuildMember[]
+  CurrentGuildTask CurrentGuildTask?
+}
+
+model CurrentGuildTask {
+  id             Int       @id @default(autoincrement())
+  task           GuildTask @relation(fields: [guildTaskId], references: [id])
+  guildTaskId    Int
+  remainingKills Int
+  Guild          Guild     @relation(fields: [guildId], references: [id])
+  guildId        Int       @unique
+}
+
+model GuildTask {
+  id               Int                @id @default(autoincrement())
+  name             String             @unique
+  target           Map                @relation(fields: [mapId], references: [id])
+  mapId            Int
+  killCount        Int                @default(10)
+  taskPoints       Int                @default(10)
+  CurrentGuildTask CurrentGuildTask[]
+}
+
+model GuildMember {
+  id           Int    @id @default(autoincrement())
+  role         String @default("member")
+  contribution Int    @default(0)
+  guildTokens  Int    @default(0)
+  user         User   @relation(fields: [userEmail], references: [email])
+  userEmail    String @unique
+  Guild        Guild? @relation(fields: [guildId], references: [id])
+  guildId      Int?
+
+  @@unique([userEmail, guildId])
 }
