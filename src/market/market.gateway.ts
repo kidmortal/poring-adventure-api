@@ -28,7 +28,6 @@ export class MarketGateway {
       createMarketDto,
       email,
     );
-    this.marketService.notifyMarketUsers();
     return result;
   }
 
@@ -44,7 +43,6 @@ export class MarketGateway {
       stacks: purchaseDto.stack,
       buyerEmail: email,
     });
-    this.marketService.notifyMarketUsers();
     return result;
   }
 
@@ -53,7 +51,6 @@ export class MarketGateway {
     const email = client.handshake.auth.email;
     this.logger.debug('remove_market_listing');
     const result = await this.marketService.remove(id, email);
-    this.marketService.notifyMarketUsers();
     return result;
   }
 
