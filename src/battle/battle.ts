@@ -148,6 +148,91 @@ export class BattleInstance {
     this.log.push({ message: log, icon });
   }
 
+  toJson() {
+    return {
+      users: this.users,
+      monsters: this.monsters,
+      attackerTurn: this.attackerTurn,
+      attackerList: this.attackerList,
+      battleFinished: this.battleFinished,
+      userLost: this.userLost,
+      log: this.log,
+      drops: this.drops,
+    };
+  }
+
+  notifyUsers() {
+    this.users.forEach((user) => {
+      const email = user.email;
+      this.socket.sendMessageToSocket({
+        email,
+        payload: this.toJson(),
+        event: 'battle_update',
+      });
+    });
+  }
+
+  notifyBattleRemoved() {
+    this.users.forEach((user) => {
+      const email = user.email;
+      this.socket.sendMessageToSocket({
+        email,
+        payload: undefined,
+        event: 'battle_update',
+      });
+    });
+  }
+
+  hasUser(email: string) {
+    const user = this.users.find((u) => u.email === email);
+    if (user) return true;
+    return false;
+  }
+
+  getUserFromBattle(email: string) {
+    return this.users.find((u) => u.email === email);
+  }
+
+  generateBattleDrops() {
+    this.users.forEach((user) => {
+      const dropedItems: {
+        [itemId: string]: { itemId: number; stack: number; item: Item };
+      } = {};
+      let silverGain = 0;
+      let expGain = 0;
+
+      this.monsters.forEach((monster) => {
+        silverGain += monster.silver;
+        expGain += monster.exp;
+        monster.drops.forEach(
+          ({ chance, item, itemId, minAmount, maxAmount }) => {
+            if (utils.isSuccess(chance)) {
+              const amount = utils.getRandomNumberBetween(minAmount, maxAmount);
+              if (dropedItems[itemId]) {
+                dropedItems[itemId].stack += amount;
+              } else {
+                dropedItems[itemId] = {
+                  itemId: itemId,
+                  stack: amount,
+                  item: item,
+                };
+              }
+            }
+          },
+        );
+      });
+
+      const battleDrop: BattleDrop = {
+        userEmail: user.email,
+        silver: silverGain,
+        exp: expGain,
+        dropedItems: Object.values(dropedItems),
+      };
+
+      this.drops.push(battleDrop);
+    });
+  }
+
   async processUserAttack(args: { email: string }) {
     const isUserTurn = this.isUserTurn(args);
 
@@ -514,51 +599,6 @@ export class BattleInstance {
     }
   }
 
-  toJson() {
-    return {
-      users: this.users,
-      monsters: this.monsters,
-      attackerTurn: this.attackerTurn,
-      attackerList: this.attackerList,
-      battleFinished: this.battleFinished,
-      userLost: this.userLost,
-      log: this.log,
-      drops: this.drops,
-    };
-  }
-
-  notifyUsers() {
-    this.users.forEach((user) => {
-      const email = user.email;
-      this.socket.sendMessageToSocket({
-        email,
-        payload: this.toJson(),
-        event: 'battle_update',
-      });
-    });
-  }
-
-  notifyBattleRemoved() {
-    this.users.forEach((user) => {
-      const email = user.email;
-      this.socket.sendMessageToSocket({
-        email,
-        payload: undefined,
-        event: 'battle_update',
-      });
-    });
-  }
-
-  hasUser(email: string) {
-    const user = this.users.find((u) => u.email === email);
-    if (user) return true;
-    return false;
-  }
-
-  getUserFromBattle(email: string) {
-    return this.users.find((u) => u.email === email);
-  }
-
   private async settleBattleAndProcessRewards() {
     const monsterAlive = this.isMonsterAlive;
     const userAlive = this.isPlayersAlive;
@@ -576,36 +616,6 @@ export class BattleInstance {
     await this.updateUsers(this);
     this.battleFinished = true;
     this.notifyUsers();
-  }
-
-  generateBattleDrops() {
-    const targetMonster = this.monsters[0];
-    this.users.forEach((user) => {
-      const silverGain = targetMonster.silver;
-      const expGain = targetMonster.exp;
-      const drops = targetMonster.drops;
-      const dropedItems: { itemId: number; stack: number; item: Item }[] = [];
-
-      drops.forEach(({ chance, item, itemId, minAmount, maxAmount }) => {
-        if (utils.isSuccess(chance)) {
-          const amount = utils.getRandomNumberBetween(minAmount, maxAmount);
-          dropedItems.push({
-            itemId: itemId,
-            stack: amount,
-            item: item,
-          });
-        }
-      });
-
-      const battleDrop: BattleDrop = {
-        userEmail: user.email,
-        silver: silverGain,
-        exp: expGain,
-        dropedItems: dropedItems,
-      };
-
-      this.drops.push(battleDrop);
-    });
   }
   private generateUserBattleValues(users: UserWithStats[]) {
     users.forEach((user) => {
