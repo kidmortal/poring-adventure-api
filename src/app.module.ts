@@ -16,6 +16,7 @@ import { join } from 'path';
 import { SkillsModule } from './skills/skills.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AdminModule } from './admin/admin.module';
+import { GuildModule } from './guild/guild.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { AdminModule } from './admin/admin.module';
     PartyModule,
     SkillsModule,
     AdminModule,
+    GuildModule,
   ],
   controllers: [MainController],
   providers: [

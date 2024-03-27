@@ -105,19 +105,20 @@ model MarketListing {
 }
 
 model Item {
-  id        Int             @id @default(autoincrement())
-  name      String
-  category  String
-  image     String
-  attack    Int?
-  str       Int?
-  agi       Int?
-  int       Int?
-  health    Int?
-  mana      Int?
-  equipped  EquippedItem[]
-  inventory InventoryItem[]
-  drop      Drop[]
+  id           Int             @id @default(autoincrement())
+  name         String
+  category     String
+  image        String
+  attack       Int?
+  str          Int?
+  agi          Int?
+  int          Int?
+  health       Int?
+  mana         Int?
+  equipped     EquippedItem[]
+  inventory    InventoryItem[]
+  drop         Drop[]
+  Notification Notification[]
 }
 
 model Drop {
@@ -210,6 +211,11 @@ model LearnedSkill {
 model Notification {
   id         Int      @id @default(autoincrement())
   content    String
+  claimed    Boolean  @default(false)
+  silver     Int?     @default(0)
+  item       Item?    @relation(fields: [itemId], references: [id])
+  itemId     Int?
+  itemStack  Int?
   visualized Boolean
   user       User     @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   userEmail  String   @unique
@@ -236,8 +242,8 @@ model Buff {
   pose     String     @default("default")
   persist  Boolean    @default(false)
   maxStack Int        @default(1)
-  UserBuff UserBuff[]
-  Skill    Skill[]
+  userBuff UserBuff[]
+  skill    Skill[]
 }
 
 model Guild {
@@ -248,8 +254,10 @@ model Guild {
   level            Int               @default(1)
   experience       Int               @default(0)
   taskPoints       Int               @default(0)
+  publicMessage    String            @default("Lets have fun")
+  internalMessage  String            @default("Lets have fun")
   members          GuildMember[]
-  CurrentGuildTask CurrentGuildTask?
+  currentGuildTask CurrentGuildTask?
 }
 
 model CurrentGuildTask {
@@ -257,7 +265,7 @@ model CurrentGuildTask {
   task           GuildTask @relation(fields: [guildTaskId], references: [id])
   guildTaskId    Int
   remainingKills Int
-  Guild          Guild     @relation(fields: [guildId], references: [id])
+  guild          Guild     @relation(fields: [guildId], references: [id])
   guildId        Int       @unique
 }
 
@@ -268,7 +276,7 @@ model GuildTask {
   mapId            Int
   killCount        Int                @default(10)
   taskPoints       Int                @default(10)
-  CurrentGuildTask CurrentGuildTask[]
+  currentGuildTask CurrentGuildTask[]
 }
 
 model GuildMember {
@@ -278,7 +286,7 @@ model GuildMember {
   guildTokens  Int    @default(0)
   user         User   @relation(fields: [userEmail], references: [email])
   userEmail    String @unique
-  Guild        Guild? @relation(fields: [guildId], references: [id])
+  guild        Guild? @relation(fields: [guildId], references: [id])
   guildId      Int?
 
   @@unique([userEmail, guildId])
