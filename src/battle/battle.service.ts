@@ -58,6 +58,7 @@ export class BattleService {
         users: users,
         monsters: monsters,
         updateUsers: (b) => this.updateStatsAndRewards(b),
+        removeBattle: () => this._remove(args.userEmail),
       });
 
       newBattleInstance.notifyUsers();
@@ -69,7 +70,19 @@ export class BattleService {
     return true;
   }
 
-  async remove(userEmail: string) {
+  async finishBattle(args: { userEmail: string }) {
+    console.log('get beto');
+    const battle = this.getUserBattle(args.userEmail);
+    if (battle) {
+      console.log('finish');
+      battle.removeBattle();
+      battle.notifyBattleRemoved();
+      return true;
+    }
+    return false;
+  }
+
+  private async _remove(userEmail: string) {
     const battleIndex = this.battleList.findIndex((battle) =>
       battle.hasUser(userEmail),
     );
