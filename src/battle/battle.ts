@@ -133,6 +133,14 @@ export class BattleInstance {
     }
   }
 
+  get monsterCount() {
+    return this.monsters.length;
+  }
+
+  get monstersMapId() {
+    return this.monsters[0].mapId;
+  }
+
   constructor({
     monsters,
     users,

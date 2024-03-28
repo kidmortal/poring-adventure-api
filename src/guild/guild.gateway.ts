@@ -23,6 +23,14 @@ export class GuildGateway {
     return this.guildService.getGuildFromUser({ userEmail: email });
   }
 
+  @SubscribeMessage('finish_current_task')
+  finishQuest(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    if (!email) return false;
+    this.logger.debug('finish_current_task');
+    return this.guildService.finishCurrentTask({ userEmail: email });
+  }
+
   @SubscribeMessage('find_all_guild')
   findAll() {
     this.logger.debug('find_all_guild');

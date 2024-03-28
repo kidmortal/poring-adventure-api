@@ -281,14 +281,15 @@ model GuildTask {
 }
 
 model GuildMember {
-  id           Int    @id @default(autoincrement())
-  role         String @default("member")
-  contribution Int    @default(0)
-  guildTokens  Int    @default(0)
-  user         User   @relation(fields: [userEmail], references: [email])
-  userEmail    String @unique
-  guild        Guild? @relation(fields: [guildId], references: [id])
-  guildId      Int?
+  id              Int    @id @default(autoincrement())
+  role            String @default("member")
+  permissionLevel Int    @default(0)
+  contribution    Int    @default(0)
+  guildTokens     Int    @default(0)
+  user            User   @relation(fields: [userEmail], references: [email])
+  userEmail       String @unique
+  guild           Guild? @relation(fields: [guildId], references: [id])
+  guildId         Int?
 
   @@unique([userEmail, guildId])
 }
