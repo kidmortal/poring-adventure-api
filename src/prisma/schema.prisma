@@ -118,7 +118,7 @@ model Item {
   equipped     EquippedItem[]
   inventory    InventoryItem[]
   drop         Drop[]
-  Notification Notification[]
+  notification Notification[]
 }
 
 model Drop {
@@ -210,6 +210,7 @@ model LearnedSkill {
 
 model Notification {
   id         Int      @id @default(autoincrement())
+  sender     String
   content    String
   claimed    Boolean  @default(false)
   silver     Int?     @default(0)
@@ -218,7 +219,7 @@ model Notification {
   itemStack  Int?
   visualized Boolean
   user       User     @relation(fields: [userEmail], references: [email], onDelete: Cascade)
-  userEmail  String   @unique
+  userEmail  String
   createdAt  DateTime @default(now())
 }
 

@@ -9,7 +9,7 @@ async function bootstrap() {
   app.enableCors({ origin: '*', allowedHeaders: '*' });
   app.useGlobalPipes(new ValidationPipe());
   setupSentry();
-  EventEmitter.setMaxListeners(20);
+  EventEmitter.setMaxListeners(30);
   await app.listen(process.env.PORT || 8000);
 }
 bootstrap();
