@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Notification as UserNofication } from '@prisma/client';
+import { Mail } from '@prisma/client';
+import { ItemsService } from 'src/items/items.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransactionContext } from 'src/prisma/types/prisma';
 import { UsersService } from 'src/users/users.service';
@@ -10,28 +11,15 @@ export class MailService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly websocket: WebsocketService,
-    private readonly user: UsersService,
+    private readonly userService: UsersService,
+    private readonly itemService: ItemsService,
   ) {}
-  async findAll(params: { userEmail: string }) {
-    const notifications = await this.prisma.notification.findMany({
-      where: { userEmail: params.userEmail },
-      include: { item: true },
-    });
-
-    if (notifications) {
-      this.websocket.sendMessageToSocket({
-        event: 'notification_list',
-        email: params.userEmail,
-        payload: notifications,
-      });
-      return true;
-    }
-
-    return false;
+  async findAll(args: { userEmail: string }) {
+    return this._notifyUserMailBox(args);
   }
 
   async viewAll(args: { userEmail: string }) {
-    const result = await this.prisma.notification.updateMany({
+    const result = await this.prisma.mail.updateMany({
       where: { userEmail: args.userEmail, visualized: false },
       data: { visualized: true },
     });
@@ -40,30 +28,66 @@ export class MailService {
 
   async claimAll(args: { userEmail: string }) {
     await this.prisma.$transaction(async (tx) => {
-      const claimableRewards = await tx.notification.findMany({
+      const claimableMails = await tx.mail.findMany({
         where: { userEmail: args.userEmail, claimed: false },
       });
-      for await (const reward of claimableRewards) {
+      for await (const mail of claimableMails) {
+        await this._claimMail({ mail, tx });
       }
     });
+
+    await this._notifyUserMailBox(args);
+    await this.userService.notifyUserUpdateWithProfile({
+      email: args.userEmail,
+    });
+    return true;
   }
 
   async deleteAll(args: { userEmail: string }) {
-    const result = await this.prisma.notification.deleteMany({
+    const result = await this.prisma.mail.deleteMany({
       where: { userEmail: args.userEmail, claimed: true },
     });
     return result;
   }
 
-  async _claimReward(args: {
-    notification: UserNofication;
-    tx: TransactionContext;
-  }) {
+  async _claimMail(args: { mail: Mail; tx: TransactionContext }) {
     const tx = args.tx || this.prisma;
-    const notif = args.notification;
-    if (notif) {
-      if (notif.silver) {
+    const mail = args.mail;
+    if (mail) {
+      if (mail.silver && mail.silver > 0) {
+        await this.userService.addSilverToUser({
+          userEmail: mail.userEmail,
+          amount: mail.silver,
+          tx,
+        });
       }
+      if (mail.itemId && mail.itemStack && mail.itemStack > 0) {
+        await this.itemService.addItemToUser({
+          userEmail: mail.userEmail,
+          itemId: mail.itemId,
+          stack: mail.itemStack,
+          tx,
+        });
+      }
+      await tx.mail.update({
+        where: { id: mail.id },
+        data: { claimed: true, visualized: true },
+      });
+    }
+  }
+  async _notifyUserMailBox(args: { userEmail: string }) {
+    const mailBox = await this.prisma.mail.findMany({
+      where: { userEmail: args.userEmail },
+      include: { item: true },
+    });
+
+    if (mailBox) {
+      this.websocket.sendMessageToSocket({
+        event: 'mailbox',
+        email: args.userEmail,
+        payload: mailBox,
+      });
+      return true;
     }
   }
 }
