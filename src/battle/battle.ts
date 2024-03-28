@@ -84,6 +84,7 @@ type CreateBattleParams = {
   monsters: MonsterWithDrops[];
   socket: WebsocketService;
   updateUsers: (battle: BattleInstance) => Promise<void>;
+  removeBattle: () => Promise<boolean>;
 };
 
 export type BattleLog = {
@@ -112,6 +113,7 @@ export class BattleInstance {
   battleFinished: boolean = false;
   userLost: boolean = false;
   updateUsers: (battle: BattleInstance) => Promise<void>;
+  removeBattle: () => Promise<boolean>;
   private log: BattleLog[] = [];
   private drops: BattleDrop[] = [];
 
@@ -131,12 +133,19 @@ export class BattleInstance {
     }
   }
 
-  constructor({ monsters, users, socket, updateUsers }: CreateBattleParams) {
+  constructor({
+    monsters,
+    users,
+    socket,
+    updateUsers,
+    removeBattle,
+  }: CreateBattleParams) {
     this.socket = socket;
     this.users = this.generateUserBattleValues(users);
     this.monsters = monsters;
     this.attackerList = BattleUtils.generateBattleAttackOrder(users, monsters);
     this.updateUsers = updateUsers;
+    this.removeBattle = removeBattle;
   }
 
   // Functions that round be called periodically
@@ -600,6 +609,11 @@ export class BattleInstance {
   }
 
   private async settleBattleAndProcessRewards() {
+    if (this.battleFinished) {
+      this.removeBattle();
+      this.notifyBattleRemoved();
+      return;
+    }
     const monsterAlive = this.isMonsterAlive;
     const userAlive = this.isPlayersAlive;
     if (monsterAlive && userAlive) {
@@ -613,9 +627,9 @@ export class BattleInstance {
       return;
     }
     this.generateBattleDrops();
-    this.battleFinished = true;
     if (!this.battleFinished) {
       await this.updateUsers(this);
+      this.battleFinished = true;
     }
     this.notifyUsers();
   }

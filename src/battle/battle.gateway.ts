@@ -36,7 +36,7 @@ export class BattleGateway {
   async reset(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug(`battle_reset ${email}`);
-    return this.battleService.remove(email);
+    return this.battleService.finishBattle({ userEmail: email });
   }
 
   @SubscribeMessage('battle_attack')
