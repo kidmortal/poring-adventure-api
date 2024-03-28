@@ -1,10 +1,11 @@
 import {
   WebSocketGateway,
   SubscribeMessage,
-  MessageBody,
+  ConnectedSocket,
 } from '@nestjs/websockets';
+import { Socket } from 'socket.io';
 import { GuildService } from './guild.service';
-import { CreateGuildDto } from './dto/create-guild.dto';
+
 import { Logger, UseFilters } from '@nestjs/common';
 import { WebsocketExceptionsFilter } from 'src/websocket/websocketException.filter';
 
@@ -14,14 +15,12 @@ export class GuildGateway {
   constructor(private readonly guildService: GuildService) {}
   private logger = new Logger('Websocket - guilds');
 
-  @SubscribeMessage('create_guild')
-  create(@MessageBody() createGuildDto: CreateGuildDto) {
-    return this.guildService.create(createGuildDto);
-  }
-
-  @SubscribeMessage('find_guild')
-  findOne(@MessageBody() id: number) {
-    return this.guildService.findOne(id);
+  @SubscribeMessage('get_guild')
+  findOne(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    if (!email) return false;
+    this.logger.debug('get_guild');
+    return this.guildService.getGuildFromUser({ userEmail: email });
   }
 
   @SubscribeMessage('find_all_guild')

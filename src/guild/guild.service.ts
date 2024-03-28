@@ -1,18 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CreateGuildDto } from './dto/create-guild.dto';
+
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { WebsocketService } from 'src/websocket/websocket.service';
 
 @Injectable()
 export class GuildService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly websocket: WebsocketService,
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
-  create(createGuildDto: CreateGuildDto) {
-    return 'This action adds a new guild';
-  }
 
   async findAll() {
     const cacheKey = `guild_ranking`;
@@ -27,11 +26,38 @@ export class GuildService {
     return guildRanking;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} guild`;
+  async getGuildFromUser(args: { userEmail: string }) {
+    return this._notifyUserWithGuild(args);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} guild`;
+  private async _getGuild(args: { guildId: number }) {
+    const cacheKey = `guild_id_${args.guildId}`;
+    const cachedGuild = await this.cache.get(cacheKey);
+    if (cachedGuild) return cachedGuild as any;
+    const guild = await this.prisma.guild.findUnique({
+      where: { id: args.guildId },
+      include: {
+        members: {
+          include: { user: { include: { stats: true, appearance: true } } },
+        },
+      },
+    });
+    await this.cache.set(cacheKey, guild);
+    return guild;
+  }
+  private async _notifyUserWithGuild(args: { userEmail: string }) {
+    const userGuild = await this.prisma.guildMember.findUnique({
+      where: { userEmail: args.userEmail },
+    });
+    if (!userGuild) return false;
+    const guild = await this._getGuild({ guildId: userGuild.guildId });
+    if (!guild) return false;
+
+    this.websocket.sendMessageToSocket({
+      event: 'guild',
+      email: args.userEmail,
+      payload: guild,
+    });
+    return true;
   }
 }
