@@ -37,8 +37,12 @@ export class GuildService {
     const guild = await this.prisma.guild.findUnique({
       where: { id: args.guildId },
       include: {
+        currentGuildTask: {
+          include: { task: { include: { target: true } } },
+        },
         members: {
           include: { user: { include: { stats: true, appearance: true } } },
+          orderBy: { contribution: 'desc' },
         },
       },
     });
