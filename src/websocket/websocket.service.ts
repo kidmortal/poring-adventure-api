@@ -21,6 +21,14 @@ export class WebsocketService {
     });
   }
 
+  sendErrorNotification(args: { email: string; text: string }) {
+    return this.sendMessageToSocket({
+      email: args.email,
+      event: 'error_notification',
+      payload: args.text,
+    });
+  }
+
   sendMessageToSocket(args: { email: string; event: string; payload: any }) {
     const sockets = this.getUserSockets(args.email);
     if (sockets.length > 0) {

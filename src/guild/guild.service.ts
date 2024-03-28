@@ -24,7 +24,17 @@ export class GuildService {
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
 
-  async finishCurrentTask(args: { userEmail: string }) {}
+  async finishCurrentTask(args: { userEmail: string }) {
+    const requiredPermissionLevel = 1;
+    const guildMember = await this._getUserGuildMember(args);
+    if (guildMember.permissionLevel < requiredPermissionLevel) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Your guild permission isnt high enough (need ${requiredPermissionLevel}, have ${guildMember.permissionLevel})`,
+      });
+      return false;
+    }
+  }
 
   async findAll() {
     const cacheKey = `guild_ranking`;
@@ -151,8 +161,6 @@ export class GuildService {
     });
     return true;
   }
-
-  private _isGuildOwner(args: { guild: GuildWithMembers; userEmail: string }) {}
 
   private async _notifyGuildWithUpdate(args: { guildId: number }) {
     const guild = await this._getGuild(args);
