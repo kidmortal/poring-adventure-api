@@ -17,7 +17,7 @@ import { SkillsModule } from './skills/skills.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AdminModule } from './admin/admin.module';
 import { GuildModule } from './guild/guild.module';
-import { NotificationModule } from './notification/notification.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -43,7 +43,7 @@ import { NotificationModule } from './notification/notification.module';
     SkillsModule,
     AdminModule,
     GuildModule,
-    NotificationModule,
+    MailModule,
   ],
   controllers: [MainController],
   providers: [

@@ -3,20 +3,20 @@ import {
   SubscribeMessage,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { NotificationService } from './notification.service';
 import { Logger } from '@nestjs/common';
 import { Socket } from 'socket.io';
+import { MailService } from './mail.service';
 
 @WebSocketGateway()
-export class NotificationGateway {
-  constructor(private readonly notificationService: NotificationService) {}
-  private logger = new Logger('Websocket - notification');
+export class MailGateway {
+  constructor(private readonly mailService: MailService) {}
+  private logger = new Logger('Websocket - mail');
 
   @SubscribeMessage('get_all_notification')
   findAll(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     if (!email) return false;
     this.logger.debug('get_all_notification');
-    return this.notificationService.findAll({ userEmail: email });
+    return this.mailService.findAll({ userEmail: email });
   }
 }

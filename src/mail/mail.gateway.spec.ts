@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotificationGateway } from './notification.gateway';
-import { NotificationService } from './notification.service';
+import { NotificationGateway } from './mail.gateway';
+import { NotificationService } from './mail.service';
 
 describe('NotificationGateway', () => {
   let gateway: NotificationGateway;
