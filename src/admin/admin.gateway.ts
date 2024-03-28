@@ -47,4 +47,15 @@ export class AdminGateway {
     }
     return this.websocket.getAllSockets();
   }
+
+  @SubscribeMessage('clear_all_cache')
+  async clearRoutesCache(@ConnectedSocket() client: Socket) {
+    this.logger.debug('clear_all_cache');
+    const email = client.handshake.auth.email;
+    const isAdmin = await this.userService.isAdmin(email);
+    if (!isAdmin) {
+      return this.websocket.breakUserConnection(email);
+    }
+    return this.adminService.clearCache();
+  }
 }

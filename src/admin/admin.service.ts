@@ -1,16 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable } from '@nestjs/common';
+import { Cache } from 'cache-manager';
 
 @Injectable()
 export class AdminService {
-  findAll() {
-    return `This action returns all admin`;
-  }
+  constructor(@Inject(CACHE_MANAGER) private cache: Cache) {}
 
-  findOne(id: number) {
-    return `This action returns a #${id} admin`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} admin`;
+  async clearCache() {
+    await this.cache.reset();
+    return true;
   }
 }
