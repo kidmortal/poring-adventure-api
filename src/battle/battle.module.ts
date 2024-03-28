@@ -6,6 +6,7 @@ import { MonstersModule } from 'src/monsters/monsters.module';
 import { WebsocketModule } from 'src/websocket/websocket.module';
 import { ItemsModule } from 'src/items/items.module';
 import { PartyModule } from 'src/party/party.module';
+import { GuildModule } from 'src/guild/guild.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { PartyModule } from 'src/party/party.module';
     ItemsModule,
     WebsocketModule,
     PartyModule,
+    GuildModule,
   ],
   providers: [BattleGateway, BattleService],
 })

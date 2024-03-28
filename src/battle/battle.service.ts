@@ -7,6 +7,9 @@ import { ItemsService } from 'src/items/items.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import { Cron } from '@nestjs/schedule';
 import { PartyService } from 'src/party/party.service';
+import { BattleValidations } from './validators';
+import { GuildService } from 'src/guild/guild.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class BattleService {
@@ -15,6 +18,8 @@ export class BattleService {
     private readonly userService: UsersService,
     private readonly partyService: PartyService,
     private readonly itemService: ItemsService,
+    private readonly guildService: GuildService,
+    private readonly prisma: PrismaService,
     private readonly socket: WebsocketService,
   ) {}
   private battleList: BattleInstance[] = [];
@@ -60,6 +65,7 @@ export class BattleService {
         updateUsers: (b) => this.updateStatsAndRewards(b),
         removeBattle: () => this._remove(args.userEmail),
       });
+      BattleValidations.validateBattleInstanceStart(newBattleInstance);
 
       newBattleInstance.notifyUsers();
       this.battleList.push(newBattleInstance);
@@ -122,21 +128,42 @@ export class BattleService {
       dropedItems,
       exp,
     } of battle.droppedItems) {
+      const monsterCount = battle.monsterCount;
+      const mapId = battle.monstersMapId;
       const rewardUser = battle.getUserFromBattle(userEmail);
       const remainingHealth = rewardUser.stats.health;
       const remainingMana = rewardUser.stats.mana;
-      await this.userService.decreaseUserBuffs({ userEmail });
-      await this.userService.addExpSilver({ userEmail, silver, exp });
-      await this.userService.levelUpUser({ user: rewardUser, expGain: exp });
-      await this.userService.updateUserHealthMana({
-        userEmail,
-        health: remainingHealth,
-        mana: remainingMana,
+      await this.prisma.$transaction(async (tx) => {
+        await this.userService.decreaseUserBuffs({ userEmail, tx });
+        await this.userService.addExpSilver({ userEmail, silver, exp, tx });
+        await this.userService.levelUpUser({
+          user: rewardUser,
+          expGain: exp,
+          tx,
+        });
+        await this.userService.updateUserHealthMana({
+          userEmail,
+          health: remainingHealth,
+          mana: remainingMana,
+          tx,
+        });
+        await this.guildService.contributeToGuildTask({
+          userEmail,
+          mapId,
+          amount: monsterCount,
+          tx,
+        });
+
+        for await (const { itemId, stack } of dropedItems) {
+          await this.itemService.addItemToUser({
+            userEmail,
+            itemId,
+            stack,
+            tx,
+          });
+        }
       });
 
-      for await (const { itemId, stack } of dropedItems) {
-        await this.itemService.addItemToUser({ userEmail, itemId, stack });
-      }
       await this.userService.notifyUserUpdateWithProfile({ email: userEmail });
     }
   }

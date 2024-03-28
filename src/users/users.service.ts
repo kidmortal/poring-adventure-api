@@ -126,8 +126,10 @@ export class UsersService {
     userEmail: string;
     health: number;
     mana: number;
+    tx?: TransactionContext;
   }) {
-    return this.prisma.stats.update({
+    const tx = args.tx || this.prisma;
+    return tx.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -466,12 +468,16 @@ export class UsersService {
     });
   }
 
-  async decreaseUserBuffs(args: { userEmail: string }) {
-    await this.prisma.userBuff.updateMany({
+  async decreaseUserBuffs(args: {
+    userEmail: string;
+    tx?: TransactionContext;
+  }) {
+    const tx = args.tx ?? this.prisma;
+    await tx.userBuff.updateMany({
       where: { userEmail: args.userEmail },
       data: { duration: { decrement: 1 } },
     });
-    await this.prisma.userBuff.deleteMany({
+    await tx.userBuff.deleteMany({
       where: { userEmail: args.userEmail, duration: { lte: 0 } },
     });
     return true;
@@ -480,10 +486,13 @@ export class UsersService {
   async levelUpUser({
     user,
     expGain,
+    ...args
   }: {
     user: UserWithStats;
     expGain: number;
+    tx?: TransactionContext;
   }) {
+    const tx = args.tx ?? this.prisma;
     const currentExp = user.stats.experience;
     const finalExp = currentExp + expGain;
     const currentLevel = user.stats.level;
@@ -493,6 +502,7 @@ export class UsersService {
       await this.increaseUserLevel({
         userEmail: user.email,
         amount: levelDiff,
+        tx,
       });
       return true;
     }
@@ -501,6 +511,7 @@ export class UsersService {
       await this.decreaseUserLevel({
         userEmail: user.email,
         amount: levelDiff,
+        tx,
       });
       return true;
     }
