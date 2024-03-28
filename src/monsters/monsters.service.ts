@@ -18,7 +18,10 @@ export class MonstersService {
   async findAllFromMap(mapId: number): Promise<MapWithMonster[]> {
     const cacheKey = `map_monsters_${mapId}`;
     const cachedMap = await this.cache.get(cacheKey);
-    if (cachedMap) return cachedMap as any;
+    if (cachedMap) {
+      const cloneCacheMap = structuredClone(cachedMap);
+      return cloneCacheMap as any;
+    }
 
     console.log('not cached yet');
     const mapMonsters = await this.prisma.monster.findMany({
