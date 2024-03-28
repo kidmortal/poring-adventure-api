@@ -5,9 +5,11 @@ import {
 } from '@nestjs/websockets';
 import { GuildService } from './guild.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
-import { Logger } from '@nestjs/common';
+import { Logger, UseFilters } from '@nestjs/common';
+import { WebsocketExceptionsFilter } from 'src/websocket/websocketException.filter';
 
 @WebSocketGateway()
+@UseFilters(WebsocketExceptionsFilter)
 export class GuildGateway {
   constructor(private readonly guildService: GuildService) {}
   private logger = new Logger('Websocket - guilds');

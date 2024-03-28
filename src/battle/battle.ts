@@ -613,8 +613,10 @@ export class BattleInstance {
       return;
     }
     this.generateBattleDrops();
-    await this.updateUsers(this);
     this.battleFinished = true;
+    if (!this.battleFinished) {
+      await this.updateUsers(this);
+    }
     this.notifyUsers();
   }
   private generateUserBattleValues(users: UserWithStats[]) {
