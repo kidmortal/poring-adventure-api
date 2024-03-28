@@ -28,6 +28,13 @@ export class MailGateway {
     this.logger.debug('claim_all_mail');
     return this.mailService.claimAll({ userEmail: email });
   }
+  @SubscribeMessage('view_all_mail')
+  viewAll(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    if (!email) return false;
+    this.logger.debug('view_all_mail');
+    return this.mailService.viewAll({ userEmail: email });
+  }
   @SubscribeMessage('delete_all_mail')
   deleteAll(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;

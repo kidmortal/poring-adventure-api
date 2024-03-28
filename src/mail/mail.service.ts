@@ -23,6 +23,7 @@ export class MailService {
       where: { userEmail: args.userEmail, visualized: false },
       data: { visualized: true },
     });
+    this._notifyUserMailBox(args);
     return result;
   }
 
@@ -47,6 +48,7 @@ export class MailService {
     const result = await this.prisma.mail.deleteMany({
       where: { userEmail: args.userEmail, claimed: true },
     });
+    this._notifyUserMailBox(args);
     return result;
   }
 
