@@ -30,7 +30,7 @@ model User {
   equipment     EquippedItem[]
   inventory     InventoryItem[]
   market        MarketListing[]
-  notifications Notification[]
+  mail          Mail[]
   learnedSkills LearnedSkill[]
   buffs         UserBuff[]
 }
@@ -105,20 +105,20 @@ model MarketListing {
 }
 
 model Item {
-  id           Int             @id @default(autoincrement())
-  name         String
-  category     String
-  image        String
-  attack       Int?
-  str          Int?
-  agi          Int?
-  int          Int?
-  health       Int?
-  mana         Int?
-  equipped     EquippedItem[]
-  inventory    InventoryItem[]
-  drop         Drop[]
-  notification Notification[]
+  id        Int             @id @default(autoincrement())
+  name      String
+  category  String
+  image     String
+  attack    Int?
+  str       Int?
+  agi       Int?
+  int       Int?
+  health    Int?
+  mana      Int?
+  equipped  EquippedItem[]
+  inventory InventoryItem[]
+  drop      Drop[]
+  mail      Mail[]
 }
 
 model Drop {
@@ -208,7 +208,7 @@ model LearnedSkill {
   @@unique([userEmail, skillId])
 }
 
-model Notification {
+model Mail {
   id         Int      @id @default(autoincrement())
   sender     String
   content    String
