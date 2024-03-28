@@ -103,6 +103,7 @@ export class UsersService {
         profession: { include: { skills: true } },
         learnedSkills: { include: { skill: { include: { buff: true } } } },
         buffs: { include: { buff: true } },
+        guildMember: true,
         stats: true,
       },
     });
