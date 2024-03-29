@@ -36,6 +36,17 @@ export class GuildService {
     }
   }
 
+  async findAllGuidTasks() {
+    const cacheKey = `guild_tasks`;
+    const cachedGuildTasks = await this.cache.get(cacheKey);
+    if (cachedGuildTasks) return cachedGuildTasks as any;
+    const guildTasks = await this.prisma.guildTask.findMany({
+      include: { target: true },
+    });
+    await this.cache.set(cacheKey, guildTasks);
+    return guildTasks;
+  }
+
   async findAll() {
     const cacheKey = `guild_ranking`;
     const cachedRanking = await this.cache.get(cacheKey);

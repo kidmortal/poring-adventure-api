@@ -36,4 +36,10 @@ export class GuildGateway {
     this.logger.debug('find_all_guild');
     return this.guildService.findAll();
   }
+
+  @SubscribeMessage('get_available_guild_tasks')
+  getTasks() {
+    this.logger.debug('get_available_guild_tasks');
+    return this.guildService.findAllGuidTasks();
+  }
 }
