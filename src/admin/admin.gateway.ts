@@ -34,7 +34,10 @@ export class AdminGateway {
     if (!isAdmin) {
       return this.websocket.breakUserConnection(email);
     }
-    return this.websocket.sendTextNotification(args.to, args.message);
+    return this.websocket.sendTextNotification({
+      email: args.to,
+      text: args.message,
+    });
   }
 
   @SubscribeMessage('get_all_sockets')
