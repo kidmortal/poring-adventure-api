@@ -53,6 +53,13 @@ export class PartyService {
       });
       return true;
     }
+
+    this.websocket.sendErrorNotification({
+      email: args.leaderEmail,
+      text: 'You must create a party before inviting.',
+    });
+
+    return false;
   }
 
   async joinParty(args: { email: string; partyId: number }) {
