@@ -13,11 +13,11 @@ export class WebsocketService {
     }
   }
 
-  sendTextNotification(email: string, text: string) {
+  sendTextNotification(args: { email: string; text: string }) {
     return this.sendMessageToSocket({
-      email,
+      email: args.email,
       event: 'notification',
-      payload: text,
+      payload: args.text,
     });
   }
 

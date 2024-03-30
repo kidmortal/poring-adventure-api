@@ -51,12 +51,16 @@ export class PartyService {
         email: args.invitedEmail,
         party: ownedParty,
       });
+      this.websocket.sendTextNotification({
+        email: args.leaderEmail,
+        text: 'Invited to group.',
+      });
       return true;
     }
 
     this.websocket.sendErrorNotification({
       email: args.leaderEmail,
-      text: 'You must create a party before inviting.',
+      text: 'You must create a party before sending an invitation.',
     });
 
     return false;
