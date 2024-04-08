@@ -11,6 +11,25 @@ export class MainController {
     const indexContent = fs.readFileSync(indexPath, 'utf-8');
     return indexContent;
   }
+  @Get('/br/privacity')
+  getPrivacity() {
+    const indexPath = path.join(
+      __dirname,
+      '..',
+      'public',
+      'br',
+      'privacidade.html',
+    );
+    const indexContent = fs.readFileSync(indexPath, 'utf-8');
+    return indexContent;
+  }
+
+  @Get('/br/terms')
+  getTerms() {
+    const indexPath = path.join(__dirname, '..', 'public', 'br', 'termos.html');
+    const indexContent = fs.readFileSync(indexPath, 'utf-8');
+    return indexContent;
+  }
 
   @Get('/version')
   getApiVersion() {
