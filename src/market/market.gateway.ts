@@ -10,6 +10,7 @@ import { MarketService } from './market.service';
 import { CreateMarketDto } from './dto/create-market.dto';
 import { PurchaseMarketDto } from './dto/purchase-market.dto';
 import { WebsocketExceptionsFilter } from 'src/websocket/websocketException.filter';
+import { ItemCategory } from 'src/items/constants';
 
 @UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway({ cors: true })
@@ -55,8 +56,10 @@ export class MarketGateway {
   }
 
   @SubscribeMessage('get_all_market_listing')
-  async findAll() {
+  async findAll(
+    @MessageBody() params: { page: number; category: ItemCategory },
+  ) {
     this.logger.debug('get_all_market_listing');
-    return this.marketService.findAll();
+    return this.marketService.findAll(params);
   }
 }

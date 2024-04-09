@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -23,6 +23,7 @@ export class GuildService {
     private readonly websocket: WebsocketService,
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
+  private logger = new Logger('Cache - guild');
 
   async finishCurrentTask(args: { userEmail: string }) {
     const requiredPermissionLevel = 1;
@@ -39,7 +40,10 @@ export class GuildService {
   async findAllGuidTasks() {
     const cacheKey = `guild_tasks`;
     const cachedGuildTasks = await this.cache.get(cacheKey);
-    if (cachedGuildTasks) return cachedGuildTasks as any;
+    if (cachedGuildTasks) {
+      this.logger.log(`returning cached ${cacheKey}`);
+      return cachedGuildTasks as any;
+    }
     const guildTasks = await this.prisma.guildTask.findMany({
       include: { target: true },
     });
