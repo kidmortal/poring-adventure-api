@@ -1,7 +1,9 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   InternalServerErrorException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { CreateMarketDto } from './dto/create-market.dto';
@@ -11,6 +13,10 @@ import { ItemsService } from 'src/items/items.service';
 import { UsersService } from 'src/users/users.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import { TransactionContext } from 'src/prisma/types/prisma';
+import { ItemCategory } from 'src/items/constants';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { EQUIPABLE_CATEGORIES } from 'src/items/entities/categories';
 
 @Injectable()
 export class MarketService {
@@ -19,7 +25,9 @@ export class MarketService {
     private readonly userService: UsersService,
     private readonly websocket: WebsocketService,
     private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
+  private logger = new Logger('Cache - market');
   async addItemToMarket(createMarketDto: CreateMarketDto, sellerEmail: string) {
     const inventoryItem = await this.prisma.inventoryItem.findUnique({
       where: {
@@ -30,6 +38,7 @@ export class MarketService {
       },
       include: {
         marketListing: true,
+        item: true,
       },
     });
 
@@ -63,7 +72,8 @@ export class MarketService {
       inventoryId: inventoryItem.id,
       sellerEmail,
     });
-    this._notifyMarketUsers();
+    const category = inventoryItem.item.category as ItemCategory;
+    this._clearSelectedCache({ clear: ['all', category] });
     return true;
   }
 
@@ -81,7 +91,7 @@ export class MarketService {
       }
       const marketListing = await tx.marketListing.findUnique({
         where: { id: args.marketListingId },
-        include: { inventory: true },
+        include: { inventory: { include: { item: true } } },
       });
       if (!marketListing) {
         throw new BadRequestException('Listing not found');
@@ -111,24 +121,17 @@ export class MarketService {
         stack: args.stacks,
         tx,
       });
-      this._notifyMarketUsers();
+      const category = marketListing.inventory?.item?.category as ItemCategory;
+      this._clearSelectedCache({ clear: ['all', category] });
       return true;
     });
+
     return false;
   }
 
-  findAll() {
-    return this.prisma.marketListing.findMany({
-      take: 10,
-      include: {
-        inventory: {
-          include: {
-            item: true,
-          },
-        },
-        seller: true,
-      },
-    });
+  async findAll(params: { page: number; category: ItemCategory }) {
+    const listings = await this._getMarketListings(params);
+    return listings;
   }
 
   findOne(id: number) {
@@ -153,17 +156,52 @@ export class MarketService {
     try {
       const deletedItem = await this.prisma.marketListing.delete({
         where: { id },
+        include: { inventory: { include: { item: true } } },
       });
-      this._notifyMarketUsers();
+      const category = deletedItem.inventory?.item?.category as ItemCategory;
+      this._clearSelectedCache({ clear: ['all', category] });
       return deletedItem;
     } catch (error) {
       throw new InternalServerErrorException(error);
     }
   }
 
-  private async _notifyMarketUsers() {
-    const listing = await this.findAll();
-    this.websocket.broadcast('market_update', listing);
+  private async _getMarketListings(params: {
+    page: number;
+    category: ItemCategory;
+  }) {
+    const cacheKey = `market_listing_${params.category}_${params.page}`;
+    const cachedMarketListing = await this.cache.get(cacheKey);
+    if (cachedMarketListing) {
+      this.logger.log(`returning cached ${cacheKey}`);
+      return cachedMarketListing as any;
+    }
+
+    const query = {
+      skip: (params.page - 1) * 10,
+      take: 10,
+      where: {},
+      include: { inventory: { include: { item: true } }, seller: true },
+    };
+    switch (params.category) {
+      case 'all':
+        query.where = {};
+        break;
+      case 'equipment':
+        query.where = {
+          inventory: { item: { category: { in: EQUIPABLE_CATEGORIES } } },
+        };
+        break;
+
+      default:
+        query.where = {
+          inventory: { item: { category: { equals: params.category } } },
+        };
+        break;
+    }
+    const listings = await this.prisma.marketListing.findMany(query);
+    this.cache.set(cacheKey, listings);
+    return listings;
   }
 
   private async _createOrIncrementMarketListing(args: {
@@ -229,5 +267,16 @@ export class MarketService {
     throw new BadRequestException(
       `Invalid decrement has been provided, you cant remove ${args.decrementStacks} from ${args.currentStacks}`,
     );
+  }
+
+  private async _clearSelectedCache(params: { clear: ItemCategory[] }) {
+    const keys = await this.cache.store.keys();
+
+    keys.forEach((key) => {
+      params.clear.forEach((categoryKey) => {
+        const cacheKey = `market_listing_${categoryKey}`;
+        if (key.includes(cacheKey)) this.cache.del(key);
+      });
+    });
   }
 }
