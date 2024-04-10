@@ -9,4 +9,11 @@ export class DiscordService {
       where: { discordId: args.discordId },
     });
   }
+
+  inventory(args: { discordId: string }) {
+    return this.prisma.inventoryItem.findMany({
+      where: { user: { discordId: args.discordId } },
+      include: { item: true },
+    });
+  }
 }

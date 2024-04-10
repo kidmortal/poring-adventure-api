@@ -69,7 +69,7 @@ describe('User Gateway', () => {
       const fakeReturn = {} as any;
       const findAll = jest.fn().mockReturnValue(fakeReturn);
       jest.spyOn(service, 'findAll').mockImplementation(findAll);
-      const returnUser = await gateway.findAll();
+      const returnUser = await gateway.findAll({ page: 1 });
       expect(findAll).toHaveBeenCalled();
       expect(returnUser).toBe(fakeReturn);
     });

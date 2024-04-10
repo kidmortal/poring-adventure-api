@@ -23,4 +23,13 @@ export class DiscordGateway {
     const user = await this.discordService.findOne({ discordId });
     return user;
   }
+
+  @SubscribeMessage('get_discord_user_inventory')
+  async getUserInventory(@MessageBody() discordId: string) {
+    this.logger.debug(`'get_discord_user_inventory' ${discordId}`);
+    if (!discordId) return false;
+
+    const inventory = await this.discordService.inventory({ discordId });
+    return inventory;
+  }
 }

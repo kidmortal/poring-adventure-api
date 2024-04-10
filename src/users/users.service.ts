@@ -1,17 +1,26 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import { UserWithStats } from 'src/battle/battle';
 import { utils } from 'src/utils';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransactionContext } from 'src/prisma/types/prisma';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 
 @Injectable()
 export class UsersService {
   constructor(
     private readonly websocket: WebsocketService,
     private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
+  private logger = new Logger('Cache - Users');
   async notifyUserUpdate(args: { email: string; payload: any }) {
     return this.websocket.sendMessageToSocket({
       email: args.email,
@@ -55,19 +64,22 @@ export class UsersService {
     return newUser;
   }
 
-  findAll() {
-    return this.prisma.user.findMany({
-      take: 20,
-      orderBy: {
-        stats: {
-          experience: 'desc',
-        },
-      },
-      include: {
-        appearance: true,
-        stats: true,
-      },
+  async findAll(params: { page: number }) {
+    const cacheKey = `user_ranking_${params.page}`;
+    const cachecRanking = await this.cache.get(cacheKey);
+    if (cachecRanking) {
+      this.logger.log(`returning cached ${cacheKey}`);
+      return cachecRanking as any;
+    }
+    const ranking = await this.prisma.user.findMany({
+      skip: (params.page - 1) * 10,
+      take: 10,
+      orderBy: { stats: { experience: 'desc' } },
+      include: { appearance: true, stats: true },
     });
+    this.cache.set(cacheKey, ranking);
+
+    return ranking;
   }
 
   getAllProfessions() {

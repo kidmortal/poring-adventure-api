@@ -36,9 +36,9 @@ export class UsersGateway {
   }
 
   @SubscribeMessage('get_all_user')
-  async findAll() {
+  async findAll(@MessageBody() params: { page: number }) {
     this.logger.debug('get_all_user');
-    const users = await this.userService.findAll();
+    const users = await this.userService.findAll(params);
     return users;
   }
 
