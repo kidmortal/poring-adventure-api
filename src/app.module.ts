@@ -18,6 +18,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AdminModule } from './admin/admin.module';
 import { GuildModule } from './guild/guild.module';
 import { MailModule } from './mail/mail.module';
+import { DiscordModule } from './discord/discord.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { MailModule } from './mail/mail.module';
     AdminModule,
     GuildModule,
     MailModule,
+    DiscordModule,
   ],
   controllers: [MainController],
   providers: [
