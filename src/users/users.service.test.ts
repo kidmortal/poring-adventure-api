@@ -47,7 +47,7 @@ describe('User Service', () => {
       const fakeUsers = [{ email: 'test@test.com' }] as any;
       const findMany = jest.fn().mockResolvedValue(fakeUsers);
       prisma.user.findMany = findMany;
-      const returnUsers = await service.findAll();
+      const returnUsers = await service.findAll({ page: 1 });
       expect(findMany).toHaveBeenCalled();
       expect(returnUsers).toBe(fakeUsers);
     });
