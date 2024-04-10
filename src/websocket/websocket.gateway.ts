@@ -30,20 +30,18 @@ export class WebsocketGateway
     this.logger.debug(`socket ${client.id} connected`);
     this.websocket.wsClients.push(client);
     const accessToken = client.handshake.auth?.acessToken;
-    if (!accessToken) {
-      client.disconnect();
+    if (accessToken) {
+      const authEmail =
+        await this.auth.getAuthenticatedEmailFromToken(accessToken);
+      if (authEmail) {
+        client.handshake.auth.email = authEmail;
+        this.websocket.sendMessageToSocket({
+          event: 'authenticated',
+          email: authEmail,
+          payload: {},
+        });
+      }
     }
-    const authEmail =
-      await this.auth.getAuthenticatedEmailFromToken(accessToken);
-    if (!authEmail) {
-      return client.disconnect();
-    }
-    client.handshake.auth.email = authEmail;
-    this.websocket.sendMessageToSocket({
-      event: 'authenticated',
-      email: authEmail,
-      payload: {},
-    });
   }
 
   handleDisconnect(client: Socket) {
