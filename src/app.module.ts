@@ -19,6 +19,7 @@ import { AdminModule } from './admin/admin.module';
 import { GuildModule } from './guild/guild.module';
 import { MailModule } from './mail/mail.module';
 import { DiscordModule } from './discord/discord.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { DiscordModule } from './discord/discord.module';
     GuildModule,
     MailModule,
     DiscordModule,
+    NotificationModule,
   ],
   controllers: [MainController],
   providers: [
