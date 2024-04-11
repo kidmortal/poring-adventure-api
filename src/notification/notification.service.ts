@@ -9,6 +9,6 @@ export class NotificationService {
     return this.notification.sendPushNotification(args);
   }
   sendPushNotificationToUser(args: { userEmail: string; message: string }) {
-    // todo
+    return this.notification.sendPushNotificationToUser(args);
   }
 }
