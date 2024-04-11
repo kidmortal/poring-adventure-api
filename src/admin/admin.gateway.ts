@@ -61,4 +61,19 @@ export class AdminGateway {
     }
     return this.adminService.clearCache();
   }
+
+  @SubscribeMessage('send_push_notification')
+  async sendPushNotification(
+    @MessageBody()
+    message: string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.logger.debug('send_push_notification');
+    const email = client.handshake.auth.email;
+    const isAdmin = await this.userService.isAdmin(email);
+    if (!isAdmin) {
+      return this.websocket.breakUserConnection(email);
+    }
+    return this.adminService.sendPushNotification({ message });
+  }
 }
