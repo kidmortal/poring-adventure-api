@@ -52,6 +52,29 @@ export class MailService {
     return result;
   }
 
+  async sendMail(args: {
+    receiverEmail: string;
+    senderName: string;
+    content: string;
+    silver?: number;
+    itemId: number;
+    itemStack?: number;
+  }) {
+    await this.prisma.mail.create({
+      data: {
+        userEmail: args.receiverEmail,
+        sender: args.senderName,
+        content: args.content,
+        silver: args.silver,
+        itemId: args.itemId,
+        itemStack: args.itemStack,
+        visualized: false,
+        claimed: false,
+      },
+    });
+    return true;
+  }
+
   async _claimMail(args: { mail: Mail; tx: TransactionContext }) {
     const tx = args.tx || this.prisma;
     const mail = args.mail;
