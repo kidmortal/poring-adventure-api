@@ -81,6 +81,11 @@ export class AdminService {
     return true;
   }
 
+  async restartServer() {
+    execSync('pm2 restart poring-adventure');
+    return true;
+  }
+
   _getRamUsage() {
     const freeMemory = os.freemem();
     const totalMemory = os.totalmem();

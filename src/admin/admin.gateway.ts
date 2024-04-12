@@ -6,10 +6,12 @@ import {
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { AdminService } from './admin.service';
-import { Logger } from '@nestjs/common';
+import { Logger, UseFilters } from '@nestjs/common';
 import { UsersService } from 'src/users/users.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
+import { WebsocketExceptionsFilter } from 'src/websocket/websocketException.filter';
 
+@UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway()
 export class AdminGateway {
   constructor(
@@ -60,6 +62,17 @@ export class AdminGateway {
       return this.websocket.breakUserConnection(email);
     }
     return this.adminService.getServerInfo({ userEmail: email });
+  }
+
+  @SubscribeMessage('restart_server')
+  async restartServer(@ConnectedSocket() client: Socket) {
+    this.logger.debug('restart_server');
+    const email = client.handshake.auth.email;
+    const isAdmin = await this.userService.isAdmin(email);
+    if (!isAdmin) {
+      return this.websocket.breakUserConnection(email);
+    }
+    return this.adminService.restartServer();
   }
 
   @SubscribeMessage('clear_all_cache')
