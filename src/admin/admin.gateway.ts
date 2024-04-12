@@ -51,6 +51,17 @@ export class AdminGateway {
     return this.adminService.getConnectedUsers();
   }
 
+  @SubscribeMessage('get_server_info')
+  async getServerInfo(@ConnectedSocket() client: Socket) {
+    this.logger.debug('get_server_info');
+    const email = client.handshake.auth.email;
+    const isAdmin = await this.userService.isAdmin(email);
+    if (!isAdmin) {
+      return this.websocket.breakUserConnection(email);
+    }
+    return this.adminService.getServerInfo();
+  }
+
   @SubscribeMessage('clear_all_cache')
   async clearRoutesCache(@ConnectedSocket() client: Socket) {
     this.logger.debug('clear_all_cache');
