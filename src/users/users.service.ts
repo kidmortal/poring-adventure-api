@@ -131,13 +131,19 @@ export class UsersService {
   }
 
   async isAdmin(email: string) {
+    const cacheKey = `user_admin_info_${email}`;
+    const cachedUser = await this.cache.get(cacheKey);
+    if (cachedUser) {
+      this.cacheLogger.log(`returning cached ${cacheKey}`);
+      return cachedUser as any;
+    }
     if (!email) {
       throw new BadRequestException('No email provided');
     }
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
-
+    this.cache.set(cacheKey, user);
     return user.admin;
   }
 
