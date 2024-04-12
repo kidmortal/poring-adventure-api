@@ -48,7 +48,7 @@ export class AdminGateway {
     if (!isAdmin) {
       return this.websocket.breakUserConnection(email);
     }
-    return this.adminService.getConnectedUsers();
+    return this.adminService.getConnectedUsers({ userEmail: email });
   }
 
   @SubscribeMessage('get_server_info')
@@ -59,7 +59,7 @@ export class AdminGateway {
     if (!isAdmin) {
       return this.websocket.breakUserConnection(email);
     }
-    return this.adminService.getServerInfo();
+    return this.adminService.getServerInfo({ userEmail: email });
   }
 
   @SubscribeMessage('clear_all_cache')

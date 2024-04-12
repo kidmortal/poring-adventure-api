@@ -6,7 +6,6 @@ import { NotificationService } from 'src/notification/notification.service';
 import { UsersService } from 'src/users/users.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import * as os from 'os';
-import { utils } from 'src/utils';
 import { execSync } from 'child_process';
 
 @Injectable()
@@ -36,7 +35,7 @@ export class AdminService {
     return true;
   }
 
-  async getConnectedUsers() {
+  async getConnectedUsers(args: { userEmail: string }) {
     const sockets = this.websocket.getAllSockets();
     const users = [];
 
@@ -46,7 +45,12 @@ export class AdminService {
         users.push(user);
       }
     }
-    return users;
+    this.websocket.sendMessageToSocket({
+      email: args.userEmail,
+      event: 'connected_users',
+      payload: users,
+    });
+    return true;
   }
 
   async sendGiftMail(args: { userEmail: string }) {
@@ -65,11 +69,16 @@ export class AdminService {
     return true;
   }
 
-  async getServerInfo() {
+  async getServerInfo(args: { userEmail: string }) {
     const branchData = execSync('git rev-parse HEAD').toString();
     const branchHash = branchData.trim();
     const memoryInfo = this._getRamUsage();
-    return { branchHash, memoryInfo };
+    this.websocket.sendMessageToSocket({
+      email: args.userEmail,
+      event: 'server_info',
+      payload: { branchHash, memoryInfo },
+    });
+    return true;
   }
 
   _getRamUsage() {
@@ -77,8 +86,8 @@ export class AdminService {
     const totalMemory = os.totalmem();
     const memoryUsage = totalMemory - freeMemory;
     return {
-      totalMemory: utils.formatMemory(totalMemory),
-      memoryUsage: utils.formatMemory(memoryUsage),
+      totalMemory,
+      memoryUsage,
     };
   }
 }
