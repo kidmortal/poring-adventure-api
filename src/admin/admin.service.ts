@@ -37,18 +37,19 @@ export class AdminService {
 
   async getConnectedUsers(args: { userEmail: string }) {
     const sockets = this.websocket.getAllSockets();
-    const users = [];
+    const users = {};
 
     for await (const socket of sockets) {
-      const user = await this.userService.findOne(socket.email);
-      if (user) {
-        users.push(user);
+      const email = socket.email;
+      if (!users[email]) {
+        const user = await this.userService.findOne(socket.email);
+        users[email] = user;
       }
     }
     this.websocket.sendMessageToSocket({
       email: args.userEmail,
       event: 'connected_users',
-      payload: users,
+      payload: Object.values(users),
     });
     return true;
   }
