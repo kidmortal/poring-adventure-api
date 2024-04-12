@@ -57,7 +57,7 @@ export class MailService {
     senderName: string;
     content: string;
     silver?: number;
-    itemId: number;
+    itemId?: number;
     itemStack?: number;
   }) {
     await this.prisma.mail.create({

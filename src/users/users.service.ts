@@ -20,7 +20,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
-  private logger = new Logger('Cache - Users');
+  private cacheLogger = new Logger('Cache - Users');
   async notifyUserUpdate(args: { email: string; payload: any }) {
     return this.websocket.sendMessageToSocket({
       email: args.email,
@@ -68,7 +68,7 @@ export class UsersService {
     const cacheKey = `user_ranking_${params.page}`;
     const cachecRanking = await this.cache.get(cacheKey);
     if (cachecRanking) {
-      this.logger.log(`returning cached ${cacheKey}`);
+      this.cacheLogger.log(`returning cached ${cacheKey}`);
       return cachecRanking as any;
     }
     const ranking = await this.prisma.user.findMany({
@@ -106,6 +106,12 @@ export class UsersService {
     if (!email) {
       throw new BadRequestException('No email provided');
     }
+    const cacheKey = `user_${email}`;
+    const cachedUser = await this.cache.get(cacheKey);
+    if (cachedUser) {
+      this.cacheLogger.log(`returning cached ${cacheKey}`);
+      return cachedUser as any;
+    }
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: {
@@ -119,6 +125,7 @@ export class UsersService {
         stats: true,
       },
     });
+    this.cache.set(cacheKey, user);
 
     return user;
   }
@@ -141,7 +148,7 @@ export class UsersService {
     tx?: TransactionContext;
   }) {
     const tx = args.tx || this.prisma;
-    return tx.stats.update({
+    await tx.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -150,6 +157,8 @@ export class UsersService {
         mana: args.mana,
       },
     });
+    this.clearUserCache({ email: args.userEmail });
+    return true;
   }
 
   async decrementUserHealth(args: { userEmail: string; amount: number }) {
@@ -197,16 +206,13 @@ export class UsersService {
       if (finalHealth > maxHealth) {
         finalHealth = maxHealth;
       }
-      return tx.stats.update({
-        where: {
-          userEmail: args.userEmail,
-        },
-        data: {
-          health: {
-            set: finalHealth,
-          },
-        },
+      await tx.stats.update({
+        where: { userEmail: args.userEmail },
+        data: { health: { set: finalHealth } },
       });
+      this.clearUserCache({ email: args.userEmail });
+
+      return true;
     }
   }
 
@@ -223,7 +229,7 @@ export class UsersService {
       if (finalMana < 0) {
         finalMana = 0;
       }
-      return this.prisma.stats.update({
+      await this.prisma.stats.update({
         where: {
           userEmail: args.userEmail,
         },
@@ -233,6 +239,8 @@ export class UsersService {
           },
         },
       });
+      this.clearUserCache({ email: args.userEmail });
+      return true;
     }
   }
 
@@ -255,7 +263,7 @@ export class UsersService {
       if (finalMana > maxMana) {
         finalMana = maxMana;
       }
-      return tx.stats.update({
+      await tx.stats.update({
         where: {
           userEmail: args.userEmail,
         },
@@ -265,6 +273,8 @@ export class UsersService {
           },
         },
       });
+      this.clearUserCache({ email: args.userEmail });
+      return true;
     }
   }
 
@@ -280,7 +290,7 @@ export class UsersService {
     tx?: TransactionContext;
   }) {
     const tx = args.tx || this.prisma;
-    return tx.stats.update({
+    await tx.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -294,6 +304,8 @@ export class UsersService {
         int: { increment: args.int ?? 0 },
       },
     });
+    this.clearUserCache({ email: args.userEmail });
+    return true;
   }
   async decreaseUserStats(args: {
     userEmail: string;
@@ -307,7 +319,7 @@ export class UsersService {
     tx?: TransactionContext;
   }) {
     const tx = args.tx || this.prisma;
-    return tx.stats.update({
+    await tx.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -321,6 +333,8 @@ export class UsersService {
         int: { decrement: args.int ?? 0 },
       },
     });
+    this.clearUserCache({ email: args.userEmail });
+    return true;
   }
 
   async deleteUser(email: string) {
@@ -336,7 +350,7 @@ export class UsersService {
     tx?: TransactionContext;
   }) {
     const tx = args.tx || this.prisma;
-    return tx.user.update({
+    await tx.user.update({
       where: {
         email: args.userEmail,
       },
@@ -345,6 +359,8 @@ export class UsersService {
         stats: { update: { experience: { increment: args.exp } } },
       },
     });
+    this.clearUserCache({ email: args.userEmail });
+    return true;
   }
   async addSilverToUser(args: {
     userEmail: string;
@@ -352,7 +368,7 @@ export class UsersService {
     tx?: TransactionContext;
   }) {
     const tx = args.tx || this.prisma;
-    return tx.user.update({
+    await tx.user.update({
       where: {
         email: args.userEmail,
       },
@@ -362,6 +378,8 @@ export class UsersService {
         },
       },
     });
+    this.clearUserCache({ email: args.userEmail });
+    return true;
   }
   async addExpToUser(args: {
     userEmail: string;
@@ -369,7 +387,7 @@ export class UsersService {
     tx?: TransactionContext;
   }) {
     const tx = args.tx || this.prisma;
-    return tx.stats.update({
+    await tx.stats.update({
       where: {
         userEmail: args.userEmail,
       },
@@ -379,6 +397,8 @@ export class UsersService {
         },
       },
     });
+    this.clearUserCache({ email: args.userEmail });
+    return true;
   }
 
   async removeSilverFromUser(args: {
@@ -387,7 +407,7 @@ export class UsersService {
     tx?: TransactionContext;
   }) {
     const tx = args.tx || this.prisma;
-    return tx.user.update({
+    await tx.user.update({
       where: {
         email: args.userEmail,
       },
@@ -397,6 +417,8 @@ export class UsersService {
         },
       },
     });
+    this.clearUserCache({ email: args.userEmail });
+    return true;
   }
 
   async transferSilverFromUserToUser(args: {
@@ -543,5 +565,11 @@ export class UsersService {
         },
       });
     }
+  }
+
+  async clearUserCache(args: { email: string }) {
+    const cacheKey = `user_${args.email}`;
+    this.cacheLogger.debug(`clearing ${cacheKey}`);
+    this.cache.del(cacheKey);
   }
 }

@@ -40,15 +40,15 @@ export class AdminGateway {
     });
   }
 
-  @SubscribeMessage('get_all_sockets')
+  @SubscribeMessage('get_all_connected_users')
   async getAllSockets(@ConnectedSocket() client: Socket) {
-    this.logger.debug('get_all_sockets');
+    this.logger.debug('get_all_connected_users');
     const email = client.handshake.auth.email;
     const isAdmin = await this.userService.isAdmin(email);
     if (!isAdmin) {
       return this.websocket.breakUserConnection(email);
     }
-    return this.websocket.getAllSockets();
+    return this.adminService.getConnectedUsers();
   }
 
   @SubscribeMessage('clear_all_cache')
@@ -75,6 +75,21 @@ export class AdminGateway {
       return this.websocket.breakUserConnection(email);
     }
     return this.adminService.sendPushNotification({ message });
+  }
+
+  @SubscribeMessage('send_gift_mail')
+  async sendGiftMail(
+    @MessageBody()
+    receiverEmail: string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.logger.debug('send_gift_mail');
+    const email = client.handshake.auth.email;
+    const isAdmin = await this.userService.isAdmin(email);
+    if (!isAdmin) {
+      return this.websocket.breakUserConnection(email);
+    }
+    return this.adminService.sendGiftMail({ userEmail: receiverEmail });
   }
 
   @SubscribeMessage('disconnect_user_websocket')
