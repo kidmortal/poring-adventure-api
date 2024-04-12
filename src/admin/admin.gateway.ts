@@ -76,4 +76,39 @@ export class AdminGateway {
     }
     return this.adminService.sendPushNotification({ message });
   }
+
+  @SubscribeMessage('disconnect_user_websocket')
+  async disconnectUserWebsocket(
+    @MessageBody()
+    disconnectEmail: string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.logger.debug('disconnect_user_websocket');
+    const email = client.handshake.auth.email;
+    const isAdmin = await this.userService.isAdmin(email);
+    if (!isAdmin) {
+      return this.websocket.breakUserConnection(email);
+    }
+    return this.adminService.disconnectUserSocket({
+      userEmail: disconnectEmail,
+    });
+  }
+
+  @SubscribeMessage('send_push_notification_user')
+  async sendPushNotificationToUser(
+    @MessageBody()
+    params: { email: string; message: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.logger.debug('send_push_notification_user');
+    const email = client.handshake.auth.email;
+    const isAdmin = await this.userService.isAdmin(email);
+    if (!isAdmin) {
+      return this.websocket.breakUserConnection(email);
+    }
+    return this.adminService.sendPushNotificationToUser({
+      message: params.message,
+      userEmail: params.email,
+    });
+  }
 }
