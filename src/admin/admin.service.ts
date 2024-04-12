@@ -5,6 +5,9 @@ import { MailService } from 'src/mail/mail.service';
 import { NotificationService } from 'src/notification/notification.service';
 import { UsersService } from 'src/users/users.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
+import * as os from 'os';
+import { utils } from 'src/utils';
+import { execSync } from 'child_process';
 
 @Injectable()
 export class AdminService {
@@ -60,5 +63,22 @@ export class AdminService {
   async clearCache() {
     await this.cache.reset();
     return true;
+  }
+
+  async getServerInfo() {
+    const branchData = execSync('git rev-parse HEAD').toString();
+    const branchHash = branchData.trim();
+    const memoryInfo = this._getRamUsage();
+    return { branchHash, memoryInfo };
+  }
+
+  _getRamUsage() {
+    const freeMemory = os.freemem();
+    const totalMemory = os.totalmem();
+    const memoryUsage = totalMemory - freeMemory;
+    return {
+      totalMemory: utils.formatMemory(totalMemory),
+      memoryUsage: utils.formatMemory(memoryUsage),
+    };
   }
 }
