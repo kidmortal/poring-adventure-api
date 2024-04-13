@@ -30,6 +30,7 @@ export class UsersService {
   }
 
   async notifyUserUpdateWithProfile(args: { email: string }) {
+    this.clearUserCache(args);
     const user = await this.findOne(args.email);
 
     if (user) {
