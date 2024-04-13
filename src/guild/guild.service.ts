@@ -6,6 +6,7 @@ import { Cache } from 'cache-manager';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import { TransactionContext } from 'src/prisma/types/prisma';
 import { Prisma } from '@prisma/client';
+import { NotificationService } from 'src/notification/notification.service';
 
 type GuildWithMembers = Prisma.GuildGetPayload<{
   include: {
@@ -21,6 +22,7 @@ export class GuildService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly websocket: WebsocketService,
+    private readonly notificationService: NotificationService,
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
   private logger = new Logger('Cache - guild');
@@ -35,6 +37,146 @@ export class GuildService {
       });
       return false;
     }
+  }
+
+  async applyToGuild(args: { userEmail: string; guildId: number }) {
+    const currentApplication = await this.prisma.guildApplication.findFirst({
+      where: args,
+    });
+    if (currentApplication) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `You've already applied to this guild`,
+      });
+      return false;
+    }
+    await this.prisma.guildApplication.create({ data: args });
+    this.websocket.sendTextNotification({
+      email: args.userEmail,
+      text: `Application sent to the guild`,
+    });
+    return true;
+  }
+  async acceptGuildApplication(args: {
+    userEmail: string;
+    applicationId: number;
+  }) {
+    const requiredPermissionLevel = 1;
+    const guildMember = await this._getUserGuildMember(args);
+    if (guildMember.permissionLevel < requiredPermissionLevel) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Your guild permission isnt high enough (need ${requiredPermissionLevel}, have ${guildMember.permissionLevel})`,
+      });
+      return false;
+    }
+    await this.prisma.$transaction(async (tx) => {
+      const application = await tx.guildApplication.findUnique({
+        where: { id: args.applicationId },
+      });
+      if (application) {
+        const applicantEmail = application.userEmail;
+        const guildId = application.guildId;
+        await tx.guildApplication.deleteMany({
+          where: { userEmail: applicantEmail },
+        });
+        await tx.guildMember.create({
+          data: { guildId, userEmail: applicantEmail },
+        });
+        this.notificationService.sendPushNotificationToUser({
+          userEmail: applicantEmail,
+          message: `Your guild application has been accepted`,
+        });
+      }
+    });
+
+    this.websocket.sendTextNotification({
+      email: args.userEmail,
+      text: 'Application accepted',
+    });
+    this._clearGuildCache({ guildId: guildMember.guildId });
+    this._notifyGuildWithUpdate({ guildId: guildMember.guildId });
+    return true;
+  }
+
+  async refuseGuildApplication(args: {
+    userEmail: string;
+    applicationId: number;
+  }) {
+    const requiredPermissionLevel = 1;
+    const guildMember = await this._getUserGuildMember(args);
+    if (guildMember.permissionLevel < requiredPermissionLevel) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Your guild permission isnt high enough (need ${requiredPermissionLevel}, have ${guildMember.permissionLevel})`,
+      });
+      return false;
+    }
+    await this.prisma.guildApplication.delete({
+      where: { id: args.applicationId, guildId: guildMember.guildId },
+    });
+
+    this.websocket.sendTextNotification({
+      email: args.userEmail,
+      text: 'Application refused',
+    });
+    this._clearGuildCache({ guildId: guildMember.guildId });
+    this._notifyGuildWithUpdate({ guildId: guildMember.guildId });
+    return true;
+  }
+
+  async cancelCurrentTask(args: { userEmail: string }) {
+    const requiredPermissionLevel = 1;
+    const guildMember = await this._getUserGuildMember(args);
+    if (guildMember.permissionLevel < requiredPermissionLevel) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Your guild permission isnt high enough (need ${requiredPermissionLevel}, have ${guildMember.permissionLevel})`,
+      });
+      return false;
+    }
+
+    await this.prisma.currentGuildTask.delete({
+      where: { guildId: guildMember.guildId },
+    });
+    return true;
+  }
+
+  async acceptTask(args: { userEmail: string; taskId: number }) {
+    const requiredPermissionLevel = 1;
+    const guildMember = await this._getUserGuildMember(args);
+    if (guildMember.permissionLevel < requiredPermissionLevel) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Your guild permission isnt high enough (need ${requiredPermissionLevel}, have ${guildMember.permissionLevel})`,
+      });
+      return false;
+    }
+    const currentTask = await this.prisma.currentGuildTask.findUnique({
+      where: { guildId: guildMember.guildId },
+    });
+    if (currentTask) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Your guild guild is already doing a task`,
+      });
+
+      return false;
+    }
+    const newTask = await this.prisma.guildTask.findUnique({
+      where: { id: args.taskId },
+    });
+    if (newTask) {
+      await this.prisma.currentGuildTask.create({
+        data: {
+          guildId: guildMember.guildId,
+          guildTaskId: newTask.id,
+          remainingKills: newTask.killCount,
+        },
+      });
+      return true;
+    }
+    return false;
   }
 
   async findAllGuidTasks() {
@@ -149,12 +291,13 @@ export class GuildService {
     const guild = await this.prisma.guild.findUnique({
       where: { id: args.guildId },
       include: {
-        currentGuildTask: {
-          include: { task: { include: { target: true } } },
-        },
+        currentGuildTask: { include: { task: { include: { target: true } } } },
         members: {
           include: { user: { include: { stats: true, appearance: true } } },
           orderBy: { contribution: 'desc' },
+        },
+        guildApplications: {
+          include: { user: { include: { appearance: true, stats: true } } },
         },
       },
     });
@@ -188,5 +331,9 @@ export class GuildService {
         });
       });
     }
+  }
+  private async _clearGuildCache(args: { guildId: number }) {
+    const cacheKey = `guild_id_${args.guildId}`;
+    this.cache.del(cacheKey);
   }
 }

@@ -15,25 +15,26 @@ datasource db {
 }
 
 model User {
-  id            Int             @id @default(autoincrement())
-  email         String          @unique
-  name          String
-  discordId     String?         @unique
-  silver        Int             @default(20)
-  admin         Boolean         @default(false)
-  appearance    Appearance?
-  guildMember   GuildMember?
-  stats         Stats?
-  profession    Profession?     @relation(fields: [professionId], references: [id])
-  professionId  Int?
-  Party         Party?          @relation(fields: [partyId], references: [id])
-  partyId       Int?
-  equipment     EquippedItem[]
-  inventory     InventoryItem[]
-  market        MarketListing[]
-  mail          Mail[]
-  learnedSkills LearnedSkill[]
-  buffs         UserBuff[]
+  id                Int                @id @default(autoincrement())
+  email             String             @unique
+  name              String
+  discordId         String?            @unique
+  silver            Int                @default(20)
+  admin             Boolean            @default(false)
+  appearance        Appearance?
+  guildMember       GuildMember?
+  stats             Stats?
+  profession        Profession?        @relation(fields: [professionId], references: [id])
+  professionId      Int?
+  Party             Party?             @relation(fields: [partyId], references: [id])
+  partyId           Int?
+  equipment         EquippedItem[]
+  inventory         InventoryItem[]
+  market            MarketListing[]
+  mail              Mail[]
+  learnedSkills     LearnedSkill[]
+  buffs             UserBuff[]
+  guildApplications GuildApplication[]
 }
 
 model Stats {
@@ -249,17 +250,18 @@ model Buff {
 }
 
 model Guild {
-  id               Int               @id @default(autoincrement())
-  name             String            @unique
-  leaderEmail      String            @unique
-  imageUrl         String            @default("https://kidmortal.sirv.com/misc/guild_image.png")
-  level            Int               @default(1)
-  experience       Int               @default(0)
-  taskPoints       Int               @default(0)
-  publicMessage    String            @default("Lets have fun")
-  internalMessage  String            @default("Lets have fun")
-  members          GuildMember[]
-  currentGuildTask CurrentGuildTask?
+  id                Int                @id @default(autoincrement())
+  name              String             @unique
+  leaderEmail       String             @unique
+  imageUrl          String             @default("https://kidmortal.sirv.com/misc/guild_image.png")
+  level             Int                @default(1)
+  experience        Int                @default(0)
+  taskPoints        Int                @default(0)
+  publicMessage     String             @default("Lets have fun")
+  internalMessage   String             @default("Lets have fun")
+  members           GuildMember[]
+  currentGuildTask  CurrentGuildTask?
+  guildApplications GuildApplication[]
 }
 
 model CurrentGuildTask {
@@ -293,4 +295,12 @@ model GuildMember {
   guildId         Int?
 
   @@unique([userEmail, guildId])
+}
+
+model GuildApplication {
+  id        Int    @id @default(autoincrement())
+  user      User   @relation(fields: [userEmail], references: [email])
+  userEmail String
+  guild     Guild  @relation(fields: [guildId], references: [id])
+  guildId   Int
 }
