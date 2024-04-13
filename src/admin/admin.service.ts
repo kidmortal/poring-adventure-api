@@ -26,7 +26,11 @@ export class AdminService {
     userEmail: string;
     message: string;
   }) {
-    await this.notification.sendPushNotificationToUser(args);
+    await this.notification.sendPushNotificationToUser({
+      title: 'Debug Message',
+      message: args.message,
+      userEmail: args.userEmail,
+    });
     return true;
   }
 
