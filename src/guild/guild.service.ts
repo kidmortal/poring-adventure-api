@@ -56,6 +56,8 @@ export class GuildService {
           amount: task.taskPoints,
           tx,
         });
+        this._clearGuildCache({ guildId: currentTask.guildId });
+        this._notifyGuildWithUpdate({ guildId: currentTask.guildId });
         this.notificationService.sendPushNotificationToTag({
           tagKey: 'guild',
           tagValue: String(currentTask.guildId),
