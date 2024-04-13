@@ -37,6 +37,33 @@ export class GuildService {
       });
       return false;
     }
+    await this.prisma.$transaction(async (tx) => {
+      const currentTask = await tx.currentGuildTask.findUnique({
+        where: { guildId: guildMember.guildId },
+        include: { task: true },
+      });
+      const task = currentTask.task;
+      if (currentTask.remainingKills <= 0) {
+        await tx.guild.update({
+          where: { id: currentTask.guildId },
+          data: { taskPoints: { increment: task.taskPoints } },
+        });
+        await tx.currentGuildTask.delete({
+          where: { guildId: currentTask.guildId },
+        });
+        await this._distributeTokensToGuild({
+          guildId: currentTask.guildId,
+          amount: task.taskPoints,
+          tx,
+        });
+        this.notificationService.sendPushNotificationToTag({
+          tagKey: 'guild',
+          tagValue: String(currentTask.guildId),
+          title: 'Guild Task Completed',
+          message: `${task.taskPoints} Task Points has been added to your account.`,
+        });
+      }
+    });
   }
 
   async applyToGuild(args: { userEmail: string; guildId: number }) {
@@ -73,6 +100,7 @@ export class GuildService {
     await this.prisma.$transaction(async (tx) => {
       const application = await tx.guildApplication.findUnique({
         where: { id: args.applicationId },
+        include: { guild: true },
       });
       if (application) {
         const applicantEmail = application.userEmail;
@@ -85,7 +113,13 @@ export class GuildService {
         });
         this.notificationService.sendPushNotificationToUser({
           userEmail: applicantEmail,
-          message: `Your guild application has been accepted`,
+          title: `Guild application`,
+          message: `You have joined ${application.guild.name}`,
+        });
+        this.notificationService.addTagToSubscription({
+          key: 'guild',
+          value: String(guildMember.guildId),
+          userEmail: applicantEmail,
         });
       }
     });
@@ -96,6 +130,7 @@ export class GuildService {
     });
     this._clearGuildCache({ guildId: guildMember.guildId });
     this._notifyGuildWithUpdate({ guildId: guildMember.guildId });
+
     return true;
   }
 
@@ -305,13 +340,19 @@ export class GuildService {
     return guild;
   }
   private async _notifyUserWithGuild(args: { userEmail: string }) {
-    const userGuild = await this.prisma.guildMember.findUnique({
+    const userGuildMember = await this.prisma.guildMember.findUnique({
       where: { userEmail: args.userEmail },
     });
-    if (!userGuild) return false;
-    const guild = await this._getGuild({ guildId: userGuild.guildId });
+    if (!userGuildMember) {
+      this.websocket.sendMessageToSocket({
+        event: 'guild',
+        email: args.userEmail,
+        payload: false,
+      });
+      return false;
+    }
+    const guild = await this._getGuild({ guildId: userGuildMember.guildId });
     if (!guild) return false;
-
     this.websocket.sendMessageToSocket({
       event: 'guild',
       email: args.userEmail,
@@ -330,6 +371,23 @@ export class GuildService {
           payload: guild,
         });
       });
+    }
+  }
+
+  private async _distributeTokensToGuild(args: {
+    guildId: number;
+    amount: number;
+    tx: TransactionContext;
+  }) {
+    const tx = args.tx ?? this.prisma;
+    const guild = await this._getGuild(args);
+    if (guild) {
+      for await (const member of guild.members) {
+        await tx.guildMember.update({
+          where: { id: member.id },
+          data: { guildTokens: { increment: args.amount } },
+        });
+      }
     }
   }
   private async _clearGuildCache(args: { guildId: number }) {
