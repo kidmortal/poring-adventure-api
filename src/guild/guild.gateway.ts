@@ -35,6 +35,25 @@ export class GuildGateway {
     return this.guildService.applyToGuild({ userEmail: email, guildId });
   }
 
+  @SubscribeMessage('kick_from_guild')
+  kickFromGuild(
+    @MessageBody() kickEmail: string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const email = client.handshake.auth.email;
+    if (!email) return false;
+    this.logger.debug('kick_from_guild');
+    return this.guildService.kickFromGuild({ userEmail: email, kickEmail });
+  }
+
+  @SubscribeMessage('quit_from_guild')
+  quitFromGuild(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    if (!email) return false;
+    this.logger.debug('quit_from_guild');
+    return this.guildService.quitFromGuild({ userEmail: email });
+  }
+
   @SubscribeMessage('accept_guild_application')
   acceptGuildApplication(
     @MessageBody() applicationId: number,

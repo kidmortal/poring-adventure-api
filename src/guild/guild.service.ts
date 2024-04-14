@@ -68,6 +68,58 @@ export class GuildService {
     });
   }
 
+  async quitFromGuild(args: { userEmail: string }) {
+    const guildMember = await this._getUserGuildMember(args);
+    if (!guildMember) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `You have no guild`,
+      });
+      return false;
+    }
+    const role = guildMember.role as GuildRole;
+    if (role === 'owner') {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `You cant leave the guild while you are the owner`,
+      });
+      return false;
+    }
+    await this._removeUserFromGuild({ userEmail: args.userEmail });
+    return true;
+  }
+
+  async kickFromGuild(args: { userEmail: string; kickEmail: string }) {
+    const guildMember = await this._getUserGuildMember(args);
+    if (!guildMember) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `You have no guild`,
+      });
+      return false;
+    }
+    const kickMember = await this._getUserGuildMember({
+      userEmail: args.kickEmail,
+    });
+    if (!kickMember) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Wrong user information to kick`,
+      });
+      return false;
+    }
+    if (guildMember.permissionLevel > kickMember.permissionLevel) {
+      await this._removeUserFromGuild({ userEmail: args.kickEmail });
+      return true;
+    } else {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `You can't kick an user with higher role`,
+      });
+      return false;
+    }
+  }
+
   async applyToGuild(args: { userEmail: string; guildId: number }) {
     const currentApplication = await this.prisma.guildApplication.findFirst({
       where: args,
@@ -316,6 +368,23 @@ export class GuildService {
     const tx = args.tx ?? this.prisma;
     return tx.guildMember.findUnique({
       where: { userEmail: args.userEmail },
+    });
+  }
+
+  private async _removeUserFromGuild(args: { userEmail: string }) {
+    const data = await this.prisma.guildMember.delete({
+      where: { userEmail: args.userEmail },
+      include: { guild: true },
+    });
+    this._notifyUserWithGuild(args);
+    this.notificationService.sendPushNotificationToUser({
+      userEmail: args.userEmail,
+      title: 'Guild',
+      message: `You have left from ${data.guild.name}`,
+    });
+    this.notificationService.removeTagFromSubscription({
+      userEmail: args.userEmail,
+      key: 'guild',
     });
   }
 

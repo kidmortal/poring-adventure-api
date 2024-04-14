@@ -32,11 +32,7 @@ export class NotificationService {
   }) {
     return this.notification.addTagToSubscription(args);
   }
-  removeTagFromSubscription(args: {
-    userEmail: string;
-    key: string;
-    value: string;
-  }) {
+  removeTagFromSubscription(args: { userEmail: string; key: string }) {
     return this.notification.removeTagFromSubscription(args);
   }
 }
