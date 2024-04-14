@@ -177,6 +177,8 @@ export class GuildService {
           value: String(guildMember.guildId),
           userEmail: applicantEmail,
         });
+        this.userService.clearUserCache({ email: applicantEmail });
+        this.userService.notifyUserUpdateWithProfile({ email: applicantEmail });
       }
     });
 
