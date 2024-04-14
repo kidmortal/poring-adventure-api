@@ -4,11 +4,13 @@ import { GuildGateway } from './guild.gateway';
 import { CacheModule } from '@nestjs/cache-manager';
 import { WebsocketModule } from 'src/websocket/websocket.module';
 import { NotificationModule } from 'src/notification/notification.module';
+import { UsersModule } from 'src/users/users.module';
 
 @Module({
   imports: [
     WebsocketModule,
     NotificationModule,
+    UsersModule,
     CacheModule.register({ ttl: 1000 * 60 * 10 }),
   ], // 10 minutes cache
   providers: [GuildGateway, GuildService],

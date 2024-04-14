@@ -7,6 +7,7 @@ import { WebsocketService } from 'src/websocket/websocket.service';
 import { TransactionContext } from 'src/prisma/types/prisma';
 import { Prisma } from '@prisma/client';
 import { NotificationService } from 'src/notification/notification.service';
+import { UsersService } from 'src/users/users.service';
 
 type GuildWithMembers = Prisma.GuildGetPayload<{
   include: {
@@ -23,6 +24,7 @@ export class GuildService {
     private readonly prisma: PrismaService,
     private readonly websocket: WebsocketService,
     private readonly notificationService: NotificationService,
+    private readonly userService: UsersService,
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
   private logger = new Logger('Cache - guild');
@@ -375,6 +377,10 @@ export class GuildService {
     const data = await this.prisma.guildMember.delete({
       where: { userEmail: args.userEmail },
       include: { guild: true },
+    });
+    this.userService.clearUserCache({ email: args.userEmail });
+    await this.userService.notifyUserUpdateWithProfile({
+      email: args.userEmail,
     });
     this._notifyUserWithGuild(args);
     this.notificationService.sendPushNotificationToUser({
