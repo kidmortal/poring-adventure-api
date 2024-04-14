@@ -46,7 +46,9 @@ export class AdminService {
     for await (const socket of sockets) {
       const email = socket.email;
       if (!users[email]) {
-        const user = await this.userService.findOne(socket.email);
+        const user = await this.userService._getUserWithEmail({
+          userEmail: socket.email,
+        });
         users[email] = user;
       }
     }

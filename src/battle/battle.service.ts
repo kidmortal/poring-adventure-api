@@ -45,7 +45,9 @@ export class BattleService {
 
     if (!battle) {
       let users: UserWithStats[] = [];
-      const userData = await this.userService.findOne(args.userEmail);
+      const userData = await this.userService._getUserWithEmail({
+        userEmail: args.userEmail,
+      });
       if (userData.partyId) {
         const fullPartyInfo = await this.partyService.getFullParty(
           userData.email,

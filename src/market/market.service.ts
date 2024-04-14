@@ -6,8 +6,6 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import { CreateMarketDto } from './dto/create-market.dto';
-// import { UpdateMarketDto } from './dto/update-market.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ItemsService } from 'src/items/items.service';
 import { UsersService } from 'src/users/users.service';
@@ -28,12 +26,17 @@ export class MarketService {
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
   private logger = new Logger('Cache - market');
-  async addItemToMarket(createMarketDto: CreateMarketDto, sellerEmail: string) {
+  async addItemToMarket(args: {
+    price: number;
+    stack: number;
+    itemId: number;
+    sellerEmail: string;
+  }) {
     const inventoryItem = await this.prisma.inventoryItem.findUnique({
       where: {
         userEmail_itemId: {
-          itemId: createMarketDto.itemId,
-          userEmail: sellerEmail,
+          itemId: args.itemId,
+          userEmail: args.sellerEmail,
         },
       },
       include: {
@@ -44,13 +47,13 @@ export class MarketService {
 
     if (!inventoryItem) {
       throw new BadRequestException(
-        `No item found with id ${createMarketDto.itemId} on ${sellerEmail} inventory`,
+        `No item found with id ${args.itemId} on ${args.sellerEmail} inventory`,
       );
     }
 
-    if (inventoryItem.stack < createMarketDto.stack) {
+    if (inventoryItem.stack < args.stack) {
       throw new BadRequestException(
-        `You only have ${inventoryItem.stack}, but trying to sell ${createMarketDto.stack}`,
+        `You only have ${inventoryItem.stack}, but trying to sell ${args.stack}`,
       );
     }
 
@@ -58,19 +61,32 @@ export class MarketService {
       const remainingStock =
         inventoryItem.stack - inventoryItem.marketListing.stack;
 
-      if (createMarketDto.stack > remainingStock) {
-        throw new BadRequestException(
-          `You only have ${remainingStock}, but trying to post ${createMarketDto.stack} stacks`,
-        );
+      if (args.stack > remainingStock) {
+        this.websocket.sendErrorNotification({
+          email: args.sellerEmail,
+          text: `You only have ${remainingStock}, but trying to post ${args.stack} stacks`,
+        });
+        return false;
+      }
+      if (args.price !== inventoryItem.marketListing.price) {
+        this.websocket.sendErrorNotification({
+          email: args.sellerEmail,
+          text: `Item already listed for ${inventoryItem.marketListing.price} silver, you cant post again with different price`,
+        });
+        return false;
       }
     }
 
     await this._createOrIncrementMarketListing({
-      price: createMarketDto.price,
-      stack: createMarketDto.stack,
+      price: args.price,
+      stack: args.stack,
       currentStacks: inventoryItem.stack,
       inventoryId: inventoryItem.id,
-      sellerEmail,
+      sellerEmail: args.sellerEmail,
+    });
+    this.websocket.sendTextNotification({
+      email: args.sellerEmail,
+      text: `Listed ${args.stack}x ${inventoryItem.item.name} on Market!`,
     });
     const category = inventoryItem.item.category as ItemCategory;
     this._clearSelectedCache({ clear: ['all', category] });
@@ -79,8 +95,8 @@ export class MarketService {
 
   async purchase(args: {
     marketListingId: number;
-    buyerEmail: string;
     stacks: number;
+    buyerEmail: string;
   }) {
     await this.prisma.$transaction(async (tx) => {
       const purchasingUser = await tx.user.findUnique({
@@ -159,6 +175,10 @@ export class MarketService {
         include: { inventory: { include: { item: true } } },
       });
       const category = deletedItem.inventory?.item?.category as ItemCategory;
+      this.websocket.sendTextNotification({
+        email: authEmail,
+        text: `Removed ${deletedItem.stack}x ${deletedItem.inventory.item.name} from Market!`,
+      });
       this._clearSelectedCache({ clear: ['all', category] });
       return deletedItem;
     } catch (error) {

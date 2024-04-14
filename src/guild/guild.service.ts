@@ -134,6 +134,7 @@ export class GuildService {
       return false;
     }
     await this.prisma.guildApplication.create({ data: args });
+    this._clearGuildCache({ guildId: args.guildId });
     this.websocket.sendTextNotification({
       email: args.userEmail,
       text: `Application sent to the guild`,
@@ -381,9 +382,11 @@ export class GuildService {
       include: { guild: true },
     });
     this.userService.clearUserCache({ email: args.userEmail });
-    await this.userService.notifyUserUpdateWithProfile({
+    this._clearGuildCache({ guildId: data.guildId });
+    this.userService.notifyUserUpdateWithProfile({
       email: args.userEmail,
     });
+    this._notifyGuildWithUpdate({ guildId: data.guildId });
     this._notifyUserWithGuild(args);
     this.notificationService.sendPushNotificationToUser({
       userEmail: args.userEmail,

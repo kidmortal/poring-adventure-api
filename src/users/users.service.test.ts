@@ -36,7 +36,7 @@ describe('User Service', () => {
       const fakeUser = { email: authEmail } as any;
       const findUnique = jest.fn().mockResolvedValue(fakeUser);
       prisma.user.findUnique = findUnique;
-      const returnUser = await service.findOne(authEmail);
+      const returnUser = await service.findOne({ userEmail: authEmail });
       expect(findUnique).toHaveBeenCalledWith(fullUserparams);
       expect(returnUser).toBe(fakeUser);
     });
