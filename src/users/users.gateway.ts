@@ -24,15 +24,7 @@ export class UsersGateway {
     this.logger.debug(`'get_user' ${email}`);
     if (!email) return false;
 
-    const user = await this.userService.findOne(email);
-    if (!user) {
-      return false;
-    }
-    this.userService.notifyUserUpdate({
-      email,
-      payload: user,
-    });
-    return user;
+    return this.userService.findOne({ userEmail: email });
   }
 
   @SubscribeMessage('get_all_user')

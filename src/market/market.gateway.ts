@@ -7,8 +7,6 @@ import {
 import { Socket } from 'socket.io';
 import { Logger, UseFilters } from '@nestjs/common';
 import { MarketService } from './market.service';
-import { CreateMarketDto } from './dto/create-market.dto';
-import { PurchaseMarketDto } from './dto/purchase-market.dto';
 import { WebsocketExceptionsFilter } from 'src/websocket/websocketException.filter';
 import { ItemCategory } from 'src/items/constants';
 
@@ -20,28 +18,30 @@ export class MarketGateway {
 
   @SubscribeMessage('create_market_listing')
   async create(
-    @MessageBody() createMarketDto: CreateMarketDto,
+    @MessageBody() create: { price: number; stack: number; itemId: number },
     @ConnectedSocket() client: Socket,
   ) {
     const email = client.handshake.auth.email;
     this.logger.debug('create_market_listing');
-    const result = await this.marketService.addItemToMarket(
-      createMarketDto,
-      email,
-    );
+    const result = await this.marketService.addItemToMarket({
+      itemId: create.itemId,
+      price: create.price,
+      stack: create.stack,
+      sellerEmail: email,
+    });
     return result;
   }
 
   @SubscribeMessage('purchase_market_listing')
   async purchase(
-    @MessageBody() purchaseDto: PurchaseMarketDto,
+    @MessageBody() purchase: { marketListingId: number; stack: number },
     @ConnectedSocket() client: Socket,
   ) {
     const email = client.handshake.auth.email;
     this.logger.debug('purchase_market_listing');
     const result = await this.marketService.purchase({
-      marketListingId: purchaseDto.marketListingId,
-      stacks: purchaseDto.stack,
+      marketListingId: purchase.marketListingId,
+      stacks: purchase.stack,
       buyerEmail: email,
     });
     return result;

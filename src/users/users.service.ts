@@ -31,7 +31,7 @@ export class UsersService {
 
   async notifyUserUpdateWithProfile(args: { email: string }) {
     this.clearUserCache(args);
-    const user = await this.findOne(args.email);
+    const user = await this._getUserWithEmail({ userEmail: args.email });
 
     if (user) {
       this.websocket.sendMessageToSocket({
@@ -103,32 +103,10 @@ export class UsersService {
     return true;
   }
 
-  async findOne(email: string) {
-    if (!email) {
-      throw new BadRequestException('No email provided');
-    }
-    const cacheKey = `user_${email}`;
-    const cachedUser = await this.cache.get(cacheKey);
-    if (cachedUser) {
-      this.cacheLogger.log(`returning cached ${cacheKey}`);
-      return cachedUser as any;
-    }
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: {
-        appearance: true,
-        inventory: { include: { item: true, marketListing: true } },
-        equipment: { include: { item: true } },
-        profession: { include: { skills: true } },
-        learnedSkills: { include: { skill: { include: { buff: true } } } },
-        buffs: { include: { buff: true } },
-        guildMember: true,
-        stats: true,
-      },
-    });
-    this.cache.set(cacheKey, user);
+  async findOne(args: { userEmail: string }) {
+    await this.notifyUserUpdateWithProfile({ email: args.userEmail });
 
-    return user;
+    return true;
   }
 
   async isAdmin(email: string) {
@@ -578,5 +556,33 @@ export class UsersService {
     const cacheKey = `user_${args.email}`;
     this.cacheLogger.debug(`clearing ${cacheKey}`);
     this.cache.del(cacheKey);
+  }
+
+  async _getUserWithEmail(args: { userEmail: string }) {
+    if (!args.userEmail) {
+      throw new BadRequestException('No email provided');
+    }
+    const cacheKey = `user_${args.userEmail}`;
+    const cachedUser = await this.cache.get(cacheKey);
+    if (cachedUser) {
+      this.cacheLogger.log(`returning cached ${cacheKey}`);
+      return cachedUser as any;
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { email: args.userEmail },
+      include: {
+        appearance: true,
+        inventory: { include: { item: true, marketListing: true } },
+        equipment: { include: { item: true } },
+        profession: { include: { skills: true } },
+        learnedSkills: { include: { skill: { include: { buff: true } } } },
+        buffs: { include: { buff: true } },
+        guildMember: true,
+        stats: true,
+      },
+    });
+    this.cache.set(cacheKey, user);
+
+    return user;
   }
 }
