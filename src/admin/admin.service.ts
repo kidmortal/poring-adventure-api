@@ -7,6 +7,7 @@ import { UsersService } from 'src/users/users.service';
 import { WebsocketService } from 'src/websocket/websocket.service';
 import * as os from 'os';
 import { execSync } from 'child_process';
+import { memoryUsage } from 'process';
 
 @Injectable()
 export class AdminService {
@@ -55,7 +56,10 @@ export class AdminService {
     this.websocket.sendMessageToSocket({
       email: args.userEmail,
       event: 'connected_users',
-      payload: Object.values(users),
+      payload: {
+        users: Object.values(users),
+        connectedSockets: sockets.length,
+      },
     });
     return true;
   }
@@ -96,10 +100,12 @@ export class AdminService {
   _getRamUsage() {
     const freeMemory = os.freemem();
     const totalMemory = os.totalmem();
-    const memoryUsage = totalMemory - freeMemory;
+    const appMemoryUsage = memoryUsage().rss;
+    const totalMemoryUsage = totalMemory - freeMemory;
     return {
       totalMemory,
-      memoryUsage,
+      appMemoryUsage,
+      totalMemoryUsage,
     };
   }
 }
