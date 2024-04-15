@@ -54,7 +54,15 @@ export class PurchaseService {
       transactionId: purchase.transactionId,
       appUserId: purchase.appUserId,
     });
-    return cancel;
+    if (cancel) {
+      await this._cancelPurchase({
+        email: args.userEmail,
+        transactionId: purchase.transactionId,
+      });
+      return true;
+    }
+
+    return false;
   }
 
   async claimPurchase(args: { userEmail: string; purchaseId: number }) {
