@@ -35,6 +35,7 @@ model User {
   learnedSkills     LearnedSkill[]
   buffs             UserBuff[]
   guildApplications GuildApplication[]
+  purchases         UserPurchase[]
 }
 
 model Stats {
@@ -303,4 +304,23 @@ model GuildApplication {
   userEmail String
   guild     Guild  @relation(fields: [guildId], references: [id])
   guildId   Int
+}
+
+model UserPurchase {
+  id             Int          @id @default(autoincrement())
+  transactionId  String       @unique
+  appUserId      String
+  received       Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  product        StoreProduct @relation(fields: [storeProductId], references: [id])
+  storeProductId Int
+  user           User         @relation(fields: [userEmail], references: [email])
+  userEmail      String
+}
+
+model StoreProduct {
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  displayName   String         @unique
+  userPurchases UserPurchase[]
 }

@@ -7,45 +7,47 @@ import {
 import { Socket } from 'socket.io';
 
 import { Logger, UseFilters } from '@nestjs/common';
-import { ItemsService } from './items.service';
+
 import { WebsocketExceptionsFilter } from 'src/websocket/websocketException.filter';
+import { PurchaseService } from './purchase.service';
 
 @WebSocketGateway({ cors: true })
 @UseFilters(WebsocketExceptionsFilter)
-export class ItemsGateway {
-  constructor(private readonly itemService: ItemsService) {}
-  private logger = new Logger('Items');
+export class PurchaseGateway {
+  constructor(private readonly purchaseService: PurchaseService) {}
+  private logger = new Logger('Purchases');
 
-  @SubscribeMessage('consume_item')
+  @SubscribeMessage('get_purchases')
   async consumeItem(
     @MessageBody() itemId: number,
     @ConnectedSocket() client: Socket,
   ) {
     const email = client.handshake.auth.email;
     if (!email) return false;
-    this.logger.debug('consume_item');
-    return this.itemService.consumeItem({ userEmail: email, itemId, stack: 1 });
+    this.logger.debug('get_purchases');
+
+    return this.purchaseService.findAll({ userEmail: email });
   }
 
-  @SubscribeMessage('equip_item')
-  async equipItem(
-    @MessageBody() itemId: number,
+  @SubscribeMessage('refund_purchase')
+  async refundPurchase(
+    @MessageBody() purchaseId: number,
     @ConnectedSocket() client: Socket,
   ) {
     const email = client.handshake.auth.email;
     if (!email) return false;
-    this.logger.debug('equip_item');
-    return this.itemService.equipItem({ userEmail: email, itemId });
+    this.logger.debug('refund_purchase');
+    return this.purchaseService.requestRefund({ userEmail: email, purchaseId });
   }
 
-  @SubscribeMessage('unequip_item')
-  async unequipItem(
-    @MessageBody() itemId: number,
+  @SubscribeMessage('claim_purchase')
+  async claimPurchase(
+    @MessageBody() purchaseId: number,
     @ConnectedSocket() client: Socket,
   ) {
     const email = client.handshake.auth.email;
     if (!email) return false;
-    this.logger.debug('unequip_item');
-    return this.itemService.unequipItem({ userEmail: email, itemId });
+    this.logger.debug('claim_purchase');
+    return this.purchaseService.claimPurchase({ userEmail: email, purchaseId });
   }
 }
