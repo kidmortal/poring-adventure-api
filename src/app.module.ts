@@ -20,6 +20,7 @@ import { GuildModule } from './guild/guild.module';
 import { MailModule } from './mail/mail.module';
 import { DiscordModule } from './discord/discord.module';
 import { NotificationModule } from './notification/notification.module';
+import { PurchaseModule } from './purchase/purchase.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { NotificationModule } from './notification/notification.module';
     MailModule,
     DiscordModule,
     NotificationModule,
+    PurchaseModule,
   ],
   controllers: [MainController],
   providers: [
