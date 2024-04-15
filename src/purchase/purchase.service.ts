@@ -66,10 +66,29 @@ export class PurchaseService {
   }
 
   async claimPurchase(args: { userEmail: string; purchaseId: number }) {
-    this.websocket.sendTextNotification({
-      email: args.userEmail,
-      text: 'Not implemented Yet',
+    const purchase = await this.prisma.userPurchase.findUnique({
+      where: { id: args.purchaseId, userEmail: args.userEmail },
     });
+    const userHasTransaction = await this.revenuecat.userHasTransaction({
+      appUserId: purchase.appUserId,
+      transactionId: purchase.transactionId,
+    });
+    if (userHasTransaction) {
+      this.websocket.sendTextNotification({
+        email: args.userEmail,
+        text: 'Not implemented Yet',
+      });
+    } else {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: 'This Purchase is not available',
+      });
+      this._cancelPurchase({
+        email: args.userEmail,
+        transactionId: purchase.transactionId,
+      });
+    }
+
     return true;
   }
 
