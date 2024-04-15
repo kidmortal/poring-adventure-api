@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 import * as Sentry from '@sentry/node';
+import { RevenueCatCustomer } from './entities/customer.entity';
 export class RevenueCatService {
   private client = axios.create({
     baseURL: 'https://api.revenuecat.com/v1/',
@@ -13,11 +14,40 @@ export class RevenueCatService {
   async refundPurchase(args: { transactionId: string; appUserId: string }) {
     try {
       await this.client.post(
-        `https://api.revenuecat.com/v1/subscribers/${args.appUserId}/transactions/${args.transactionId}/refund`,
+        `/subscribers/${args.appUserId}/transactions/${args.transactionId}/refund`,
         {},
       );
       return true;
     } catch (error) {
+      console.log(error.response);
+      Sentry.captureException(error);
+      return false;
+    }
+  }
+
+  async userHasTransaction(args: { transactionId: string; appUserId: string }) {
+    try {
+      const customer = await this.client.get<RevenueCatCustomer>(
+        `/subscribers/${args.appUserId}`,
+        {},
+      );
+      const transactionsGroups = Object.values(
+        customer.data.subscriber.non_subscriptions,
+      );
+      transactionsGroups.forEach((transactionGroup) => {
+        const userTransaction = transactionGroup.find(
+          (transaction) =>
+            transaction.store_transaction_id === args.transactionId,
+        );
+        if (userTransaction) {
+          return true;
+        } else {
+          return false;
+        }
+      });
+      return false;
+    } catch (error) {
+      console.log(error.response);
       Sentry.captureException(error);
       return false;
     }
