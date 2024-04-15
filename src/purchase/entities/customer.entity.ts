@@ -5,7 +5,6 @@ export type RevenueCatCustomer = {
 };
 
 export type Subscriber = {
-  entitlements: Entitlements;
   first_seen: string;
   last_seen: string;
   management_url: any;
@@ -15,10 +14,7 @@ export type Subscriber = {
   original_purchase_date: any;
   other_purchases: OtherPurchases;
   subscriber_attributes: SubscriberAttributes;
-  subscriptions: Subscriptions;
 };
-
-export type Entitlements = {};
 
 export type NonSubscriptions = {
   [key: string]: Purchase[];
@@ -49,5 +45,3 @@ export type Email = {
   updated_at_ms: number;
   value: string;
 };
-
-export type Subscriptions = {};

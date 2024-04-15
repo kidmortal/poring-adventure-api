@@ -3,6 +3,8 @@ import axios from 'axios';
 import * as Sentry from '@sentry/node';
 import { RevenueCatCustomer } from './entities/customer.entity';
 export class RevenueCatService {
+  constructor() {}
+
   private client = axios.create({
     baseURL: 'https://api.revenuecat.com/v1/',
     headers: {
@@ -10,7 +12,7 @@ export class RevenueCatService {
       'Content-Type': 'application/json',
     },
   });
-  constructor() {}
+
   async refundPurchase(args: { transactionId: string; appUserId: string }) {
     try {
       await this.client.post(
@@ -26,6 +28,7 @@ export class RevenueCatService {
   }
 
   async userHasTransaction(args: { transactionId: string; appUserId: string }) {
+    let hasTransaction = false;
     try {
       const customer = await this.client.get<RevenueCatCustomer>(
         `/subscribers/${args.appUserId}`,
@@ -40,16 +43,14 @@ export class RevenueCatService {
             transaction.store_transaction_id === args.transactionId,
         );
         if (userTransaction) {
-          return true;
-        } else {
-          return false;
+          hasTransaction = true;
         }
       });
-      return false;
+      return hasTransaction;
     } catch (error) {
       console.log(error.response);
       Sentry.captureException(error);
-      return false;
+      return hasTransaction;
     }
   }
 }
