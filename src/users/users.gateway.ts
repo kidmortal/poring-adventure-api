@@ -30,7 +30,7 @@ export class UsersGateway {
   @SubscribeMessage('get_all_user')
   async findAll(@MessageBody() params: { page: number }) {
     this.logger.debug('get_all_user');
-    const users = await this.userService.findAll(params);
+    const users = await this.userService.getUsersPage(params);
     return users;
   }
 
