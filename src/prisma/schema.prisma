@@ -311,6 +311,7 @@ model UserPurchase {
   transactionId  String       @unique
   appUserId      String
   received       Boolean      @default(false)
+  refunded       Boolean      @default(false)
   createdAt      DateTime     @default(now())
   product        StoreProduct @relation(fields: [storeProductId], references: [id])
   storeProductId Int
