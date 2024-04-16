@@ -22,9 +22,11 @@ export class PurchaseService {
     const productId = args.purchase?.event?.product_id;
     const appUserId = args.purchase?.event?.app_user_id;
     if (type === 'NON_RENEWING_PURCHASE') {
+      this.logger.warn(`Receiving purchase ${transactionId}`);
       return this._purchase({ appUserId, productId, email, transactionId });
     }
     if (type === 'CANCELLATION') {
+      this.logger.warn(`Cancel purchase ${transactionId}`);
       return this._cancelPurchase({ transactionId, email });
     }
 
@@ -56,9 +58,9 @@ export class PurchaseService {
       appUserId: purchase.appUserId,
     });
     if (cancel) {
-      await this._cancelPurchase({
-        email: args.userEmail,
-        transactionId: purchase.transactionId,
+      await this.prisma.userPurchase.update({
+        where: { id: purchase.id },
+        data: { refunded: true },
       });
       return true;
     }
@@ -70,15 +72,24 @@ export class PurchaseService {
     const purchase = await this.prisma.userPurchase.findUnique({
       where: { id: args.purchaseId, userEmail: args.userEmail },
     });
+
     const userHasTransaction = await this.revenuecat.userHasTransaction({
       appUserId: purchase.appUserId,
       transactionId: purchase.transactionId,
     });
     if (userHasTransaction) {
+      if (purchase.refunded) {
+        this.websocket.sendTextNotification({
+          email: args.userEmail,
+          text: 'Purchase being refunded',
+        });
+        return false;
+      }
       this.websocket.sendTextNotification({
         email: args.userEmail,
         text: 'Not implemented Yet',
       });
+      return true;
     } else {
       this.websocket.sendErrorNotification({
         email: args.userEmail,
@@ -101,7 +112,7 @@ export class PurchaseService {
     transactionId: string;
     email: string;
   }) {
-    const purchase = await this.prisma.userPurchase.findUnique({
+    const purchase = await this.prisma.userPurchase.findFirst({
       where: { transactionId: args.transactionId },
     });
     if (purchase) {

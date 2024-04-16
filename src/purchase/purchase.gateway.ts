@@ -18,10 +18,7 @@ export class PurchaseGateway {
   private logger = new Logger('Purchases');
 
   @SubscribeMessage('get_purchases')
-  async consumeItem(
-    @MessageBody() itemId: number,
-    @ConnectedSocket() client: Socket,
-  ) {
+  async getPurchases(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     if (!email) return false;
     this.logger.debug('get_purchases');
