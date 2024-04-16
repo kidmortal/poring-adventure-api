@@ -2,9 +2,9 @@ import { Controller, Post, Body, UseGuards, UseFilters } from '@nestjs/common';
 import { PurchaseService } from './purchase.service';
 import { PurchaseGuard } from './purchase.guard';
 import { RevenueCatPurchaseWebhook } from './entities/purchase.entity';
-import { HttpExceptionFilter } from './http-exception.filter';
+import { AllExceptionsFilter } from './http-exception.filter';
 
-@UseFilters(HttpExceptionFilter)
+@UseFilters(AllExceptionsFilter)
 @Controller('purchase')
 export class PurchaseController {
   constructor(private readonly purchaseService: PurchaseService) {}
