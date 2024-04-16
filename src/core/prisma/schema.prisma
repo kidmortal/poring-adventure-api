@@ -18,7 +18,6 @@ model User {
   id                Int                @id @default(autoincrement())
   email             String             @unique
   name              String
-  discordId         String?            @unique
   silver            Int                @default(20)
   admin             Boolean            @default(false)
   appearance        Appearance?
@@ -36,6 +35,16 @@ model User {
   buffs             UserBuff[]
   guildApplications GuildApplication[]
   purchases         UserPurchase[]
+  discord           Discord?
+}
+
+model Discord {
+  id        Int    @id @default(autoincrement())
+  discordId String @unique
+  name      String
+  url       String
+  user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  userEmail String @unique
 }
 
 model Stats {

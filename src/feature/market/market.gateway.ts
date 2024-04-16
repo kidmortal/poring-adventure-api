@@ -1,9 +1,4 @@
-import {
-  WebSocketGateway,
-  SubscribeMessage,
-  MessageBody,
-  ConnectedSocket,
-} from '@nestjs/websockets';
+import { WebSocketGateway, SubscribeMessage, MessageBody, ConnectedSocket } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { Logger, UseFilters } from '@nestjs/common';
 import { MarketService } from './market.service';
@@ -56,9 +51,7 @@ export class MarketGateway {
   }
 
   @SubscribeMessage('get_all_market_listing')
-  async findAll(
-    @MessageBody() params: { page: number; category: ItemCategory },
-  ) {
+  async findAll(@MessageBody() params: { page: number; category: ItemCategory }) {
     this.logger.debug('get_all_market_listing');
     return this.marketService.findAll(params);
   }
