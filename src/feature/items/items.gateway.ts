@@ -1,9 +1,4 @@
-import {
-  WebSocketGateway,
-  SubscribeMessage,
-  ConnectedSocket,
-  MessageBody,
-} from '@nestjs/websockets';
+import { WebSocketGateway, SubscribeMessage, ConnectedSocket, MessageBody } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 
 import { Logger, UseFilters } from '@nestjs/common';
@@ -17,10 +12,7 @@ export class ItemsGateway {
   private logger = new Logger('Items');
 
   @SubscribeMessage('consume_item')
-  async consumeItem(
-    @MessageBody() itemId: number,
-    @ConnectedSocket() client: Socket,
-  ) {
+  async consumeItem(@MessageBody() itemId: number, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     if (!email) return false;
     this.logger.debug('consume_item');
@@ -28,10 +20,7 @@ export class ItemsGateway {
   }
 
   @SubscribeMessage('equip_item')
-  async equipItem(
-    @MessageBody() itemId: number,
-    @ConnectedSocket() client: Socket,
-  ) {
+  async equipItem(@MessageBody() itemId: number, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     if (!email) return false;
     this.logger.debug('equip_item');
@@ -39,10 +28,7 @@ export class ItemsGateway {
   }
 
   @SubscribeMessage('unequip_item')
-  async unequipItem(
-    @MessageBody() itemId: number,
-    @ConnectedSocket() client: Socket,
-  ) {
+  async unequipItem(@MessageBody() itemId: number, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     if (!email) return false;
     this.logger.debug('unequip_item');
