@@ -65,22 +65,11 @@ export class UsersService {
     return newUser;
   }
 
-  async findAll(params: { page: number }) {
-    const cacheKey = `user_ranking_${params.page}`;
-    const cachecRanking = await this.cache.get(cacheKey);
-    if (cachecRanking) {
-      this.cacheLogger.log(`returning cached ${cacheKey}`);
-      return cachecRanking as any;
-    }
-    const ranking = await this.prisma.user.findMany({
-      skip: (params.page - 1) * 10,
-      take: 10,
-      orderBy: { stats: { experience: 'desc' } },
-      include: { appearance: true, stats: true },
-    });
-    this.cache.set(cacheKey, ranking);
+  async getUsersPage(params: { page: number }) {
+    const count = await this._getUserCount();
+    const users = await this._getAllUsersPage(params);
 
-    return ranking;
+    return { users, count };
   }
 
   getAllProfessions() {
@@ -584,5 +573,35 @@ export class UsersService {
     this.cache.set(cacheKey, user);
 
     return user;
+  }
+
+  async _getAllUsersPage(params: { page: number }) {
+    const cacheKey = `users_page_${params.page}`;
+    const cachedUsersPage = await this.cache.get(cacheKey);
+    if (cachedUsersPage) {
+      this.cacheLogger.log(`returning cached ${cacheKey}`);
+      return cachedUsersPage as any;
+    }
+    const usersPage = await this.prisma.user.findMany({
+      skip: (params.page - 1) * 10,
+      take: 10,
+      orderBy: { stats: { experience: 'desc' } },
+      include: { appearance: true, stats: true },
+    });
+    this.cache.set(cacheKey, usersPage);
+
+    return usersPage;
+  }
+
+  async _getUserCount() {
+    const cacheKey = `user_count`;
+    const cachedCount = await this.cache.get(cacheKey);
+    if (cachedCount) {
+      this.cacheLogger.log(`returning cached ${cacheKey}`);
+      return cachedCount as any;
+    }
+    const count = await this.prisma.user.count();
+    this.cache.set(cacheKey, count);
+    return count;
   }
 }

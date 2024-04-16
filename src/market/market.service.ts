@@ -147,7 +147,8 @@ export class MarketService {
 
   async findAll(params: { page: number; category: ItemCategory }) {
     const listings = await this._getMarketListings(params);
-    return listings;
+    const count = await this._marketListingsCount();
+    return { listings, count };
   }
 
   findOne(id: number) {
@@ -222,6 +223,17 @@ export class MarketService {
     const listings = await this.prisma.marketListing.findMany(query);
     this.cache.set(cacheKey, listings);
     return listings;
+  }
+  private async _marketListingsCount() {
+    const cacheKey = `market_listing_count`;
+    const cachedCount = await this.cache.get(cacheKey);
+    if (cachedCount) {
+      this.logger.log(`returning cached ${cacheKey}`);
+      return cachedCount as any;
+    }
+    const count = await this.prisma.marketListing.count();
+    this.cache.set(cacheKey, count);
+    return count;
   }
 
   private async _createOrIncrementMarketListing(args: {
@@ -298,5 +310,10 @@ export class MarketService {
         if (key.includes(cacheKey)) this.cache.del(key);
       });
     });
+    this._clearCountCache();
+  }
+  private async _clearCountCache() {
+    const cacheKey = `market_listing_count`;
+    this.cache.del(cacheKey);
   }
 }
