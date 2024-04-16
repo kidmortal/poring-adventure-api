@@ -1,9 +1,4 @@
-import {
-  ConnectedSocket,
-  MessageBody,
-  SubscribeMessage,
-  WebSocketGateway,
-} from '@nestjs/websockets';
+import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { AdminService } from './admin.service';
 import { Logger, UseFilters } from '@nestjs/common';
@@ -22,14 +17,7 @@ export class AdminGateway {
   private logger = new Logger('Websocket - admin');
 
   @SubscribeMessage('message_socket')
-  async sendMessage(
-    @MessageBody()
-    args: {
-      to: string;
-      message: string;
-    },
-    @ConnectedSocket() client: Socket,
-  ) {
+  async sendMessage(@MessageBody() args: { to: string; message: string }, @ConnectedSocket() client: Socket) {
     this.logger.debug('message_socket');
     const email = client.handshake.auth.email;
     const isAdmin = await this.userService.isAdmin(email);
@@ -51,6 +39,28 @@ export class AdminGateway {
       return this.websocket.breakUserConnection(email);
     }
     return this.adminService.getConnectedUsers({ userEmail: email });
+  }
+
+  @SubscribeMessage('full_heal_user')
+  async fullHealUser(@MessageBody() healEmail: string, @ConnectedSocket() client: Socket) {
+    this.logger.debug('full_heal_user');
+    const email = client.handshake.auth.email;
+    const isAdmin = await this.userService.isAdmin(email);
+    if (!isAdmin) {
+      return this.websocket.breakUserConnection(email);
+    }
+    return this.adminService.fullHealUser({ userEmail: email, healEmail });
+  }
+
+  @SubscribeMessage('kill_user')
+  async killUser(@MessageBody() killEmail: string, @ConnectedSocket() client: Socket) {
+    this.logger.debug('kill_user');
+    const email = client.handshake.auth.email;
+    const isAdmin = await this.userService.isAdmin(email);
+    if (!isAdmin) {
+      return this.websocket.breakUserConnection(email);
+    }
+    return this.adminService.killUser({ userEmail: email, killEmail });
   }
 
   @SubscribeMessage('get_server_info')
@@ -87,11 +97,7 @@ export class AdminGateway {
   }
 
   @SubscribeMessage('send_push_notification')
-  async sendPushNotification(
-    @MessageBody()
-    message: string,
-    @ConnectedSocket() client: Socket,
-  ) {
+  async sendPushNotification(@MessageBody() message: string, @ConnectedSocket() client: Socket) {
     this.logger.debug('send_push_notification');
     const email = client.handshake.auth.email;
     const isAdmin = await this.userService.isAdmin(email);
@@ -102,26 +108,18 @@ export class AdminGateway {
   }
 
   @SubscribeMessage('send_gift_mail')
-  async sendGiftMail(
-    @MessageBody()
-    receiverEmail: string,
-    @ConnectedSocket() client: Socket,
-  ) {
+  async sendGiftMail(@MessageBody() receiverEmail: string, @ConnectedSocket() client: Socket) {
     this.logger.debug('send_gift_mail');
     const email = client.handshake.auth.email;
     const isAdmin = await this.userService.isAdmin(email);
     if (!isAdmin) {
       return this.websocket.breakUserConnection(email);
     }
-    return this.adminService.sendGiftMail({ userEmail: receiverEmail });
+    return this.adminService.sendGiftMail({ userEmail: email, receiverEmail });
   }
 
   @SubscribeMessage('disconnect_user_websocket')
-  async disconnectUserWebsocket(
-    @MessageBody()
-    disconnectEmail: string,
-    @ConnectedSocket() client: Socket,
-  ) {
+  async disconnectUserWebsocket(@MessageBody() disconnectEmail: string, @ConnectedSocket() client: Socket) {
     this.logger.debug('disconnect_user_websocket');
     const email = client.handshake.auth.email;
     const isAdmin = await this.userService.isAdmin(email);
@@ -129,14 +127,14 @@ export class AdminGateway {
       return this.websocket.breakUserConnection(email);
     }
     return this.adminService.disconnectUserSocket({
-      userEmail: disconnectEmail,
+      userEmail: email,
+      disconnectEmail,
     });
   }
 
   @SubscribeMessage('send_push_notification_user')
   async sendPushNotificationToUser(
-    @MessageBody()
-    params: { email: string; message: string },
+    @MessageBody() params: { email: string; message: string },
     @ConnectedSocket() client: Socket,
   ) {
     this.logger.debug('send_push_notification_user');
@@ -147,7 +145,8 @@ export class AdminGateway {
     }
     return this.adminService.sendPushNotificationToUser({
       message: params.message,
-      userEmail: params.email,
+      userEmail: email,
+      receiverEmail: params.email,
     });
   }
 }
