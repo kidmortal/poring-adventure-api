@@ -23,20 +23,19 @@ export class AdminService {
     await this.notification.sendPushNotification(args);
     return true;
   }
-  async sendPushNotificationToUser(args: {
-    userEmail: string;
-    message: string;
-  }) {
+  async sendPushNotificationToUser(args: { userEmail: string; receiverEmail: string; message: string }) {
     await this.notification.sendPushNotificationToUser({
       title: 'Debug Message',
       message: args.message,
-      userEmail: args.userEmail,
+      userEmail: args.receiverEmail,
     });
+    this.websocket.sendTextNotification({ email: args.userEmail, text: 'Push notification sent to user' });
     return true;
   }
 
-  async disconnectUserSocket(args: { userEmail: string }) {
-    this.websocket.breakUserConnection(args.userEmail);
+  async disconnectUserSocket(args: { userEmail: string; disconnectEmail: string }) {
+    this.websocket.breakUserConnection(args.disconnectEmail);
+    this.websocket.sendTextNotification({ email: args.userEmail, text: 'You have disconnected a user' });
     return true;
   }
 
@@ -64,14 +63,15 @@ export class AdminService {
     return true;
   }
 
-  async sendGiftMail(args: { userEmail: string }) {
+  async sendGiftMail(args: { userEmail: string; receiverEmail: string }) {
     await this.mailService.sendMail({
       senderName: 'Admin',
-      receiverEmail: args.userEmail,
+      receiverEmail: args.receiverEmail,
       content: 'System Gift',
       silver: 100,
     });
     await this.mailService._notifyUserMailBox(args);
+    this.websocket.sendTextNotification({ email: args.userEmail, text: 'You have sent a gift to the user' });
     return true;
   }
 
@@ -94,6 +94,25 @@ export class AdminService {
 
   async restartServer() {
     execSync('pm2 restart poring-adventure');
+    return true;
+  }
+
+  async fullHealUser(args: { userEmail: string; healEmail: string }) {
+    await this.userService.incrementUserHealth({ userEmail: args.healEmail, amount: 9999 });
+    await this.userService.incrementUserMana({ userEmail: args.healEmail, amount: 9999 });
+    this.websocket.sendTextNotification({ email: args.userEmail, text: 'User has been Fully healed' });
+    this.websocket.sendTextNotification({ email: args.healEmail, text: 'You got fully healed by an Admin' });
+    this.getConnectedUsers(args);
+
+    return true;
+  }
+
+  async killUser(args: { userEmail: string; killEmail: string }) {
+    await this.userService.decrementUserHealth({ userEmail: args.killEmail, amount: 9999 });
+    await this.userService.decrementUserMana({ userEmail: args.killEmail, amount: 9999 });
+    this.websocket.sendTextNotification({ email: args.userEmail, text: 'User has been killed' });
+    this.websocket.sendTextNotification({ email: args.killEmail, text: 'You got killed by an Admin' });
+    this.getConnectedUsers(args);
     return true;
   }
 
