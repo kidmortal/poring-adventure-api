@@ -16,7 +16,7 @@ export class PurchaseService {
   ) {}
   private logger = new Logger('Purchase');
   async webhook(args: { purchase: RevenueCatPurchaseWebhook }) {
-    const type = args.purchase.event.type;
+    const type = args.purchase?.event?.type;
     const email = args.purchase?.event?.subscriber_attributes?.$email?.value;
     const transactionId = args.purchase?.event?.transaction_id;
     const productId = args.purchase?.event?.product_id;
@@ -31,6 +31,7 @@ export class PurchaseService {
     if (type === 'TEST') {
       return 'hello world lol';
     }
+    throw new BadRequestException('No type has been passed');
   }
 
   async findAll(args: { userEmail: string }) {
@@ -134,6 +135,12 @@ export class PurchaseService {
       throw new BadRequestException(
         `No product registered with id ${args.productId}`,
       );
+    }
+    const purchase = await this.prisma.userPurchase.findUnique({
+      where: { transactionId: args.transactionId, appUserId: args.appUserId },
+    });
+    if (purchase) {
+      throw new BadRequestException(`Purchase already registered`);
     }
     const result = await this.prisma.userPurchase.create({
       data: {
