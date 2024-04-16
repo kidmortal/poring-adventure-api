@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "prisma": {
-    "schema": "src/prisma/schema.prisma"
+    "schema": "src/core/prisma/schema.prisma"
   },
   "scripts": {
     "build": "prisma generate && nest build",
