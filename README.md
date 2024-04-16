@@ -44,5 +44,5 @@ npx prisma migrate dev --name init
 ```
 
 ```bash
-turso db shell default < ./src/prisma/migrations/{migration_folder}/migration.sql
+turso db shell default < ./src/core/prisma/migrations/{migration_folder}/migration.sql
 ```
