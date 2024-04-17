@@ -114,14 +114,19 @@ export class AdminService {
   async _notifyWithConnectedUsers(args: { userEmail: string }) {
     const sockets = this.websocket.getAllSockets();
     const users = {};
+    const integrations = [];
 
     for await (const socket of sockets) {
       const email = socket.email;
       if (!users[email] && email) {
-        const user = await this.userService._getUserWithEmail({
-          userEmail: socket.email,
-        });
-        users[email] = user;
+        if (email != 'discord') {
+          const user = await this.userService._getUserWithEmail({
+            userEmail: socket.email,
+          });
+          users[email] = user;
+        } else {
+          integrations.push('discord');
+        }
       }
     }
     this.websocket.sendMessageToSocket({
@@ -130,6 +135,7 @@ export class AdminService {
       payload: {
         users: Object.values(users),
         connectedSockets: sockets.length,
+        integrations,
       },
     });
     return true;
