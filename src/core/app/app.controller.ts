@@ -7,26 +7,20 @@ import { execSync } from 'child_process';
 export class MainController {
   @Get('/')
   getHome() {
-    const indexPath = path.join(__dirname, '..', 'public', 'index.html');
+    const indexPath = path.join(__dirname, '..', '..', '..', 'public', 'index.html');
     const indexContent = fs.readFileSync(indexPath, 'utf-8');
     return indexContent;
   }
   @Get('/br/privacy')
   getPrivacity() {
-    const indexPath = path.join(
-      __dirname,
-      '..',
-      'public',
-      'br',
-      'privacy.html',
-    );
+    const indexPath = path.join(__dirname, '..', '..', '..', 'public', 'br', 'privacy.html');
     const indexContent = fs.readFileSync(indexPath, 'utf-8');
     return indexContent;
   }
 
   @Get('/br/terms')
   getTerms() {
-    const indexPath = path.join(__dirname, '..', 'public', 'br', 'terms.html');
+    const indexPath = path.join(__dirname, '..', '..', '..', 'public', 'br', 'terms.html');
     const indexContent = fs.readFileSync(indexPath, 'utf-8');
     return indexContent;
   }
