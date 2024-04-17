@@ -40,26 +40,7 @@ export class AdminService {
   }
 
   async getConnectedUsers(args: { userEmail: string }) {
-    const sockets = this.websocket.getAllSockets();
-    const users = {};
-
-    for await (const socket of sockets) {
-      const email = socket.email;
-      if (!users[email]) {
-        const user = await this.userService._getUserWithEmail({
-          userEmail: socket.email,
-        });
-        users[email] = user;
-      }
-    }
-    this.websocket.sendMessageToSocket({
-      email: args.userEmail,
-      event: 'connected_users',
-      payload: {
-        users: Object.values(users),
-        connectedSockets: sockets.length,
-      },
-    });
+    await this._notifyWithConnectedUsers(args);
     return true;
   }
 
@@ -103,7 +84,7 @@ export class AdminService {
     this.userService.notifyUserUpdateWithProfile({ email: args.healEmail });
     this.websocket.sendTextNotification({ email: args.userEmail, text: 'User has been Fully healed' });
     this.websocket.sendTextNotification({ email: args.healEmail, text: 'You got fully healed by an Admin' });
-    this.getConnectedUsers(args);
+    this._notifyWithConnectedUsers(args);
 
     return true;
   }
@@ -114,7 +95,7 @@ export class AdminService {
     this.userService.notifyUserUpdateWithProfile({ email: args.killEmail });
     this.websocket.sendTextNotification({ email: args.userEmail, text: 'User has been killed' });
     this.websocket.sendTextNotification({ email: args.killEmail, text: 'You got killed by an Admin' });
-    this.getConnectedUsers(args);
+    this._notifyWithConnectedUsers(args);
     return true;
   }
 
@@ -128,5 +109,29 @@ export class AdminService {
       appMemoryUsage,
       totalMemoryUsage,
     };
+  }
+
+  async _notifyWithConnectedUsers(args: { userEmail: string }) {
+    const sockets = this.websocket.getAllSockets();
+    const users = {};
+
+    for await (const socket of sockets) {
+      const email = socket.email;
+      if (!users[email]) {
+        const user = await this.userService._getUserWithEmail({
+          userEmail: socket.email,
+        });
+        users[email] = user;
+      }
+    }
+    this.websocket.sendMessageToSocket({
+      email: args.userEmail,
+      event: 'connected_users',
+      payload: {
+        users: Object.values(users),
+        connectedSockets: sockets.length,
+      },
+    });
+    return true;
   }
 }
