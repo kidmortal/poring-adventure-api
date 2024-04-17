@@ -1,22 +1,15 @@
-import {
-  WebSocketGateway,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  WebSocketServer,
-} from '@nestjs/websockets';
+import { WebSocketGateway, OnGatewayConnection, OnGatewayDisconnect, WebSocketServer } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { Server } from 'http';
 import { Logger, UseFilters } from '@nestjs/common';
 
-import { AuthService } from 'src/core/auth/auth.service';
 import { WebsocketService } from './websocket.service';
 import { WebsocketExceptionsFilter } from './websocketException.filter';
+import { AuthService } from '../auth/auth.service';
 
 @UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway({ cors: true })
-export class WebsocketGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
+export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
 
   private logger = new Logger('Websocket - gateway');
@@ -27,20 +20,17 @@ export class WebsocketGateway
   ) {}
 
   async handleConnection(client: Socket) {
-    this.logger.debug(`socket ${client.id} connected`);
-    this.websocket.wsClients.push(client);
-    const accessToken = client.handshake.auth?.acessToken;
-    if (accessToken) {
-      const authEmail =
-        await this.auth.getAuthenticatedEmailFromToken(accessToken);
-      if (authEmail) {
-        client.handshake.auth.email = authEmail;
-        this.websocket.sendMessageToSocket({
-          event: 'authenticated',
-          email: authEmail,
-          payload: {},
-        });
-      }
+    const validConnection = await this.auth.validateWebsocketConnection({ socket: client });
+    if (validConnection) {
+      this.websocket.wsClients.push(client);
+
+      this.websocket.sendMessageToSocket({
+        event: 'authenticated',
+        email: client.handshake?.auth?.email,
+        payload: {},
+      });
+    } else {
+      client.disconnect();
     }
   }
 
