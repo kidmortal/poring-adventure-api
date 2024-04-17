@@ -26,12 +26,7 @@ export class MarketService {
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
   private logger = new Logger('Cache - market');
-  async addItemToMarket(args: {
-    price: number;
-    stack: number;
-    itemId: number;
-    sellerEmail: string;
-  }) {
+  async addItemToMarket(args: { price: number; stack: number; itemId: number; sellerEmail: string }) {
     const inventoryItem = await this.prisma.inventoryItem.findUnique({
       where: {
         userEmail_itemId: {
@@ -46,20 +41,15 @@ export class MarketService {
     });
 
     if (!inventoryItem) {
-      throw new BadRequestException(
-        `No item found with id ${args.itemId} on ${args.sellerEmail} inventory`,
-      );
+      throw new BadRequestException(`No item found with id ${args.itemId} on ${args.sellerEmail} inventory`);
     }
 
     if (inventoryItem.stack < args.stack) {
-      throw new BadRequestException(
-        `You only have ${inventoryItem.stack}, but trying to sell ${args.stack}`,
-      );
+      throw new BadRequestException(`You only have ${inventoryItem.stack}, but trying to sell ${args.stack}`);
     }
 
     if (inventoryItem.marketListing) {
-      const remainingStock =
-        inventoryItem.stack - inventoryItem.marketListing.stack;
+      const remainingStock = inventoryItem.stack - inventoryItem.marketListing.stack;
 
       if (args.stack > remainingStock) {
         this.websocket.sendErrorNotification({
@@ -93,11 +83,7 @@ export class MarketService {
     return true;
   }
 
-  async purchase(args: {
-    marketListingId: number;
-    stacks: number;
-    buyerEmail: string;
-  }) {
+  async purchase(args: { marketListingId: number; stacks: number; buyerEmail: string }) {
     await this.prisma.$transaction(async (tx) => {
       const purchasingUser = await tx.user.findUnique({
         where: { email: args.buyerEmail },
@@ -155,29 +141,29 @@ export class MarketService {
     return `This action returns a #${id} market`;
   }
 
-  async remove(id: number, authEmail: string) {
+  async remove(args: { marketListingId: number; userEmail: string }) {
     const marketListing = await this.prisma.marketListing.findUnique({
-      where: { id },
+      where: { id: args.marketListingId },
     });
 
     if (!marketListing) {
       throw new BadRequestException('Listing not found');
     }
 
-    if (marketListing?.sellerEmail !== authEmail) {
+    if (marketListing?.sellerEmail !== args.userEmail) {
       throw new UnauthorizedException(
-        `You are signed as ${authEmail}, but the listing number ${id} was made by ${marketListing.sellerEmail}`,
+        `You are signed as ${args.userEmail}, but the listing number ${args.marketListingId} was made by ${marketListing.sellerEmail}`,
       );
     }
 
     try {
       const deletedItem = await this.prisma.marketListing.delete({
-        where: { id },
+        where: { id: args.marketListingId },
         include: { inventory: { include: { item: true } } },
       });
       const category = deletedItem.inventory?.item?.category as ItemCategory;
       this.websocket.sendTextNotification({
-        email: authEmail,
+        email: args.userEmail,
         text: `Removed ${deletedItem.stack}x ${deletedItem.inventory.item.name} from Market!`,
       });
       this._clearSelectedCache({ clear: ['all', category] });
@@ -187,10 +173,7 @@ export class MarketService {
     }
   }
 
-  private async _getMarketListings(params: {
-    page: number;
-    category: ItemCategory;
-  }) {
+  private async _getMarketListings(params: { page: number; category: ItemCategory }) {
     const cacheKey = `market_listing_${params.category}_${params.page}`;
     const cachedMarketListing = await this.cache.get(cacheKey);
     if (cachedMarketListing) {

@@ -1,10 +1,12 @@
 import { WebSocketGateway, SubscribeMessage, MessageBody, ConnectedSocket } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
-import { Logger, UseFilters } from '@nestjs/common';
+import { Logger, UseFilters, UseGuards } from '@nestjs/common';
 import { MarketService } from './market.service';
 import { WebsocketExceptionsFilter } from 'src/core/websocket/websocketException.filter';
 import { ItemCategory } from 'src/feature/items/constants';
+import { WebsocketAuthEmailGuard } from 'src/core/websocket/websocket.guard';
 
+@UseGuards(WebsocketAuthEmailGuard)
 @UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway({ cors: true })
 export class MarketGateway {
@@ -43,16 +45,16 @@ export class MarketGateway {
   }
 
   @SubscribeMessage('remove_market_listing')
-  async remove(@MessageBody() id: number, @ConnectedSocket() client: Socket) {
+  async remove(@MessageBody() marketListingId: number, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('remove_market_listing');
-    const result = await this.marketService.remove(id, email);
+    const result = await this.marketService.remove({ marketListingId, userEmail: email });
     return result;
   }
 
   @SubscribeMessage('get_all_market_listing')
   async findAll(@MessageBody() params: { page: number; category: ItemCategory }) {
     this.logger.debug('get_all_market_listing');
-    return this.marketService.findAll(params);
+    return this.marketService.findAll({ page: params.page, category: params.category });
   }
 }

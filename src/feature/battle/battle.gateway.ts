@@ -1,14 +1,11 @@
-import {
-  WebSocketGateway,
-  SubscribeMessage,
-  ConnectedSocket,
-  MessageBody,
-} from '@nestjs/websockets';
+import { WebSocketGateway, SubscribeMessage, ConnectedSocket, MessageBody } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
-import { Logger, UseFilters } from '@nestjs/common';
+import { Logger, UseFilters, UseGuards } from '@nestjs/common';
 import { BattleService } from './battle.service';
 import { WebsocketExceptionsFilter } from 'src/core/websocket/websocketException.filter';
+import { WebsocketAuthEmailGuard } from 'src/core/websocket/websocket.guard';
 
+@UseGuards(WebsocketAuthEmailGuard)
 @UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway({ cors: true })
 export class BattleGateway {
@@ -16,10 +13,7 @@ export class BattleGateway {
   private logger = new Logger('Websocket');
 
   @SubscribeMessage('battle_create')
-  async create(
-    @MessageBody() mapId: number,
-    @ConnectedSocket() client: Socket,
-  ) {
+  async create(@MessageBody() mapId: number, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug(`battle_create ${email}`);
     return this.battleService.create({ userEmail: email, mapId });
@@ -46,10 +40,7 @@ export class BattleGateway {
     return this.battleService.attack(email);
   }
   @SubscribeMessage('battle_cast')
-  async cast(
-    @MessageBody() params: { skillId: number; targetName?: string },
-    @ConnectedSocket() client: Socket,
-  ) {
+  async cast(@MessageBody() params: { skillId: number; targetName?: string }, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug(`battle_cast ${email}`);
     return this.battleService.cast({
