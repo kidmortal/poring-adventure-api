@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { UserWithStats } from 'src/feature/battle/battle';
@@ -115,12 +110,7 @@ export class UsersService {
     return user.admin;
   }
 
-  async updateUserHealthMana(args: {
-    userEmail: string;
-    health: number;
-    mana: number;
-    tx?: TransactionContext;
-  }) {
+  async updateUserHealthMana(args: { userEmail: string; health: number; mana: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     await tx.stats.update({
       where: {
@@ -161,11 +151,7 @@ export class UsersService {
     }
   }
 
-  async incrementUserHealth(args: {
-    userEmail: string;
-    amount: number;
-    tx?: TransactionContext;
-  }) {
+  async incrementUserHealth(args: { userEmail: string; amount: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     const currentStats = await tx.stats.findUnique({
       where: {
@@ -218,11 +204,7 @@ export class UsersService {
     }
   }
 
-  async incrementUserMana(args: {
-    userEmail: string;
-    amount: number;
-    tx?: TransactionContext;
-  }) {
+  async incrementUserMana(args: { userEmail: string; amount: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     const currentStats = await tx.stats.findUnique({
       where: {
@@ -317,12 +299,7 @@ export class UsersService {
     });
     return deletedUser;
   }
-  async addExpSilver(args: {
-    userEmail: string;
-    exp: number;
-    silver: number;
-    tx?: TransactionContext;
-  }) {
+  async addExpSilver(args: { userEmail: string; exp: number; silver: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     await tx.user.update({
       where: {
@@ -336,11 +313,7 @@ export class UsersService {
     this.clearUserCache({ email: args.userEmail });
     return true;
   }
-  async addSilverToUser(args: {
-    userEmail: string;
-    amount: number;
-    tx?: TransactionContext;
-  }) {
+  async addSilverToUser(args: { userEmail: string; amount: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     await tx.user.update({
       where: {
@@ -355,11 +328,7 @@ export class UsersService {
     this.clearUserCache({ email: args.userEmail });
     return true;
   }
-  async addExpToUser(args: {
-    userEmail: string;
-    amount: number;
-    tx?: TransactionContext;
-  }) {
+  async addExpToUser(args: { userEmail: string; amount: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     await tx.stats.update({
       where: {
@@ -375,11 +344,7 @@ export class UsersService {
     return true;
   }
 
-  async removeSilverFromUser(args: {
-    userEmail: string;
-    amount: number;
-    tx?: TransactionContext;
-  }) {
+  async removeSilverFromUser(args: { userEmail: string; amount: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     await tx.user.update({
       where: {
@@ -414,11 +379,7 @@ export class UsersService {
     });
   }
 
-  async increaseUserLevel(args: {
-    userEmail: string;
-    amount: number;
-    tx?: TransactionContext;
-  }) {
+  async increaseUserLevel(args: { userEmail: string; amount: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     const increaseAmount = args.amount;
     const user = await tx.user.findUnique({
@@ -445,11 +406,7 @@ export class UsersService {
     });
   }
 
-  async decreaseUserLevel(args: {
-    userEmail: string;
-    amount: number;
-    tx?: TransactionContext;
-  }) {
+  async decreaseUserLevel(args: { userEmail: string; amount: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     const decreaseAmount = args.amount;
     const user = await tx.user.findUnique({
@@ -476,10 +433,7 @@ export class UsersService {
     });
   }
 
-  async decreaseUserBuffs(args: {
-    userEmail: string;
-    tx?: TransactionContext;
-  }) {
+  async decreaseUserBuffs(args: { userEmail: string; tx?: TransactionContext }) {
     const tx = args.tx ?? this.prisma;
     await tx.userBuff.updateMany({
       where: { userEmail: args.userEmail },
@@ -491,15 +445,7 @@ export class UsersService {
     return true;
   }
 
-  async levelUpUser({
-    user,
-    expGain,
-    ...args
-  }: {
-    user: UserWithStats;
-    expGain: number;
-    tx?: TransactionContext;
-  }) {
+  async levelUpUser({ user, expGain, ...args }: { user: UserWithStats; expGain: number; tx?: TransactionContext }) {
     const tx = args.tx ?? this.prisma;
     const currentExp = user.stats.experience;
     const finalExp = currentExp + expGain;
