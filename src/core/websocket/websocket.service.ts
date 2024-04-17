@@ -56,9 +56,7 @@ export class WebsocketService {
   }
 
   private getUserSockets(email: string) {
-    const sockets = this.wsClients.filter(
-      (socket) => socket.handshake.auth.email === email,
-    );
+    const sockets = this.wsClients.filter((socket) => socket.handshake.auth.email === email);
     return sockets;
   }
 }
