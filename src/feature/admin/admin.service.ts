@@ -100,6 +100,7 @@ export class AdminService {
   async fullHealUser(args: { userEmail: string; healEmail: string }) {
     await this.userService.incrementUserHealth({ userEmail: args.healEmail, amount: 9999 });
     await this.userService.incrementUserMana({ userEmail: args.healEmail, amount: 9999 });
+    this.userService.notifyUserUpdateWithProfile({ email: args.healEmail });
     this.websocket.sendTextNotification({ email: args.userEmail, text: 'User has been Fully healed' });
     this.websocket.sendTextNotification({ email: args.healEmail, text: 'You got fully healed by an Admin' });
     this.getConnectedUsers(args);
@@ -110,6 +111,7 @@ export class AdminService {
   async killUser(args: { userEmail: string; killEmail: string }) {
     await this.userService.decrementUserHealth({ userEmail: args.killEmail, amount: 9999 });
     await this.userService.decrementUserMana({ userEmail: args.killEmail, amount: 9999 });
+    this.userService.notifyUserUpdateWithProfile({ email: args.killEmail });
     this.websocket.sendTextNotification({ email: args.userEmail, text: 'User has been killed' });
     this.websocket.sendTextNotification({ email: args.killEmail, text: 'You got killed by an Admin' });
     this.getConnectedUsers(args);
