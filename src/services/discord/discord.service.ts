@@ -22,6 +22,7 @@ export class DiscordService {
   findOne(args: { discordId: string }) {
     return this.prisma.user.findFirst({
       where: { discord: { discordId: args.discordId } },
+      include: { appearance: true },
     });
   }
 
