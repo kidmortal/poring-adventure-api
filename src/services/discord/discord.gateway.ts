@@ -12,7 +12,7 @@ import { WebsocketAuthEmailGuard } from 'src/core/websocket/websocket.guard';
 @WebSocketGateway({ cors: true })
 export class DiscordGateway {
   constructor(private readonly discordService: DiscordService) {}
-  private logger = new Logger('Websocket - users');
+  private logger = new Logger('Websocket - discord');
 
   @SubscribeMessage('create_discord_register_token')
   async createToken(@ConnectedSocket() client: Socket) {

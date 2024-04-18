@@ -39,9 +39,19 @@ function getLevelFromExp(exp: number) {
   return level;
 }
 
+function removeElementFromList<T>(args: { list: T[]; element: T }): boolean {
+  const index = args.list.indexOf(args.element);
+  if (index !== -1) {
+    args.list.splice(index, 1);
+    return true;
+  }
+  return false;
+}
+
 export const utils = {
   isSuccess,
   getRandomNumberBetween,
   getLevelFromExp,
   randomDamage,
+  removeElementFromList,
 };

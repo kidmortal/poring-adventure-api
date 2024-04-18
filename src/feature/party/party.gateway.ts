@@ -25,6 +25,30 @@ export class PartyGateway {
     return this.partyService.remove({ userEmail: email, partyId: dto.partyId });
   }
 
+  @SubscribeMessage('get_open_parties')
+  getOpenParties() {
+    this.logger.debug('get_open_parties');
+    return this.partyService.getAllOpenParties();
+  }
+  @SubscribeMessage('open_party')
+  openParty(@MessageBody() dto: OpenPartyDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('open_party');
+    return this.partyService.openParty({ partyId: dto.partyId, email });
+  }
+  @SubscribeMessage('close_party')
+  closeParty(@MessageBody() dto: OpenPartyDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('close_party');
+    return this.partyService.closeParty({ partyId: dto.partyId, email });
+  }
+
+  @SubscribeMessage('send_party_chat_message')
+  sendPartyChatMessage(@MessageBody() dto: SendPartyChatMessage) {
+    this.logger.debug('send_party_chat_message');
+    return this.partyService.sendPartyChatMessage({ partyId: dto.partyId, message: dto.message });
+  }
+
   @SubscribeMessage('get_party')
   findOne(@MessageBody() dto: GetPartyDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
