@@ -96,15 +96,10 @@ export class PartyService {
     return false;
   }
 
-  async remove(args: { email: string }) {
-    const ownedParty = await this.prisma.party.findUnique({
-      where: { leaderEmail: args.email },
-      include: { members: true },
-    });
+  async remove(args: { userEmail: string; partyId: number }) {
+    const ownedParty = await this._getOwnedParty(args);
     if (ownedParty) {
-      await this.prisma.party.delete({
-        where: { leaderEmail: args.email },
-      });
+      await this.prisma.party.delete({ where: { leaderEmail: args.userEmail } });
       ownedParty.members.forEach((member) => this._notifyUserWithNoParty({ email: member.email }));
       return true;
     }

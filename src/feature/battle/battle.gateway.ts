@@ -13,10 +13,10 @@ export class BattleGateway {
   private logger = new Logger('Websocket');
 
   @SubscribeMessage('battle_create')
-  async create(@MessageBody() mapId: number, @ConnectedSocket() client: Socket) {
+  async create(@MessageBody() dto: BattleCreateDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug(`battle_create ${email}`);
-    return this.battleService.create({ userEmail: email, mapId });
+    return this.battleService.create({ userEmail: email, mapId: dto.mapId });
   }
 
   @SubscribeMessage('battle_update')
@@ -40,13 +40,13 @@ export class BattleGateway {
     return this.battleService.attack(email);
   }
   @SubscribeMessage('battle_cast')
-  async cast(@MessageBody() params: { skillId: number; targetName?: string }, @ConnectedSocket() client: Socket) {
+  async cast(@MessageBody() dto: BattleCastDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug(`battle_cast ${email}`);
     return this.battleService.cast({
       email,
-      skillId: params.skillId,
-      targetName: params.targetName,
+      skillId: dto.skillId,
+      targetName: dto.targetName,
     });
   }
 }
