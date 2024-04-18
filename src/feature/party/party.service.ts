@@ -4,6 +4,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Party, Prisma } from '@prisma/client';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
+import { utils } from 'src/utilities/utils';
 
 type FullParty = Prisma.PartyGetPayload<{
   include: {
@@ -22,6 +23,7 @@ type FullParty = Prisma.PartyGetPayload<{
 @Injectable()
 export class PartyService {
   private openPartiesIdList: number[] = [];
+  private partyChat: { [partyId: string]: string[] } = {};
   constructor(
     private readonly websocket: WebsocketService,
     private readonly prisma: PrismaService,
@@ -29,10 +31,27 @@ export class PartyService {
   ) {}
 
   async openParty(args: { email: string; partyId: number }) {
-    const party = await this.getPartyFromId({ partyId: args.partyId });
-    if (party && party.leaderEmail === args.email) {
-      this.openPartiesIdList.push(party.id);
+    const party = await this._getOwnedParty({ userEmail: args.email, partyId: args.partyId });
+    if (party) {
+      const alreadyOpen = this._isPartyOpen({ partyId: party.id });
+      if (!alreadyOpen) {
+        this.openPartiesIdList.push(party.id);
+      }
+      this._notifyPartyWithStatus({ partyId: args.partyId });
+
+      return true;
     }
+    return false;
+  }
+
+  async closeParty(args: { email: string; partyId: number }) {
+    const party = await this._getOwnedParty({ userEmail: args.email, partyId: args.partyId });
+    if (party) {
+      utils.removeElementFromList({ list: this.openPartiesIdList, element: party.id });
+      this._notifyPartyWithStatus({ partyId: args.partyId });
+      return true;
+    }
+    return false;
   }
 
   async create(args: { email: string }) {
@@ -50,6 +69,7 @@ export class PartyService {
       this._notifyUserWithNoParty(args);
       return false;
     }
+    this._notifyPartyMemberWithStatus({ memberEmail: args.email, partyId: args.partyId });
     return true;
   }
 
@@ -103,6 +123,35 @@ export class PartyService {
       ownedParty.members.forEach((member) => this._notifyUserWithNoParty({ email: member.email }));
       return true;
     }
+    return false;
+  }
+  async sendPartyChatMessage(args: { partyId: number; message: string }) {
+    await this._pushMessageToPartyChat(args);
+    return true;
+  }
+
+  async getAllOpenParties() {
+    const openParties: FullParty[] = [];
+    for await (const partyId of this.openPartiesIdList) {
+      const party = await this.getPartyFromId({ partyId });
+      openParties.push(party);
+    }
+    return openParties;
+  }
+
+  private async _pushMessageToPartyChat(args: { partyId: number; message: string }) {
+    let chat = this.partyChat[args.partyId];
+    if (!chat) {
+      this.partyChat[args.partyId] = [];
+      chat = this.partyChat[args.partyId];
+    }
+    chat.push(args.message);
+    this._notifyPartyWithStatus({ partyId: args.partyId });
+  }
+
+  private _isPartyOpen(args: { partyId: number }) {
+    const alreadyOpen = this.openPartiesIdList.find((partyId) => partyId === args.partyId);
+    if (alreadyOpen) return true;
     return false;
   }
 
@@ -206,6 +255,26 @@ export class PartyService {
     this._notifyUserWithNoParty({ email: args.email });
     this._notifyPartyLeftMember({ partyId: leftUser.partyId, leftPlayerName: leftUser.name });
     this._notifyPartyWithData({ partyId: leftUser.partyId });
+  }
+
+  private async _notifyPartyWithStatus(args: { partyId?: number }) {
+    const party = await this.getPartyFromId({ partyId: args.partyId });
+    if (!party) return false;
+
+    party.members.forEach((member) => {
+      this._notifyPartyMemberWithStatus({ memberEmail: member.email, partyId: args.partyId });
+    });
+  }
+  private async _notifyPartyMemberWithStatus(args: { partyId?: number; memberEmail: string }): Promise<boolean> {
+    const chat = this.partyChat[args.partyId];
+    const isPartyOpen = this._isPartyOpen({ partyId: args.partyId });
+    this.websocket.sendMessageToSocket({
+      email: args.memberEmail,
+      event: 'party_status',
+      payload: { chat, isPartyOpen },
+    });
+
+    return true;
   }
 
   private async _addUserToParty(args: { partyId: number; email?: string }) {

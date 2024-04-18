@@ -7,7 +7,18 @@ declare type InviteToPartyDto = {
   invitedEmail: string;
 };
 
+declare type SendPartyChatMessage = {
+  partyId: number;
+  message: string;
+};
+
 declare type GetPartyDto = {
+  partyId: number;
+};
+declare type OpenPartyDto = {
+  partyId: number;
+};
+declare type ClosePartyDto = {
   partyId: number;
 };
 declare type JoinPartyDto = {
