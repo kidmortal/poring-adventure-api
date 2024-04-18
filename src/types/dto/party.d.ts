@@ -13,6 +13,10 @@ declare type GetPartyDto = {
 declare type JoinPartyDto = {
   partyId: number;
 };
+declare type RemovePartyDto = {
+  partyId: number;
+};
+
 declare type QuitPartyDto = {
   partyId: number;
 };

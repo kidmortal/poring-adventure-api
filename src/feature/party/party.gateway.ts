@@ -19,10 +19,10 @@ export class PartyGateway {
     return this.partyService.create({ email });
   }
   @SubscribeMessage('remove_party')
-  remove(@ConnectedSocket() client: Socket) {
+  remove(@MessageBody() dto: QuitPartyDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('remove_party');
-    return this.partyService.remove({ email });
+    return this.partyService.remove({ userEmail: email, partyId: dto.partyId });
   }
 
   @SubscribeMessage('get_party')

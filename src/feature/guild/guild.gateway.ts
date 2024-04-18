@@ -77,7 +77,7 @@ export class GuildGateway {
   }
 
   @SubscribeMessage('cancel_guild_task')
-  cancelGuildTask(@MessageBody() taskId: number, @ConnectedSocket() client: Socket) {
+  cancelGuildTask(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('cancel_guild_task');
     return this.guildService.cancelCurrentTask({ userEmail: email });
