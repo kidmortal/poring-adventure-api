@@ -270,8 +270,20 @@ model Guild {
   publicMessage     String             @default("Lets have fun")
   internalMessage   String             @default("Lets have fun")
   members           GuildMember[]
-  currentGuildTask  CurrentGuildTask?
   guildApplications GuildApplication[]
+  currentGuildTask  CurrentGuildTask?
+  GuildBlessing     GuildBlessing?
+}
+
+model GuildBlessing {
+  id      Int   @id @default(autoincrement())
+  guild   Guild @relation(fields: [guildId], references: [id])
+  guildId Int   @unique
+  health  Int   @default(5)
+  mana    Int   @default(5)
+  str     Int   @default(1)
+  int     Int   @default(1)
+  agi     Int   @default(1)
 }
 
 model CurrentGuildTask {

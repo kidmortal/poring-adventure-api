@@ -8,6 +8,7 @@ import { TransactionContext } from 'src/core/prisma/types/prisma';
 import { Prisma } from '@prisma/client';
 import { NotificationService } from 'src/services/notification/notification.service';
 import { UsersService } from 'src/feature/users/users.service';
+import { utils } from 'src/utilities/utils';
 
 type GuildWithMembers = Prisma.GuildGetPayload<{
   include: {
@@ -46,10 +47,7 @@ export class GuildService {
       });
       const task = currentTask.task;
       if (currentTask.remainingKills <= 0) {
-        await tx.guild.update({
-          where: { id: currentTask.guildId },
-          data: { taskPoints: { increment: task.taskPoints } },
-        });
+        await this._addTaskPointsToGuild({ guildId: currentTask.guildId, amount: task.taskPoints, tx });
         await tx.currentGuildTask.delete({
           where: { guildId: currentTask.guildId },
         });
@@ -141,10 +139,7 @@ export class GuildService {
     });
     return true;
   }
-  async acceptGuildApplication(args: {
-    userEmail: string;
-    applicationId: number;
-  }) {
+  async acceptGuildApplication(args: { userEmail: string; applicationId: number }) {
     const requiredPermissionLevel = 1;
     const guildMember = await this._getUserGuildMember(args);
     if (guildMember.permissionLevel < requiredPermissionLevel) {
@@ -193,10 +188,7 @@ export class GuildService {
     return true;
   }
 
-  async refuseGuildApplication(args: {
-    userEmail: string;
-    applicationId: number;
-  }) {
+  async refuseGuildApplication(args: { userEmail: string; applicationId: number }) {
     const requiredPermissionLevel = 1;
     const guildMember = await this._getUserGuildMember(args);
     if (guildMember.permissionLevel < requiredPermissionLevel) {
@@ -268,6 +260,8 @@ export class GuildService {
           remainingKills: newTask.killCount,
         },
       });
+      this._clearGuildCache({ guildId: guildMember.guildId });
+      this._notifyGuildWithUpdate({ guildId: guildMember.guildId });
       return true;
     }
     return false;
@@ -304,12 +298,7 @@ export class GuildService {
     return this._notifyUserWithGuild(args);
   }
 
-  async contributeToGuildTask(args: {
-    userEmail: string;
-    mapId: number;
-    amount: number;
-    tx?: TransactionContext;
-  }) {
+  async contributeToGuildTask(args: { userEmail: string; mapId: number; amount: number; tx?: TransactionContext }) {
     const tx = args.tx ?? this.prisma;
     const member = await this._getUserGuildMember({
       userEmail: args.userEmail,
@@ -334,6 +323,46 @@ export class GuildService {
     }
   }
 
+  private async _addTaskPointsToGuild(args: { guildId: number; amount: number; tx?: TransactionContext }) {
+    const tx = args.tx || this.prisma;
+
+    const guild = await tx.guild.findUnique({ where: { id: args.guildId } });
+
+    const currentExp = guild.experience;
+    const finalExp = currentExp + args.amount;
+    const currentLevel = guild.level;
+    const correctLevel = utils.getLevelFromExp(finalExp);
+    if (correctLevel > currentLevel) {
+      const levelDiff = correctLevel - currentLevel;
+      await tx.guild.update({
+        where: { id: args.guildId },
+        data: {
+          taskPoints: { increment: args.amount },
+          experience: { increment: args.amount },
+          level: { increment: levelDiff },
+        },
+      });
+      return true;
+    }
+    if (currentLevel > correctLevel) {
+      const levelDiff = currentLevel - correctLevel;
+      await tx.guild.update({
+        where: { id: args.guildId },
+        data: {
+          taskPoints: { increment: args.amount },
+          experience: { increment: args.amount },
+          level: { decrement: levelDiff },
+        },
+      });
+      return true;
+    }
+    await tx.guild.update({
+      where: { id: args.guildId },
+      data: { experience: { increment: args.amount }, taskPoints: { increment: args.amount } },
+    });
+    return true;
+  }
+
   private async _contributeToGuildTask(args: {
     taskId: number;
     amount: number;
@@ -354,10 +383,7 @@ export class GuildService {
     });
   }
 
-  private async _getGuildCurrentTask(args: {
-    guildId: number;
-    tx?: TransactionContext;
-  }) {
+  private async _getGuildCurrentTask(args: { guildId: number; tx?: TransactionContext }) {
     const tx = args.tx ?? this.prisma;
     const task = await tx.currentGuildTask.findUnique({
       where: { guildId: args.guildId },
@@ -366,10 +392,7 @@ export class GuildService {
     return task;
   }
 
-  private async _getUserGuildMember(args: {
-    userEmail: string;
-    tx?: TransactionContext;
-  }) {
+  private async _getUserGuildMember(args: { userEmail: string; tx?: TransactionContext }) {
     const tx = args.tx ?? this.prisma;
     return tx.guildMember.findUnique({
       where: { userEmail: args.userEmail },
@@ -399,9 +422,7 @@ export class GuildService {
     });
   }
 
-  private async _getGuild(args: {
-    guildId: number;
-  }): Promise<GuildWithMembers> {
+  private async _getGuild(args: { guildId: number }): Promise<GuildWithMembers> {
     const cacheKey = `guild_id_${args.guildId}`;
     const cachedGuild = await this.cache.get(cacheKey);
     if (cachedGuild) return cachedGuild as any;
@@ -456,11 +477,7 @@ export class GuildService {
     }
   }
 
-  private async _distributeTokensToGuild(args: {
-    guildId: number;
-    amount: number;
-    tx: TransactionContext;
-  }) {
+  private async _distributeTokensToGuild(args: { guildId: number; amount: number; tx: TransactionContext }) {
     const tx = args.tx ?? this.prisma;
     const guild = await this._getGuild(args);
     if (guild) {

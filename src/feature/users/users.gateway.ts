@@ -1,12 +1,14 @@
 import { WebSocketGateway, SubscribeMessage, ConnectedSocket, MessageBody } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 
-import { Logger, UseFilters } from '@nestjs/common';
+import { Logger, UseFilters, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 
 import { CreateUserDto } from './dto/create-user.dto';
 import { WebsocketExceptionsFilter } from 'src/core/websocket/websocketException.filter';
+import { WebsocketAuthEmailGuard } from 'src/core/websocket/websocket.guard';
 
+@UseGuards(WebsocketAuthEmailGuard)
 @UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway({ cors: true })
 export class UsersGateway {
@@ -17,8 +19,6 @@ export class UsersGateway {
   async findOne(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug(`'get_user' ${email}`);
-    if (!email) return false;
-
     return this.userService.findOne({ userEmail: email });
   }
 
@@ -32,7 +32,6 @@ export class UsersGateway {
   @SubscribeMessage('create_user')
   async create(@MessageBody() createUserDto: CreateUserDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
-    if (!email) return false;
     this.logger.debug('create_user');
     return this.userService.create({ ...createUserDto, email: email });
   }
@@ -40,7 +39,6 @@ export class UsersGateway {
   @SubscribeMessage('update_user_name')
   async updateName(@MessageBody() newName: string, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
-    if (!email) return false;
     this.logger.debug('update_user_name');
     return this.userService.updateUserName({ email: email, newName });
   }
@@ -48,7 +46,6 @@ export class UsersGateway {
   @SubscribeMessage('delete_user')
   async remove(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
-    if (!email) return false;
     this.logger.debug('delete_user');
     return this.userService.deleteUser(email);
   }

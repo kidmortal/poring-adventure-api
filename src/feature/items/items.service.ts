@@ -16,11 +16,7 @@ export class ItemsService {
     return this.prisma.item.create({ data: createItemDto });
   }
 
-  async consumeItem(args: {
-    userEmail: string;
-    itemId: number;
-    stack: number;
-  }) {
+  async consumeItem(args: { userEmail: string; itemId: number; stack: number }) {
     await this.prisma.$transaction(async (tx) => {
       const inventoryItem = await this._getOneInventoryItem({ ...args, tx });
       if (inventoryItem) {
@@ -48,12 +44,7 @@ export class ItemsService {
     return false;
   }
 
-  async addItemToUser(args: {
-    userEmail: string;
-    itemId: number;
-    stack: number;
-    tx?: TransactionContext;
-  }) {
+  async addItemToUser(args: { userEmail: string; itemId: number; stack: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     const userHasItem = await this._userHasItem(args);
 
@@ -84,9 +75,7 @@ export class ItemsService {
       });
       return createNewItem;
     } catch (error) {
-      throw new BadRequestException(
-        'Either the user or the item does not exist',
-      );
+      throw new BadRequestException('Either the user or the item does not exist');
     }
   }
 
@@ -209,10 +198,7 @@ export class ItemsService {
       return updateAmount;
     }
 
-    throw new BadRequestException(
-      `There was an error processing this`,
-      `args: ${JSON.stringify(args)}`,
-    );
+    throw new BadRequestException(`There was an error processing this`, `args: ${JSON.stringify(args)}`);
   }
 
   private async _swapEquippedItem(args: {
@@ -288,11 +274,7 @@ export class ItemsService {
     });
   }
 
-  private async _userHasItem(args: {
-    userEmail: string;
-    itemId: number;
-    tx?: TransactionContext;
-  }) {
+  private async _userHasItem(args: { userEmail: string; itemId: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
 
     return tx.inventoryItem.findUnique({
@@ -305,11 +287,7 @@ export class ItemsService {
     });
   }
 
-  private async _getOneInventoryItem(args: {
-    userEmail: string;
-    itemId: number;
-    tx?: TransactionContext;
-  }) {
+  private async _getOneInventoryItem(args: { userEmail: string; itemId: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     return tx.inventoryItem.findUnique({
       where: {
@@ -322,11 +300,7 @@ export class ItemsService {
     });
   }
 
-  private async _getOneEquippedItem(args: {
-    userEmail: string;
-    itemId: number;
-    tx?: TransactionContext;
-  }) {
+  private async _getOneEquippedItem(args: { userEmail: string; itemId: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
 
     return tx.equippedItem.findUnique({
@@ -342,10 +316,7 @@ export class ItemsService {
     });
   }
 
-  private async _getAllEquippedItems(args: {
-    userEmail: string;
-    tx?: TransactionContext;
-  }) {
+  private async _getAllEquippedItems(args: { userEmail: string; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
 
     return tx.equippedItem.findMany({
@@ -354,11 +325,7 @@ export class ItemsService {
     });
   }
 
-  private async _unequipItem(args: {
-    item: Item;
-    userEmail: string;
-    tx?: TransactionContext;
-  }) {
+  private async _unequipItem(args: { item: Item; userEmail: string; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     await this._removeEquipmentFromUser({
       userEmail: args.userEmail,
@@ -374,11 +341,7 @@ export class ItemsService {
     });
   }
 
-  private async _equipItem(args: {
-    item: Item;
-    userEmail: string;
-    tx?: TransactionContext;
-  }) {
+  private async _equipItem(args: { item: Item; userEmail: string; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     await this._addEquipmentToUser({
       userEmail: args.userEmail,

@@ -1,11 +1,13 @@
 import { WebSocketGateway, SubscribeMessage, MessageBody, ConnectedSocket } from '@nestjs/websockets';
 
-import { Logger, UseFilters } from '@nestjs/common';
+import { Logger, UseFilters, UseGuards } from '@nestjs/common';
 import { Socket } from 'socket.io';
 import { WebsocketExceptionsFilter } from 'src/core/websocket/websocketException.filter';
 import { DiscordService } from './discord.service';
 import { RegisterDiscordProfilePayload } from './dto/register';
+import { WebsocketAuthEmailGuard } from 'src/core/websocket/websocket.guard';
 
+@UseGuards(WebsocketAuthEmailGuard)
 @UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway({ cors: true })
 export class DiscordGateway {
@@ -16,7 +18,6 @@ export class DiscordGateway {
   async createToken(@ConnectedSocket() client: Socket) {
     this.logger.debug(`create_discord_register_token`);
     const email = client.handshake.auth.email;
-    if (!email) return false;
     const token = this.discordService.createRegisterToken({ userEmail: email });
     return token;
   }
@@ -33,7 +34,6 @@ export class DiscordGateway {
   async discordIntegration(@ConnectedSocket() client: Socket) {
     this.logger.debug(`get_profile`);
     const email = client.handshake.auth.email;
-    if (!email) return false;
     const user = await this.discordService.discordProfile({ userEmail: email });
     return user;
   }
