@@ -48,11 +48,6 @@ export class AdminGateway {
   async killUser(@MessageBody() killEmail: string, @ConnectedSocket() client: Socket) {
     this.logger.debug('kill_user');
     const email = client.handshake.auth.email;
-    if (!email) return false;
-    const isAdmin = await this.userService.isAdmin(email);
-    if (!isAdmin) {
-      return this.websocket.breakUserConnection(email);
-    }
     return this.adminService.killUser({ userEmail: email, killEmail });
   }
 

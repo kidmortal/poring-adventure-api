@@ -49,9 +49,7 @@ export class BattleService {
         userEmail: args.userEmail,
       });
       if (userData.partyId) {
-        const fullPartyInfo = await this.partyService.getFullParty(
-          userData.email,
-        );
+        const fullPartyInfo = await this.partyService.getPartyFromId({ partyId: userData.partyId });
         const partyMembers = fullPartyInfo.members;
         users = partyMembers;
       } else {
@@ -79,10 +77,8 @@ export class BattleService {
   }
 
   async finishBattle(args: { userEmail: string }) {
-    console.log('get beto');
     const battle = this.getUserBattle(args.userEmail);
     if (battle) {
-      console.log('finish');
       battle.removeBattle();
       battle.notifyBattleRemoved();
       return true;
@@ -91,9 +87,7 @@ export class BattleService {
   }
 
   private async _remove(userEmail: string) {
-    const battleIndex = this.battleList.findIndex((battle) =>
-      battle.hasUser(userEmail),
-    );
+    const battleIndex = this.battleList.findIndex((battle) => battle.hasUser(userEmail));
 
     if (battleIndex >= 0) {
       const removedBattle = this.battleList.splice(battleIndex, 1);
@@ -124,12 +118,7 @@ export class BattleService {
   private async updateStatsAndRewards(battle: BattleInstance) {
     this.logger.log('Battle finished, giving rewards');
     this.logger.log(JSON.stringify(battle.droppedItems));
-    for await (const {
-      userEmail,
-      silver,
-      dropedItems,
-      exp,
-    } of battle.droppedItems) {
+    for await (const { userEmail, silver, dropedItems, exp } of battle.droppedItems) {
       const monsterCount = battle.monsterCount;
       const mapId = battle.monstersMapId;
       const rewardUser = battle.getUserFromBattle(userEmail);

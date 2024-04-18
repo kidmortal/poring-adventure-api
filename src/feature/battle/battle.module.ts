@@ -9,14 +9,7 @@ import { PartyModule } from 'src/feature/party/party.module';
 import { GuildModule } from 'src/feature/guild/guild.module';
 
 @Module({
-  imports: [
-    UsersModule,
-    MonstersModule,
-    ItemsModule,
-    WebsocketModule,
-    PartyModule,
-    GuildModule,
-  ],
+  imports: [UsersModule, MonstersModule, ItemsModule, WebsocketModule, PartyModule, GuildModule],
   providers: [BattleGateway, BattleService],
 })
 export class BattleModule {}

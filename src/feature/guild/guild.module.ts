@@ -7,12 +7,7 @@ import { NotificationModule } from 'src/services/notification/notification.modul
 import { UsersModule } from 'src/feature/users/users.module';
 
 @Module({
-  imports: [
-    WebsocketModule,
-    NotificationModule,
-    UsersModule,
-    CacheModule.register({ ttl: 1000 * 60 * 10 }),
-  ], // 10 minutes cache
+  imports: [WebsocketModule, NotificationModule, UsersModule, CacheModule.register({ ttl: 1000 * 60 * 10 })], // 10 minutes cache
   providers: [GuildGateway, GuildService],
   exports: [GuildService],
 })

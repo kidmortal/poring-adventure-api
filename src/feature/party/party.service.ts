@@ -1,35 +1,51 @@
-import { Injectable } from '@nestjs/common';
-import { Party } from '@prisma/client';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { Inject, Injectable } from '@nestjs/common';
+import { Party, Prisma } from '@prisma/client';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 
+type FullParty = Prisma.PartyGetPayload<{
+  include: {
+    members: {
+      include: {
+        stats: true;
+        appearance: true;
+        profession: true;
+        learnedSkills: { include: { skill: true } };
+        buffs: { include: { buff: true } };
+      };
+    };
+  };
+}>;
+
 @Injectable()
 export class PartyService {
+  private openPartiesIdList: number[] = [];
   constructor(
     private readonly websocket: WebsocketService,
     private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
+
+  async openParty(args: { email: string; partyId: number }) {
+    const party = await this.getPartyFromId({ partyId: args.partyId });
+    if (party && party.leaderEmail === args.email) {
+      this.openPartiesIdList.push(party.id);
+    }
+  }
 
   async create(args: { email: string }) {
     const _userHasParty = await this._userHasParty({ email: args.email });
     if (_userHasParty) return false;
-
-    try {
-      await this.prisma.party.create({
-        data: {
-          leaderEmail: args.email,
-          members: { connect: { email: args.email } },
-        },
-      });
-      this._notifyPartyWithData(args);
-      return true;
-    } catch (error) {
-      return false;
-    }
+    const newParty = await this.prisma.party.create({
+      data: { leaderEmail: args.email, members: { connect: { email: args.email } } },
+    });
+    this._notifyPartyWithData({ partyId: newParty.id });
   }
 
-  async findOne(args: { email: string }) {
-    const party = await this._notifyPartyWithData(args);
+  async findOne(args: { partyId: number; email: string }) {
+    const party = await this._notifyPartyMemberWithData({ partyId: args.partyId, memberEmail: args.email });
     if (!party) {
       this._notifyUserWithNoParty(args);
       return false;
@@ -37,29 +53,16 @@ export class PartyService {
     return true;
   }
 
-  async invite(args: { leaderEmail: string; invitedEmail: string }) {
-    const ownedParty = await this.prisma.party.findUnique({
-      where: {
-        leaderEmail: args.leaderEmail,
-      },
-      include: {
-        members: true,
-      },
-    });
+  async invite(args: { partyId: number; userEmail: string; invitedEmail: string }) {
+    const ownedParty = await this._getOwnedParty({ partyId: args.partyId, userEmail: args.userEmail });
     if (ownedParty && ownedParty.members.length < 4) {
-      this._sendPartyInviteNotification({
-        email: args.invitedEmail,
-        party: ownedParty,
-      });
-      this.websocket.sendTextNotification({
-        email: args.leaderEmail,
-        text: 'Invited to group.',
-      });
+      this._sendPartyInviteNotification({ email: args.invitedEmail, party: ownedParty });
+      this.websocket.sendTextNotification({ email: args.userEmail, text: 'Invited to group.' });
       return true;
     }
 
     this.websocket.sendErrorNotification({
-      email: args.leaderEmail,
+      email: args.userEmail,
       text: 'You must create a party before sending an invitation.',
     });
 
@@ -67,59 +70,27 @@ export class PartyService {
   }
 
   async joinParty(args: { email: string; partyId: number }) {
-    const joiningParty = await this._getPartyFromId({ partyId: args.partyId });
+    const joiningParty = await this.getPartyFromId({ partyId: args.partyId });
     if (joiningParty && joiningParty.members.length < 4) {
-      try {
-        const result = await this.prisma.user.update({
-          where: { email: args.email },
-          data: { partyId: args.partyId },
-        });
-        if (result) {
-          this._notifyPartyJoinMember({
-            email: args.email,
-            joinedPlayerName: result.name,
-          });
-          this._notifyPartyWithData({ email: args.email });
-          return true;
-        }
-      } catch (error) {
-        return false;
-      }
+      await this._addUserToParty({ partyId: joiningParty.id, email: args.email });
     }
     return false;
   }
 
-  async quitParty(args: { email: string; partyId }) {
-    const result = await this.prisma.user.update({
-      where: { email: args.email },
-      data: { partyId: undefined },
-    });
-    const remainingParty = await this.prisma.party.findUnique({
-      where: { id: args.partyId },
-    });
-    if (result) {
-      this._notifyPartyLeftMember({
-        email: remainingParty.leaderEmail,
-        leftPlayerName: result.name,
-      });
-      this._notifyUserWithNoParty({ email: args.email });
-      return true;
+  async quitParty(args: { email: string; partyId: number }) {
+    const party = await this.getPartyFromId({ partyId: args.partyId });
+    if (party) {
+      await this._removeUserFromParty({ email: args.email });
     }
   }
 
-  async kick(args: { leaderEmail: string; kickedEmail: string }) {
-    const ownedParty = await this.prisma.party.findUnique({
-      where: {
-        leaderEmail: args.leaderEmail,
-      },
-    });
+  async kick(args: { partyId: number; userEmail: string; kickedEmail: string }) {
+    const ownedParty = await this.getPartyFromId({ partyId: args.partyId });
     if (ownedParty) {
-      await this.prisma.user.update({
-        where: { email: args.kickedEmail },
-        data: { partyId: null },
-      });
-      this._notifyPartyWithData({ email: args.leaderEmail });
-      this._notifyUserWithNoParty({ email: args.kickedEmail });
+      if (ownedParty.leaderEmail !== args.userEmail) {
+        return false;
+      }
+      await this._removeUserFromParty({ email: args.kickedEmail });
       return true;
     }
     return false;
@@ -127,49 +98,28 @@ export class PartyService {
 
   async remove(args: { email: string }) {
     const ownedParty = await this.prisma.party.findUnique({
-      where: {
-        leaderEmail: args.email,
-      },
-      include: {
-        members: true,
-      },
+      where: { leaderEmail: args.email },
+      include: { members: true },
     });
     if (ownedParty) {
       await this.prisma.party.delete({
-        where: {
-          leaderEmail: args.email,
-        },
+        where: { leaderEmail: args.email },
       });
-      ownedParty.members.forEach((member) =>
-        this._notifyUserWithNoParty({ email: member.email }),
-      );
+      ownedParty.members.forEach((member) => this._notifyUserWithNoParty({ email: member.email }));
       return true;
     }
     return false;
   }
 
-  async getFullParty(leaderEmail: string) {
-    return this.prisma.party.findUnique({
-      where: {
-        leaderEmail: leaderEmail,
-      },
-      include: {
-        members: {
-          include: {
-            appearance: true,
-            stats: true,
-            buffs: { include: { buff: true } },
-            learnedSkills: { include: { skill: { include: { buff: true } } } },
-          },
-        },
-      },
-    });
+  private async _getOwnedParty(args: { userEmail: string; partyId: number }) {
+    const party = await this.getPartyFromId({ partyId: args.partyId });
+    if (party && party.leaderEmail === args.userEmail) {
+      return party;
+    }
+    return false;
   }
 
-  private async _sendPartyInviteNotification(args: {
-    party: Party;
-    email: string;
-  }): Promise<boolean> {
+  private async _sendPartyInviteNotification(args: { party: Party; email: string }): Promise<boolean> {
     if (args.party) {
       this.websocket.sendMessageToSocket({
         email: args.email,
@@ -181,9 +131,7 @@ export class PartyService {
     return false;
   }
 
-  private async _notifyUserWithNoParty(args: {
-    email: string;
-  }): Promise<boolean> {
+  private async _notifyUserWithNoParty(args: { email: string }): Promise<boolean> {
     this.websocket.sendMessageToSocket({
       email: args.email,
       event: 'party_data',
@@ -192,10 +140,21 @@ export class PartyService {
     return true;
   }
 
-  private async _notifyPartyWithData(args: {
-    email: string;
-  }): Promise<boolean> {
-    const party = await this._getUserParty(args);
+  private async _notifyPartyMemberWithData(args: { partyId?: number; memberEmail: string }): Promise<boolean> {
+    const party = await this.getPartyFromId(args);
+    if (party) {
+      this.websocket.sendMessageToSocket({
+        email: args.memberEmail,
+        event: 'party_data',
+        payload: party,
+      });
+      return true;
+    }
+    return false;
+  }
+
+  private async _notifyPartyWithData(args: { partyId?: number }): Promise<boolean> {
+    const party = await this.getPartyFromId(args);
     if (party) {
       party.members.forEach((member) => {
         this.websocket.sendMessageToSocket({
@@ -208,11 +167,8 @@ export class PartyService {
     }
     return false;
   }
-  private async _notifyPartyJoinMember(args: {
-    email: string;
-    joinedPlayerName: string;
-  }): Promise<boolean> {
-    const party = await this._getUserParty(args);
+  private async _notifyPartyJoinMember(args: { partyId?: number; joinedPlayerName: string }): Promise<boolean> {
+    const party = await this.getPartyFromId(args);
     if (party) {
       party.members.forEach((member) => {
         this.websocket.sendMessageToSocket({
@@ -226,11 +182,8 @@ export class PartyService {
     return false;
   }
 
-  private async _notifyPartyLeftMember(args: {
-    email: string;
-    leftPlayerName: string;
-  }): Promise<boolean> {
-    const party = await this._getUserParty(args);
+  private async _notifyPartyLeftMember(args: { partyId?: number; leftPlayerName: string }): Promise<boolean> {
+    const party = await this.getPartyFromId(args);
     if (party) {
       party.members.forEach((member) => {
         this.websocket.sendMessageToSocket({
@@ -246,19 +199,32 @@ export class PartyService {
 
   private async _userHasParty(args: { email?: string }): Promise<boolean> {
     if (!args.email) return false;
-    const userParty = await this.prisma.party.findFirst({
-      where: { members: { some: { email: args.email } } },
-    });
+    const userParty = await this.prisma.party.findFirst({ where: { members: { some: { email: args.email } } } });
     if (userParty) {
       return true;
     }
     return false;
   }
 
-  private async _getUserParty(args: { email?: string }) {
-    if (!args.email) return undefined;
-    const userParty = await this.prisma.party.findFirst({
-      where: { members: { some: { email: args.email } } },
+  private async _removeUserFromParty(args: { email?: string }) {
+    const leftUser = await this.prisma.user.update({ where: { email: args.email }, data: { partyId: null } });
+    this._notifyUserWithNoParty({ email: args.email });
+    this._notifyPartyLeftMember({ partyId: leftUser.partyId, leftPlayerName: leftUser.name });
+    this._notifyPartyWithData({ partyId: leftUser.partyId });
+  }
+
+  private async _addUserToParty(args: { partyId: number; email?: string }) {
+    const joinedUser = await this.prisma.user.update({ where: { email: args.email }, data: { partyId: args.partyId } });
+    this._notifyPartyJoinMember({ partyId: joinedUser.partyId, joinedPlayerName: joinedUser.name });
+    this._notifyPartyWithData({ partyId: joinedUser.partyId });
+  }
+
+  async getPartyFromId(args: { partyId?: number }): Promise<FullParty> {
+    const cacheKey = `party_id_${args.partyId}`;
+    const cachedParty = await this.cache.get(cacheKey);
+    if (cachedParty) return cachedParty as FullParty;
+    const party = await this.prisma.party.findFirst({
+      where: { id: args.partyId },
       include: {
         members: {
           include: {
@@ -266,20 +232,12 @@ export class PartyService {
             appearance: true,
             profession: true,
             learnedSkills: { include: { skill: true } },
+            buffs: { include: { buff: true } },
           },
         },
       },
     });
-    if (userParty) {
-      return userParty;
-    }
-    return undefined;
-  }
-
-  private async _getPartyFromId(args: { partyId?: number }) {
-    return this.prisma.party.findUnique({
-      where: { id: args.partyId },
-      include: { members: true },
-    });
+    await this.cache.set(cacheKey, party);
+    return party;
   }
 }

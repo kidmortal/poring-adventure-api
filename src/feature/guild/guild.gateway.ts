@@ -7,8 +7,8 @@ import { WebsocketExceptionsFilter } from 'src/core/websocket/websocketException
 import { WebsocketAuthEmailGuard } from 'src/core/websocket/websocket.guard';
 
 @UseGuards(WebsocketAuthEmailGuard)
-@WebSocketGateway()
 @UseFilters(WebsocketExceptionsFilter)
+@WebSocketGateway()
 export class GuildGateway {
   constructor(private readonly guildService: GuildService) {}
   private logger = new Logger('Websocket - guilds');
