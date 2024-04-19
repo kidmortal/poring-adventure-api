@@ -11,5 +11,6 @@ import { GuildModule } from 'src/feature/guild/guild.module';
 @Module({
   imports: [UsersModule, MonstersModule, ItemsModule, WebsocketModule, PartyModule, GuildModule],
   providers: [BattleGateway, BattleService],
+  exports: [BattleService],
 })
 export class BattleModule {}

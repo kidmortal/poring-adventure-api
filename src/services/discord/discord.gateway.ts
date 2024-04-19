@@ -4,7 +4,6 @@ import { Logger, UseFilters, UseGuards } from '@nestjs/common';
 import { Socket } from 'socket.io';
 import { WebsocketExceptionsFilter } from 'src/core/websocket/websocketException.filter';
 import { DiscordService } from './discord.service';
-import { RegisterDiscordProfilePayload } from './dto/register';
 import { WebsocketAuthEmailGuard } from 'src/core/websocket/websocket.guard';
 
 @UseGuards(WebsocketAuthEmailGuard)
@@ -23,10 +22,10 @@ export class DiscordGateway {
   }
 
   @SubscribeMessage('register_discord_profile')
-  async registerDiscord(@MessageBody() args: RegisterDiscordProfilePayload) {
-    this.logger.debug(`'register_discord_profile' ${args?.id}`);
-    if (!args?.id) return false;
-    const user = await this.discordService.register(args);
+  async registerDiscord(@MessageBody() dto: RegisterDiscordProfileDto) {
+    this.logger.debug(`'register_discord_profile' ${dto?.id}`);
+    if (!dto?.id) return false;
+    const user = await this.discordService.register(dto);
     return user;
   }
 
@@ -34,16 +33,22 @@ export class DiscordGateway {
   async discordIntegration(@ConnectedSocket() client: Socket) {
     this.logger.debug(`get_profile`);
     const email = client.handshake.auth.email;
-    const user = await this.discordService.discordProfile({ userEmail: email });
+    const user = await this.discordService.getdiscordProfileFromEmail({ userEmail: email });
     return user;
   }
 
-  @SubscribeMessage('get_discord_user')
-  async findOne(@MessageBody() discordId: string) {
-    this.logger.debug(`'get_discord_user' ${discordId}`);
-    if (!discordId) return false;
+  @SubscribeMessage('get_discord_battle')
+  async getDiscordBattle(@MessageBody() dto: GetDiscordBattleDto) {
+    this.logger.debug(`get_discord_battle`);
+    return this.discordService.getBattle({ discordId: dto.discordId });
+  }
 
-    const user = await this.discordService.findOne({ discordId });
+  @SubscribeMessage('get_discord_user')
+  async findOne(@MessageBody() dto: GetDiscordUserDto) {
+    this.logger.debug(`'get_discord_user' ${dto.discordId}`);
+    if (!dto.discordId) return false;
+
+    const user = await this.discordService.findOne({ discordId: dto.discordId });
     return user;
   }
 

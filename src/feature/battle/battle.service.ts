@@ -159,7 +159,7 @@ export class BattleService {
     }
   }
 
-  private getUserBattle(userEmail: string): BattleInstance | undefined {
+  getUserBattle(userEmail: string): BattleInstance | undefined {
     let userBattle = undefined;
     if (!userEmail) return userBattle;
     this.battleList.forEach((onGoingBattle) => {

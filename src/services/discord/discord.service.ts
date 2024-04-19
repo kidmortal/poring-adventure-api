@@ -1,11 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/core/prisma/prisma.service';
-import { RegisterDiscordProfilePayload } from './dto/register';
 import { randomUUID } from 'crypto';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { BattleService } from 'src/feature/battle/battle.service';
+import { Discord as DiscordUser } from '@prisma/client';
 
 @Injectable()
 export class DiscordService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly battleService: BattleService,
+    @Inject(CACHE_MANAGER) private cache: Cache,
+  ) {}
+  private cacheLogger = new Logger('Cache - Discord');
   private tokens: { [email: string]: string } = {};
 
   createRegisterToken(args: { userEmail: string }) {
@@ -26,7 +34,7 @@ export class DiscordService {
     });
   }
 
-  async register(args: RegisterDiscordProfilePayload) {
+  async register(args: RegisterDiscordProfileDto) {
     console.log(args);
     const hasToken = this._findTokenByToken({ token: args.token });
     if (!hasToken) {
@@ -49,8 +57,30 @@ export class DiscordService {
     });
   }
 
-  discordProfile(args: { userEmail: string }) {
+  getdiscordProfileFromEmail(args: { userEmail: string }) {
     return this.prisma.discord.findUnique({ where: { userEmail: args.userEmail } });
+  }
+
+  async getBattle(args: { discordId: string }) {
+    const user = await this._getDiscordProfileFromId({ discordId: args.discordId });
+    if (!user) return false;
+    const battle = this.battleService.getUserBattle(user.userEmail);
+    if (!battle) return false;
+    return battle.toJson();
+  }
+
+  private async _getDiscordProfileFromId(args: { discordId: string }): Promise<DiscordUser> {
+    const cacheKey = `discord_user_${args.discordId}`;
+    const cachedDiscordUser = await this.cache.get(cacheKey);
+    if (cachedDiscordUser) {
+      this.cacheLogger.log(`returning cached ${cacheKey}`);
+      return cachedDiscordUser as DiscordUser;
+    }
+    const discordUser = await this.prisma.discord.findUnique({
+      where: { discordId: args.discordId },
+    });
+    this.cache.set(cacheKey, discordUser);
+    return discordUser;
   }
 
   private _findTokenByToken(args: { token: string }) {
