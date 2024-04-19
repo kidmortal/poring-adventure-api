@@ -44,7 +44,7 @@ export class PartyGateway {
   }
 
   @SubscribeMessage('send_party_chat_message')
-  sendPartyChatMessage(@MessageBody() dto: SendPartyChatMessage) {
+  sendPartyChatMessage(@MessageBody() dto: SendPartyChatMessageDto) {
     this.logger.debug('send_party_chat_message');
     return this.partyService.sendPartyChatMessage({ partyId: dto.partyId, message: dto.message });
   }

@@ -7,7 +7,7 @@ declare type InviteToPartyDto = {
   invitedEmail: string;
 };
 
-declare type SendPartyChatMessage = {
+declare type SendPartyChatMessageDto = {
   partyId: number;
   message: string;
 };

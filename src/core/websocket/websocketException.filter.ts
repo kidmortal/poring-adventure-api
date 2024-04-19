@@ -13,10 +13,7 @@ export class WebsocketExceptionsFilter extends BaseWsExceptionFilter {
       const message = exception.message;
       Sentry.captureException(exception);
 
-      socket.emit(
-        'error_notification',
-        `Error on event ${lastArg} - message ${message}`,
-      );
+      socket.emit('error_notification', `Error on event ${lastArg} - message ${message}`);
     } catch (error) {}
   }
 }
