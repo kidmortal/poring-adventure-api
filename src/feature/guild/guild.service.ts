@@ -9,9 +9,11 @@ import { Prisma } from '@prisma/client';
 import { NotificationService } from 'src/services/notification/notification.service';
 import { UsersService } from 'src/feature/users/users.service';
 import { utils } from 'src/utilities/utils';
+import { ALLOWED_BLESSINGS, UPGRADE_FACTOR } from './constants';
 
 type GuildWithMembers = Prisma.GuildGetPayload<{
   include: {
+    blessing: true;
     currentGuildTask: { include: { task: { include: { target: true } } } };
     members: {
       include: { user: { include: { stats: true; appearance: true } } };
@@ -267,6 +269,94 @@ export class GuildService {
     return false;
   }
 
+  async unlockGuildBlessings(args: { userEmail: string; guildId: number }) {
+    const requiredPermissionLevel = 2;
+    const guildMember = await this._getUserGuildMember(args);
+    if (guildMember.permissionLevel < requiredPermissionLevel) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Your guild permission isnt high enough (need ${requiredPermissionLevel}, have ${guildMember.permissionLevel})`,
+      });
+      return false;
+    }
+    // verify is blessings are already unlocked
+    const guild = await this._getGuild({ guildId: args.guildId });
+    if (guild.blessing) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Blessings are already unlocked`,
+      });
+      return false;
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await this._decreaseGuildTokens({ guildId: args.guildId, amount: 100, tx });
+      await tx.guild.update({
+        where: { id: args.guildId },
+        data: { blessing: { create: {} } },
+      });
+      this._clearGuildCache({ guildId: args.guildId });
+      this._notifyGuildWithUpdate({ guildId: args.guildId });
+      this.websocket.sendTextNotification({
+        email: args.userEmail,
+        text: `Blessings unlocked`,
+      });
+    });
+    return true;
+  }
+
+  async upgradeGuildBlessing(args: { userEmail: string; guildId: number; blessing: string }) {
+    const requiredPermissionLevel = 2;
+    const guildMember = await this._getUserGuildMember(args);
+    //verify if blessing is allowed
+    if (!ALLOWED_BLESSINGS.includes(args.blessing)) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Blessing ${args.blessing} is not allowed`,
+      });
+      return false;
+    }
+
+    if (guildMember.permissionLevel < requiredPermissionLevel) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Your guild permission isnt high enough (need ${requiredPermissionLevel}, have ${guildMember.permissionLevel})`,
+      });
+      return false;
+    }
+    const guild = await this._getGuild({ guildId: args.guildId });
+    if (!guild.blessing) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Blessings are not unlocked`,
+      });
+      return false;
+    }
+    const cost = 100;
+    const incrementAmount = 1;
+    const upgradeFactor = UPGRADE_FACTOR[args.blessing];
+    const totalUpgrade = upgradeFactor * incrementAmount;
+    await this.prisma.$transaction(async (tx) => {
+      await this._decreaseGuildTokens({ guildId: args.guildId, amount: cost, tx });
+      await tx.guild.update({
+        where: { id: args.guildId },
+        data: { blessing: { update: { [args.blessing]: { increment: totalUpgrade } } } },
+      });
+      await this._increaseGuildMemberStats({
+        guildId: args.guildId,
+        amount: totalUpgrade,
+        stat: args.blessing,
+        tx,
+      });
+      this._clearGuildCache({ guildId: args.guildId });
+      this._notifyGuildWithUpdate({ guildId: args.guildId });
+      this.websocket.sendTextNotification({
+        email: args.userEmail,
+        text: `Blessing ${args.blessing} upgraded`,
+      });
+    });
+    return true;
+  }
+
   async findAllGuidTasks() {
     const cacheKey = `guild_tasks`;
     const cachedGuildTasks = await this.cache.get(cacheKey);
@@ -437,6 +527,7 @@ export class GuildService {
         guildApplications: {
           include: { user: { include: { appearance: true, stats: true } } },
         },
+        blessing: true,
       },
     });
     await this.cache.set(cacheKey, guild);
@@ -492,5 +583,54 @@ export class GuildService {
   private async _clearGuildCache(args: { guildId: number }) {
     const cacheKey = `guild_id_${args.guildId}`;
     this.cache.del(cacheKey);
+  }
+  private async _decreaseGuildTokens(args: { guildId: number; amount: number; tx?: TransactionContext }) {
+    const tx = args.tx ?? this.prisma;
+    // verify if has enough to decrement
+    const guild = await tx.guild.findUnique({
+      where: { id: args.guildId },
+    });
+    if (guild.taskPoints < args.amount) return false;
+    await tx.guild.update({
+      where: { id: args.guildId },
+      data: { taskPoints: { decrement: args.amount } },
+    });
+    return true;
+  }
+  private async _increaseGuildMemberStats(args: {
+    guildId: number;
+    amount: number;
+    stat: string;
+    tx?: TransactionContext;
+  }) {
+    const tx = args.tx ?? this.prisma;
+    const guild = await this._getGuild({ guildId: args.guildId });
+    if (guild) {
+      for await (const member of guild.members) {
+        await this.userService.increaseUserStats({
+          userEmail: member.userEmail,
+          [args.stat]: args.amount,
+          tx,
+        });
+      }
+    }
+  }
+  private async _decreaseGuildMemberStats(args: {
+    guildId: number;
+    amount: number;
+    stat: string;
+    tx?: TransactionContext;
+  }) {
+    const tx = args.tx ?? this.prisma;
+    const guild = await this._getGuild({ guildId: args.guildId });
+    if (guild) {
+      for await (const member of guild.members) {
+        await this.userService.decreaseUserStats({
+          userEmail: member.userEmail,
+          [args.stat]: args.amount,
+          tx,
+        });
+      }
+    }
   }
 }
