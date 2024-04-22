@@ -272,7 +272,7 @@ model Guild {
   members           GuildMember[]
   guildApplications GuildApplication[]
   currentGuildTask  CurrentGuildTask?
-  GuildBlessing     GuildBlessing?
+  blessing          GuildBlessing?
 }
 
 model GuildBlessing {
