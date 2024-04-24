@@ -14,23 +14,23 @@ export class ItemsGateway {
   private logger = new Logger('Items');
 
   @SubscribeMessage('consume_item')
-  async consumeItem(@MessageBody() itemId: number, @ConnectedSocket() client: Socket) {
+  async consumeItem(@MessageBody() dto: ConsumeItemDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('consume_item');
-    return this.itemService.consumeItem({ userEmail: email, itemId, stack: 1 });
+    return this.itemService.consumeItem({ userEmail: email, inventoryId: dto.inventoryId, stack: 1 });
   }
 
   @SubscribeMessage('equip_item')
-  async equipItem(@MessageBody() itemId: number, @ConnectedSocket() client: Socket) {
+  async equipItem(@MessageBody() dto: EquipItemDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('equip_item');
-    return this.itemService.equipItem({ userEmail: email, itemId });
+    return this.itemService.equipItem({ userEmail: email, inventoryId: dto.inventoryId });
   }
 
   @SubscribeMessage('unequip_item')
-  async unequipItem(@MessageBody() itemId: number, @ConnectedSocket() client: Socket) {
+  async unequipItem(@MessageBody() dto: UnequipItemDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('unequip_item');
-    return this.itemService.unequipItem({ userEmail: email, itemId });
+    return this.itemService.unequipItem({ userEmail: email, inventoryId: dto.inventoryId });
   }
 }

@@ -146,10 +146,12 @@ export class BattleService {
         });
 
         for await (const { itemId, stack } of dropedItems) {
-          await this.itemService.addItemToUser({
+          await this.itemService.addItemToInventory({
             userEmail,
             itemId,
             stack,
+            quality: 1,
+            enhancement: 0,
             tx,
           });
         }

@@ -1,14 +1,4 @@
-import {
-  Buff,
-  Drop,
-  Item,
-  LearnedSkill,
-  Monster,
-  Skill,
-  Stats,
-  User,
-  UserBuff,
-} from '@prisma/client';
+import { Buff, Drop, Item, LearnedSkill, Monster, Skill, Stats, User, UserBuff } from '@prisma/client';
 import { BattleUtils } from './battleUtils';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { utils } from 'src/utilities/utils';
@@ -141,13 +131,7 @@ export class BattleInstance {
     return this.monsters[0].mapId;
   }
 
-  constructor({
-    monsters,
-    users,
-    socket,
-    updateUsers,
-    removeBattle,
-  }: CreateBattleParams) {
+  constructor({ monsters, users, socket, updateUsers, removeBattle }: CreateBattleParams) {
     this.socket = socket;
     this.users = this.generateUserBattleValues(users);
     this.monsters = monsters;
@@ -187,6 +171,15 @@ export class BattleInstance {
         event: 'battle_update',
       });
     });
+    this._notifyDiscord();
+  }
+
+  private _notifyDiscord() {
+    this.socket.sendMessageToSocket({
+      email: 'discord',
+      payload: this.toJson(),
+      event: 'battle_update',
+    });
   }
 
   notifyBattleRemoved() {
@@ -221,22 +214,20 @@ export class BattleInstance {
       this.monsters.forEach((monster) => {
         silverGain += monster.silver;
         expGain += monster.exp;
-        monster.drops.forEach(
-          ({ chance, item, itemId, minAmount, maxAmount }) => {
-            if (utils.isSuccess(chance)) {
-              const amount = utils.getRandomNumberBetween(minAmount, maxAmount);
-              if (dropedItems[itemId]) {
-                dropedItems[itemId].stack += amount;
-              } else {
-                dropedItems[itemId] = {
-                  itemId: itemId,
-                  stack: amount,
-                  item: item,
-                };
-              }
+        monster.drops.forEach(({ chance, item, itemId, minAmount, maxAmount }) => {
+          if (utils.isSuccess(chance)) {
+            const amount = utils.getRandomNumberBetween(minAmount, maxAmount);
+            if (dropedItems[itemId]) {
+              dropedItems[itemId].stack += amount;
+            } else {
+              dropedItems[itemId] = {
+                itemId: itemId,
+                stack: amount,
+                item: item,
+              };
             }
-          },
-        );
+          }
+        });
       });
 
       const battleDrop: BattleDrop = {
@@ -273,11 +264,7 @@ export class BattleInstance {
     return false;
   }
 
-  async processUserCast(args: {
-    email: string;
-    skillId: number;
-    targetName: string;
-  }) {
+  async processUserCast(args: { email: string; skillId: number; targetName: string }) {
     const isUserTurn = this.isUserTurn(args);
     if (isUserTurn) {
       const user = this.getUserFromBattle(args.email);
@@ -314,9 +301,7 @@ export class BattleInstance {
   }) {
     const userAttribute: number = args.user.stats[args.skill.skill.attribute];
     const multiplier = args.skill.skill.multiplier * args.skill.masteryLevel;
-    const targetMonster = args.targetName
-      ? this.getMonsterTarget(args.targetName)
-      : this.monsters[0];
+    const targetMonster = args.targetName ? this.getMonsterTarget(args.targetName) : this.monsters[0];
     const userDamage = args.user.stats.attack + userAttribute * multiplier;
 
     return this.beforeDamageStep({
@@ -343,9 +328,7 @@ export class BattleInstance {
     const potency = utils.randomDamage(userAttribute * multiplier, 20);
     args.user.stats.mana -= args.skill.skill.manaCost;
     if (args.skill.skill.effect === SkillEffect.Healing) {
-      const targetAlly = args.targetName
-        ? this.getUserTarget(args.targetName)
-        : this.getLowestHealthMember();
+      const targetAlly = args.targetName ? this.getUserTarget(args.targetName) : this.getLowestHealthMember();
 
       this.healUser({ user: targetAlly, amount: potency });
       this.pushLog({
@@ -355,9 +338,7 @@ export class BattleInstance {
     }
 
     if (args.skill.skill.effect === SkillEffect.Infusion) {
-      const targetAlly = args.targetName
-        ? this.getUserTarget(args.targetName)
-        : this.getLowestManaMember();
+      const targetAlly = args.targetName ? this.getUserTarget(args.targetName) : this.getLowestManaMember();
       this.infuseUser({ user: targetAlly, amount: potency });
       this.pushLog({
         log: `${args.user.name} Infused ${targetAlly.name} by ${potency} Mana Points`,
@@ -367,10 +348,7 @@ export class BattleInstance {
     return this.afterDamageStep();
   }
 
-  private async processCastBuffSelf(args: {
-    user: UserWithStats;
-    skill: LearnedSkillWithSkill;
-  }) {
+  private async processCastBuffSelf(args: { user: UserWithStats; skill: LearnedSkillWithSkill }) {
     args.user.stats.mana -= args.skill.skill.manaCost;
     if (args.skill.skill.buff) {
       const buff = args.skill.skill.buff;
@@ -392,12 +370,8 @@ export class BattleInstance {
   private getLowestManaMember() {
     let lowestUser = this.users[0];
     this.users.forEach((user) => {
-      const currentLowestPercentage = Math.floor(
-        (lowestUser.stats.mana / lowestUser.stats.maxMana) * 100,
-      );
-      const currentPercentage = Math.floor(
-        (user.stats.mana / user.stats.maxMana) * 100,
-      );
+      const currentLowestPercentage = Math.floor((lowestUser.stats.mana / lowestUser.stats.maxMana) * 100);
+      const currentPercentage = Math.floor((user.stats.mana / user.stats.maxMana) * 100);
       if (currentPercentage < currentLowestPercentage) {
         lowestUser = user;
       }
@@ -408,12 +382,8 @@ export class BattleInstance {
   private getLowestHealthMember() {
     let lowestUser = this.users[0];
     this.users.forEach((user) => {
-      const currentLowestPercentage = Math.floor(
-        (lowestUser.stats.health / lowestUser.stats.maxHealth) * 100,
-      );
-      const currentPercentage = Math.floor(
-        (user.stats.health / user.stats.maxHealth) * 100,
-      );
+      const currentLowestPercentage = Math.floor((lowestUser.stats.health / lowestUser.stats.maxHealth) * 100);
+      const currentPercentage = Math.floor((user.stats.health / user.stats.maxHealth) * 100);
       if (currentPercentage < currentLowestPercentage) {
         lowestUser = user;
       }
@@ -520,9 +490,7 @@ export class BattleInstance {
 
   private getSkillFromUser(args: { email: string; skillId: number }) {
     const user = this.getUserFromBattle(args.email);
-    const castingSkill = user.learnedSkills.find(
-      (skill) => skill.skillId === args.skillId,
-    );
+    const castingSkill = user.learnedSkills.find((skill) => skill.skillId === args.skillId);
     if (castingSkill) {
       return castingSkill;
     }
@@ -567,12 +535,7 @@ export class BattleInstance {
     }
   }
 
-  private startDamageStep({
-    attacker,
-    damage,
-    user,
-    monster,
-  }: DamageStepParams) {
+  private startDamageStep({ attacker, damage, user, monster }: DamageStepParams) {
     const randomDmg = utils.randomDamage(damage.value, 20);
     if (attacker === 'user') {
       user.aggro += damage.aggro;

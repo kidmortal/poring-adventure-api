@@ -26,22 +26,16 @@ export class MarketService {
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
   private logger = new Logger('Cache - market');
-  async addItemToMarket(args: { price: number; stack: number; itemId: number; sellerEmail: string }) {
-    const inventoryItem = await this.prisma.inventoryItem.findUnique({
-      where: {
-        userEmail_itemId: {
-          itemId: args.itemId,
-          userEmail: args.sellerEmail,
-        },
-      },
-      include: {
-        marketListing: true,
-        item: true,
-      },
+  async addItemToMarket(args: { price: number; stack: number; inventoryId: number; sellerEmail: string }) {
+    const inventoryItem = await this.itemService.getOneInventoryItem({
+      userEmail: args.sellerEmail,
+      inventoryId: args.inventoryId,
     });
 
     if (!inventoryItem) {
-      throw new BadRequestException(`No item found with id ${args.itemId} on ${args.sellerEmail} inventory`);
+      throw new BadRequestException(
+        `No inventory item found with id ${args.inventoryId} on ${args.sellerEmail} inventory`,
+      );
     }
 
     if (inventoryItem.stack < args.stack) {
@@ -65,6 +59,14 @@ export class MarketService {
         });
         return false;
       }
+    }
+
+    if (inventoryItem.locked) {
+      this.websocket.sendErrorNotification({
+        email: args.sellerEmail,
+        text: `Item is locked, you cant list it on market`,
+      });
+      return false;
     }
 
     await this._createOrIncrementMarketListing({
@@ -119,7 +121,7 @@ export class MarketService {
       await this.itemService.transferItemFromUserToUser({
         senderEmail: marketListing.sellerEmail,
         receiverEmail: purchasingUser.email,
-        itemId: marketListing.inventory.itemId,
+        inventoryId: marketListing.inventoryId,
         stack: args.stacks,
         tx,
       });

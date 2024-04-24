@@ -87,7 +87,7 @@ export class MailService {
         });
       }
       if (mail.itemId && mail.itemStack && mail.itemStack > 0) {
-        await this.itemService.addItemToUser({
+        await this.itemService.addItemToInventory({
           userEmail: mail.userEmail,
           itemId: mail.itemId,
           stack: mail.itemStack,

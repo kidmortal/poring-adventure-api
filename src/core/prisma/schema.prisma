@@ -27,7 +27,6 @@ model User {
   professionId      Int?
   Party             Party?             @relation(fields: [partyId], references: [id])
   partyId           Int?
-  equipment         EquippedItem[]
   inventory         InventoryItem[]
   market            MarketListing[]
   mail              Mail[]
@@ -64,25 +63,22 @@ model Stats {
 }
 
 model InventoryItem {
-  id            Int            @id @default(autoincrement())
-  stack         Int
-  user          User           @relation(fields: [userEmail], references: [email], onDelete: Cascade)
-  userEmail     String
-  item          Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  itemId        Int
-  marketListing MarketListing?
-
-  @@unique([userEmail, itemId])
-}
-
-model EquippedItem {
   id        Int    @id @default(autoincrement())
+  stack     Int
   user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   userEmail String
   item      Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
   itemId    Int
 
-  @@unique([userEmail, itemId])
+  quality     Int @default(1)
+  enhancement Int @default(0)
+
+  equipped Boolean @default(false)
+  locked   Boolean @default(false)
+
+  marketListing MarketListing?
+
+  @@unique([userEmail, itemId, quality, enhancement, equipped, locked])
 }
 
 model Appearance {
@@ -127,7 +123,6 @@ model Item {
   int       Int?
   health    Int?
   mana      Int?
-  equipped  EquippedItem[]
   inventory InventoryItem[]
   drop      Drop[]
   mail      Mail[]
