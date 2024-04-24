@@ -1,7 +1,7 @@
 declare type CreateMarketListingDto = {
   price: number;
   stack: number;
-  itemId: number;
+  inventoryId: number;
 };
 
 declare type PuchaseMarketListingDto = {

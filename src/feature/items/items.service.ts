@@ -1,8 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { CreateItemDto } from './dto/create-item.dto';
+
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { UsersService } from 'src/feature/users/users.service';
-import { Item } from '@prisma/client';
 import { TransactionContext } from 'src/core/prisma/types/prisma';
 import { ItemsValidator } from './items.validator';
 
@@ -12,13 +11,14 @@ export class ItemsService {
     private readonly userService: UsersService,
     private readonly prisma: PrismaService,
   ) {}
-  create(createItemDto: CreateItemDto) {
-    return this.prisma.item.create({ data: createItemDto });
-  }
 
-  async consumeItem(args: { userEmail: string; itemId: number; stack: number }) {
+  async consumeItem(args: { userEmail: string; inventoryId: number; stack: number }) {
     await this.prisma.$transaction(async (tx) => {
-      const inventoryItem = await this._getOneInventoryItem({ ...args, tx });
+      const inventoryItem = await this.getOneInventoryItem({
+        userEmail: args.userEmail,
+        inventoryId: args.inventoryId,
+        tx,
+      });
       if (inventoryItem) {
         const item = inventoryItem.item;
         if (item.category === 'consumable') {
@@ -36,7 +36,7 @@ export class ItemsService {
               tx,
             });
           }
-          await this._removeItemFromUserInventory({ ...args, tx });
+          await this.removeItemFromInventory({ ...args, tx });
           return true;
         }
       }
@@ -44,23 +44,41 @@ export class ItemsService {
     return false;
   }
 
-  async addItemToUser(args: { userEmail: string; itemId: number; stack: number; tx?: TransactionContext }) {
+  async addItemToInventory(args: {
+    userEmail: string;
+    itemId: number;
+    quality?: number;
+    enhancement?: number;
+    locked?: boolean;
+    equipped?: boolean;
+    stack: number;
+    tx?: TransactionContext;
+  }) {
     const tx = args.tx || this.prisma;
-    const userHasItem = await this._userHasItem(args);
+
+    const userHasItem = await this._userHasItem({
+      userEmail: args.userEmail,
+      itemId: args.itemId,
+      quality: args.quality ?? 1,
+      enhancement: args.enhancement ?? 0,
+      equipped: args.equipped ?? false,
+      locked: args.locked ?? false,
+      tx,
+    });
 
     if (userHasItem) {
       const updateAmount = await tx.inventoryItem.update({
         where: {
-          userEmail_itemId: {
-            userEmail: args.userEmail,
-            itemId: args.itemId,
+          userEmail_itemId_quality_enhancement_equipped_locked: {
+            userEmail: userHasItem.userEmail,
+            itemId: userHasItem.itemId,
+            enhancement: userHasItem.enhancement,
+            quality: userHasItem.quality,
+            equipped: userHasItem.equipped,
+            locked: userHasItem.locked,
           },
         },
-        data: {
-          stack: {
-            increment: args.stack,
-          },
-        },
+        data: { stack: { increment: args.stack } },
       });
       return updateAmount;
     }
@@ -70,6 +88,10 @@ export class ItemsService {
         data: {
           userEmail: args.userEmail,
           itemId: args.itemId,
+          locked: args.locked ?? false,
+          quality: args.quality ?? 1,
+          enhancement: args.enhancement ?? 0,
+          equipped: args.equipped,
           stack: args.stack,
         },
       });
@@ -82,32 +104,41 @@ export class ItemsService {
   async transferItemFromUserToUser(args: {
     senderEmail: string;
     receiverEmail: string;
-    itemId: number;
+    inventoryId: number;
     stack: number;
     tx?: TransactionContext;
   }) {
     const tx = args.tx || this.prisma;
-    await this._removeItemFromUserInventory({
-      itemId: args.itemId,
+    const removedItem = await this.removeItemFromInventory({
+      inventoryId: args.inventoryId,
       stack: args.stack,
       userEmail: args.senderEmail,
       tx,
     });
 
-    return this.addItemToUser({
-      itemId: args.itemId,
+    return this.addItemToInventory({
+      itemId: removedItem.itemId,
+      quality: removedItem.quality,
+      enhancement: removedItem.enhancement,
+      locked: removedItem.locked,
       stack: args.stack,
       userEmail: args.receiverEmail,
       tx,
     });
   }
 
-  async equipItem(args: { itemId: number; userEmail: string }) {
+  async equipItem(args: { inventoryId: number; userEmail: string }) {
     await this.prisma.$transaction(async (tx) => {
-      const inventoryItem = await this._getOneInventoryItem({ ...args, tx });
+      const inventoryItem = await this.getOneInventoryItem({
+        inventoryId: args.inventoryId,
+        userEmail: args.userEmail,
+        tx,
+      });
       if (!inventoryItem) return false;
       ItemsValidator.isEquippable({ category: inventoryItem.item.category });
+      ItemsValidator.hasRemainingStock({ stack: 1, inventoryItem });
       const equippedItems = await this._getAllEquippedItems({ ...args, tx });
+
       for await (const equip of equippedItems) {
         const isSameAsEquipped = ItemsValidator.isSameCategory({
           categoryItem: inventoryItem.item.category,
@@ -115,16 +146,17 @@ export class ItemsService {
         });
         if (isSameAsEquipped) {
           await this._swapEquippedItem({
-            equipItem: inventoryItem.item,
-            unequipItem: equip.item,
+            equipInventoryId: inventoryItem.id,
+            unequipInventoryId: equip.id,
             userEmail: args.userEmail,
             tx,
           });
           return true;
         }
       }
+
       await this._equipItem({
-        item: inventoryItem.item,
+        inventoryId: args.inventoryId,
         userEmail: args.userEmail,
         tx,
       });
@@ -134,16 +166,13 @@ export class ItemsService {
     return false;
   }
 
-  async unequipItem(args: { itemId: number; userEmail: string }) {
+  async unequipItem(args: { inventoryId: number; userEmail: string }) {
     await this.prisma.$transaction(async (tx) => {
-      const equippedItem = await this._getOneEquippedItem({ ...args, tx });
-      if (equippedItem) {
-        await this._unequipItem({
-          item: equippedItem.item,
-          userEmail: args.userEmail,
-          tx,
-        });
-      }
+      await this._unequipItem({
+        inventoryId: args.inventoryId,
+        userEmail: args.userEmail,
+        tx,
+      });
       return true;
     });
 
@@ -154,14 +183,18 @@ export class ItemsService {
     return `This action returns all items`;
   }
 
-  private async _removeItemFromUserInventory(args: {
+  private async removeItemFromInventory(args: {
     userEmail: string;
-    itemId: number;
+    inventoryId: number;
     stack: number;
     tx?: TransactionContext;
   }) {
     const tx = args.tx || this.prisma;
-    const userHasItem = await this._userHasItem(args);
+    const userHasItem = await this.getOneInventoryItem({
+      userEmail: args.userEmail,
+      inventoryId: args.inventoryId,
+      tx,
+    });
 
     if (userHasItem && userHasItem.stack < args.stack) {
       throw new BadRequestException(
@@ -170,30 +203,16 @@ export class ItemsService {
     }
 
     if (userHasItem.stack === args.stack) {
-      const updateAmount = await tx.inventoryItem.delete({
-        where: {
-          userEmail_itemId: {
-            userEmail: args.userEmail,
-            itemId: args.itemId,
-          },
-        },
+      const removedItem = await tx.inventoryItem.delete({
+        where: { id: args.inventoryId },
       });
-      return updateAmount;
+      return removedItem;
     }
 
     if (userHasItem.stack > args.stack) {
       const updateAmount = await tx.inventoryItem.update({
-        where: {
-          userEmail_itemId: {
-            userEmail: args.userEmail,
-            itemId: args.itemId,
-          },
-        },
-        data: {
-          stack: {
-            decrement: args.stack,
-          },
-        },
+        where: { id: args.inventoryId },
+        data: { stack: { decrement: args.stack } },
       });
       return updateAmount;
     }
@@ -202,158 +221,153 @@ export class ItemsService {
   }
 
   private async _swapEquippedItem(args: {
-    unequipItem: Item;
-    equipItem: Item;
+    unequipInventoryId: number;
+    equipInventoryId: number;
     userEmail: string;
     tx?: TransactionContext;
   }) {
     const tx = args.tx || this.prisma;
     await this._unequipItem({
-      item: args.unequipItem,
+      inventoryId: args.unequipInventoryId,
       userEmail: args.userEmail,
       tx,
     });
     await this._equipItem({
-      item: args.equipItem,
+      inventoryId: args.equipInventoryId,
       userEmail: args.userEmail,
       tx,
     });
   }
 
-  private async _addEquipmentToUser(args: {
-    itemId: number;
+  private async _userHasItem(args: {
     userEmail: string;
-    itemInfo: Item;
+    itemId: number;
+    quality: number;
+    enhancement: number;
+    equipped: boolean;
+    locked: boolean;
     tx?: TransactionContext;
   }) {
     const tx = args.tx || this.prisma;
 
-    await this.userService.increaseUserStats({
-      userEmail: args.userEmail,
-      health: args.itemInfo.health,
-      attack: args.itemInfo.attack,
-      mana: args.itemInfo.mana,
-      str: args.itemInfo.str,
-      agi: args.itemInfo.agi,
-      int: args.itemInfo.int,
-      tx,
+    return tx.inventoryItem.findUnique({
+      where: {
+        userEmail_itemId_quality_enhancement_equipped_locked: {
+          userEmail: args.userEmail,
+          itemId: args.itemId,
+          quality: args.quality,
+          enhancement: args.enhancement,
+          equipped: args.equipped,
+          locked: args.locked,
+        },
+      },
     });
+  }
 
-    return tx.equippedItem.create({
-      data: {
+  async getOneInventoryItem(args: { userEmail: string; inventoryId: number; tx?: TransactionContext }) {
+    const tx = args.tx || this.prisma;
+    return tx.inventoryItem.findUnique({
+      where: {
+        id: args.inventoryId,
         userEmail: args.userEmail,
-        itemId: args.itemId,
       },
-    });
-  }
-  private async _removeEquipmentFromUser(args: {
-    itemId: number;
-    userEmail: string;
-    itemInfo: Item;
-    tx?: TransactionContext;
-  }) {
-    const tx = args.tx || this.prisma;
-    await this.userService.decreaseUserStats({
-      userEmail: args.userEmail,
-      health: args.itemInfo.health,
-      attack: args.itemInfo.attack,
-      mana: args.itemInfo.mana,
-      str: args.itemInfo.str,
-      agi: args.itemInfo.agi,
-      int: args.itemInfo.int,
-      tx,
-    });
-
-    return tx.equippedItem.delete({
-      where: {
-        userEmail_itemId: {
-          userEmail: args.userEmail,
-          itemId: args.itemId,
-        },
-      },
-    });
-  }
-
-  private async _userHasItem(args: { userEmail: string; itemId: number; tx?: TransactionContext }) {
-    const tx = args.tx || this.prisma;
-
-    return tx.inventoryItem.findUnique({
-      where: {
-        userEmail_itemId: {
-          userEmail: args.userEmail,
-          itemId: args.itemId,
-        },
-      },
-    });
-  }
-
-  private async _getOneInventoryItem(args: { userEmail: string; itemId: number; tx?: TransactionContext }) {
-    const tx = args.tx || this.prisma;
-    return tx.inventoryItem.findUnique({
-      where: {
-        userEmail_itemId: {
-          userEmail: args.userEmail,
-          itemId: args.itemId,
-        },
-      },
-      include: { item: true },
-    });
-  }
-
-  private async _getOneEquippedItem(args: { userEmail: string; itemId: number; tx?: TransactionContext }) {
-    const tx = args.tx || this.prisma;
-
-    return tx.equippedItem.findUnique({
-      where: {
-        userEmail_itemId: {
-          userEmail: args.userEmail,
-          itemId: args.itemId,
-        },
-      },
-      include: {
-        item: true,
-      },
+      include: { item: true, marketListing: true },
     });
   }
 
   private async _getAllEquippedItems(args: { userEmail: string; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
 
-    return tx.equippedItem.findMany({
-      where: { userEmail: args.userEmail },
+    return tx.inventoryItem.findMany({
+      where: { userEmail: args.userEmail, equipped: true },
       include: { item: true },
     });
   }
 
-  private async _unequipItem(args: { item: Item; userEmail: string; tx?: TransactionContext }) {
+  private async _unequipItem(args: { inventoryId: number; userEmail: string; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
-    await this._removeEquipmentFromUser({
+    const inventoryItem = await this.getOneInventoryItem({
+      inventoryId: args.inventoryId,
       userEmail: args.userEmail,
-      itemId: args.item.id,
-      itemInfo: args.item,
       tx,
     });
-    await this.addItemToUser({
-      stack: 1,
-      userEmail: args.userEmail,
-      itemId: args.item.id,
-      tx,
-    });
+    if (inventoryItem.equipped) {
+      await this.addItemToInventory({
+        itemId: inventoryItem.itemId,
+        userEmail: inventoryItem.userEmail,
+        enhancement: inventoryItem.enhancement,
+        quality: inventoryItem.quality,
+        locked: inventoryItem.locked,
+        stack: 1,
+        tx,
+      });
+      await this._removeEquippedItem({
+        inventoryId: inventoryItem.id,
+        userEmail: inventoryItem.userEmail,
+        tx,
+      });
+
+      return true;
+    }
+    return false;
   }
 
-  private async _equipItem(args: { item: Item; userEmail: string; tx?: TransactionContext }) {
+  private async _equipItem(args: { inventoryId: number; userEmail: string; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
-    await this._addEquipmentToUser({
+    const inventoryItem = await this.getOneInventoryItem({
+      inventoryId: args.inventoryId,
       userEmail: args.userEmail,
-      itemId: args.item.id,
-      itemInfo: args.item,
       tx,
     });
-    await this._removeItemFromUserInventory({
-      stack: 1,
+    if (inventoryItem && inventoryItem.equipped === false) {
+      await this._createEquippedItem({ inventoryId: inventoryItem.id, userEmail: inventoryItem.userEmail, tx });
+      await this.removeItemFromInventory({
+        inventoryId: inventoryItem.id,
+        userEmail: inventoryItem.userEmail,
+        stack: 1,
+        tx,
+      });
+
+      return true;
+    }
+    return false;
+  }
+
+  private async _removeEquippedItem(args: { inventoryId: number; userEmail: string; tx?: TransactionContext }) {
+    const tx = args.tx || this.prisma;
+    const inventoryItem = await this.getOneInventoryItem({
+      inventoryId: args.inventoryId,
       userEmail: args.userEmail,
-      itemId: args.item.id,
       tx,
     });
+    if (inventoryItem && inventoryItem.equipped === true) {
+      return tx.inventoryItem.delete({
+        where: { id: inventoryItem.id },
+      });
+    }
+    throw new BadRequestException(`no equipped item with inventoryId: ${args.inventoryId}`);
+  }
+
+  private async _createEquippedItem(args: { userEmail: string; inventoryId: number; tx?: TransactionContext }) {
+    const tx = args.tx || this.prisma;
+    const inventoryItem = await this.getOneInventoryItem({
+      inventoryId: args.inventoryId,
+      userEmail: args.userEmail,
+      tx,
+    });
+    if (inventoryItem) {
+      return tx.inventoryItem.create({
+        data: {
+          userEmail: inventoryItem.userEmail,
+          itemId: inventoryItem.itemId,
+          quality: inventoryItem.quality,
+          enhancement: inventoryItem.enhancement,
+          locked: inventoryItem.locked,
+          equipped: true,
+          stack: 1,
+        },
+      });
+    }
+    throw new BadRequestException(`no inventory item with inventoryId: ${args.inventoryId}`);
   }
 }

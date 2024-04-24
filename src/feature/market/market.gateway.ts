@@ -17,7 +17,7 @@ export class MarketGateway {
     const email = client.handshake.auth.email;
     this.logger.debug('create_market_listing');
     const result = await this.marketService.addItemToMarket({
-      itemId: dto.itemId,
+      inventoryId: dto.inventoryId,
       price: dto.price,
       stack: dto.stack,
       sellerEmail: email,
