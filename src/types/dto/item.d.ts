@@ -9,3 +9,11 @@ declare type EquipItemDto = {
 declare type UnequipItemDto = {
   inventoryId: number;
 };
+
+declare type EnhanceItemDto = {
+  inventoryId: number;
+};
+
+declare type UpgradeItemDto = {
+  inventoryId: number;
+};

@@ -2,11 +2,24 @@ import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common'
 import { CreateUserDto } from './dto/create-user.dto';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { UserWithStats } from 'src/feature/battle/battle';
-import { utils } from 'src/utilities/utils';
+import { Utils } from 'src/utilities/utils';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { TransactionContext } from 'src/core/prisma/types/prisma';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { Prisma } from '@prisma/client';
+
+type FullUser = Prisma.UserGetPayload<{
+  include: {
+    appearance: true;
+    inventory: { include: { item: true; marketListing: true } };
+    profession: { include: { skills: true } };
+    learnedSkills: { include: { skill: { include: { buff: true } } } };
+    buffs: { include: { buff: true } };
+    guildMember: true;
+    stats: true;
+  };
+}>;
 
 @Injectable()
 export class UsersService {
@@ -452,7 +465,7 @@ export class UsersService {
     const currentExp = user.stats.experience;
     const finalExp = currentExp + expGain;
     const currentLevel = user.stats.level;
-    const correctLevel = utils.getLevelFromExp(finalExp);
+    const correctLevel = Utils.getLevelFromExp(finalExp);
     if (correctLevel > currentLevel) {
       const levelDiff = correctLevel - currentLevel;
       await this.increaseUserLevel({
@@ -495,7 +508,7 @@ export class UsersService {
     this.cache.del(cacheKey);
   }
 
-  async _getUserWithEmail(args: { userEmail: string }) {
+  async _getUserWithEmail(args: { userEmail: string }): Promise<FullUser> {
     if (!args.userEmail) {
       throw new BadRequestException('No email provided');
     }

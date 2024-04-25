@@ -27,6 +27,20 @@ export class ItemsGateway {
     return this.itemService.equipItem({ userEmail: email, inventoryId: dto.inventoryId });
   }
 
+  @SubscribeMessage('enhance_item')
+  async enhanceItem(@MessageBody() dto: EnhanceItemDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('enhance_item');
+    return this.itemService.enhanceItem({ userEmail: email, inventoryId: dto.inventoryId });
+  }
+
+  @SubscribeMessage('upgrade_item')
+  async upgradeItem(@MessageBody() dto: UpgradeItemDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('upgrade_item');
+    return this.itemService.upgradeItem({ userEmail: email, inventoryId: dto.inventoryId });
+  }
+
   @SubscribeMessage('unequip_item')
   async unequipItem(@MessageBody() dto: UnequipItemDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;

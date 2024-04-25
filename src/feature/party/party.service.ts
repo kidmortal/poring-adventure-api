@@ -4,7 +4,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Party, Prisma } from '@prisma/client';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
-import { utils } from 'src/utilities/utils';
+import { Utils } from 'src/utilities/utils';
 
 type FullParty = Prisma.PartyGetPayload<{
   include: {
@@ -48,7 +48,7 @@ export class PartyService {
   async closeParty(args: { email: string; partyId: number }) {
     const party = await this._getOwnedParty({ userEmail: args.email, partyId: args.partyId });
     if (party) {
-      utils.removeElementFromList({ list: this.openPartiesIdList, element: party.id });
+      Utils.removeElementFromList({ list: this.openPartiesIdList, element: party.id });
       this._notifyPartyWithStatus({ partyId: args.partyId });
       return true;
     }
@@ -284,7 +284,7 @@ export class PartyService {
     if (ownedParty) {
       await this.prisma.party.delete({ where: { leaderEmail: args.email } });
       ownedParty.members.forEach((member) => this._notifyUserWithNoParty({ email: member.email }));
-      utils.removeElementFromList({ list: this.openPartiesIdList, element: ownedParty.id });
+      Utils.removeElementFromList({ list: this.openPartiesIdList, element: ownedParty.id });
       return true;
     }
     return false;
