@@ -1,7 +1,7 @@
 import { Buff, Drop, Item, LearnedSkill, Monster, Skill, Stats, User, UserBuff } from '@prisma/client';
 import { BattleUtils } from './battleUtils';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
-import { utils } from 'src/utilities/utils';
+import { Utils } from 'src/utilities/utils';
 import { runEffect } from './effects';
 
 enum SkillCategory {
@@ -215,8 +215,8 @@ export class BattleInstance {
         silverGain += monster.silver;
         expGain += monster.exp;
         monster.drops.forEach(({ chance, item, itemId, minAmount, maxAmount }) => {
-          if (utils.isSuccess(chance)) {
-            const amount = utils.getRandomNumberBetween(minAmount, maxAmount);
+          if (Utils.isSuccess(chance)) {
+            const amount = Utils.getRandomNumberBetween(minAmount, maxAmount);
             if (dropedItems[itemId]) {
               dropedItems[itemId].stack += amount;
             } else {
@@ -325,7 +325,7 @@ export class BattleInstance {
   }) {
     const userAttribute: number = args.user.stats[args.skill.skill.attribute];
     const multiplier = args.skill.skill.multiplier * args.skill.masteryLevel;
-    const potency = utils.randomDamage(userAttribute * multiplier, 20);
+    const potency = Utils.randomDamage(userAttribute * multiplier, 20);
     args.user.stats.mana -= args.skill.skill.manaCost;
     if (args.skill.skill.effect === SkillEffect.Healing) {
       const targetAlly = args.targetName ? this.getUserTarget(args.targetName) : this.getLowestHealthMember();
@@ -536,7 +536,7 @@ export class BattleInstance {
   }
 
   private startDamageStep({ attacker, damage, user, monster }: DamageStepParams) {
-    const randomDmg = utils.randomDamage(damage.value, 20);
+    const randomDmg = Utils.randomDamage(damage.value, 20);
     if (attacker === 'user') {
       user.aggro += damage.aggro;
       monster.health -= randomDmg;

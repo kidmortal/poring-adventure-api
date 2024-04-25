@@ -8,7 +8,7 @@ import { TransactionContext } from 'src/core/prisma/types/prisma';
 import { Prisma } from '@prisma/client';
 import { NotificationService } from 'src/services/notification/notification.service';
 import { UsersService } from 'src/feature/users/users.service';
-import { utils } from 'src/utilities/utils';
+import { Utils } from 'src/utilities/utils';
 import { ALLOWED_BLESSINGS, UPGRADE_FACTOR } from './constants';
 
 type GuildWithMembers = Prisma.GuildGetPayload<{
@@ -421,7 +421,7 @@ export class GuildService {
     const currentExp = guild.experience;
     const finalExp = currentExp + args.amount;
     const currentLevel = guild.level;
-    const correctLevel = utils.getLevelFromExp(finalExp);
+    const correctLevel = Utils.getLevelFromExp(finalExp);
     if (correctLevel > currentLevel) {
       const levelDiff = correctLevel - currentLevel;
       await tx.guild.update({

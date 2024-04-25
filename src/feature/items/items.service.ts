@@ -4,13 +4,80 @@ import { PrismaService } from 'src/core/prisma/prisma.service';
 import { UsersService } from 'src/feature/users/users.service';
 import { TransactionContext } from 'src/core/prisma/types/prisma';
 import { ItemsValidator } from './items.validator';
+import { Utils } from 'src/utilities/utils';
+import { WebsocketService } from 'src/core/websocket/websocket.service';
 
 @Injectable()
 export class ItemsService {
   constructor(
     private readonly userService: UsersService,
     private readonly prisma: PrismaService,
+    private readonly websocket: WebsocketService,
   ) {}
+
+  async enhanceItem(args: { userEmail: string; inventoryId: number }) {
+    return this.prisma.$transaction(async (tx) => {
+      const inventoryItem = await this.getOneInventoryItem({
+        userEmail: args.userEmail,
+        inventoryId: args.inventoryId,
+        tx,
+      });
+      if (inventoryItem) {
+        if (inventoryItem.equipped) {
+          this.websocket.sendErrorNotification({
+            email: args.userEmail,
+            text: `Cannot enhance equipped item`,
+          });
+          return false;
+        }
+
+        const user = await this.userService._getUserWithEmail({ userEmail: args.userEmail });
+        if (!user) {
+          this.websocket.sendErrorNotification({
+            email: args.userEmail,
+            text: `User does not exist`,
+          });
+          return false;
+        }
+
+        const chance = Utils.enhanceChance(inventoryItem.enhancement + 1);
+        const price = Utils.enhancePrice(inventoryItem.enhancement + 1);
+        if (user.silver < price) {
+          this.websocket.sendErrorNotification({
+            email: args.userEmail,
+            text: `Not enough silver`,
+          });
+          return false;
+        }
+        const success = Utils.isSuccess(chance);
+        if (success) {
+          await this.removeItemFromInventory({ ...args, stack: 1, tx });
+          await this.addItemToInventory({
+            itemId: inventoryItem.itemId,
+            quality: inventoryItem.quality,
+            enhancement: inventoryItem.enhancement + 1,
+            stack: 1,
+            userEmail: args.userEmail,
+            tx,
+          });
+          this.websocket.sendTextNotification({
+            email: args.userEmail,
+            text: `You have successfully enhanced your item`,
+          });
+        } else {
+          this.websocket.sendErrorNotification({
+            email: args.userEmail,
+            text: `You have failed to enhance your item`,
+          });
+        }
+        await this.userService.removeSilverFromUser({ userEmail: args.userEmail, amount: price, tx });
+        this.userService.notifyUserUpdateWithProfile({ email: args.userEmail });
+        return true;
+      }
+    });
+  }
+
+  async upgradeItem(args: { userEmail: string; inventoryId: number }) {}
 
   async consumeItem(args: { userEmail: string; inventoryId: number; stack: number }) {
     await this.prisma.$transaction(async (tx) => {
@@ -306,6 +373,19 @@ export class ItemsService {
         userEmail: inventoryItem.userEmail,
         tx,
       });
+      const enhancement = inventoryItem?.enhancement ?? 0;
+      const quality = inventoryItem?.quality ?? 0;
+      const multiplier = Utils.itemStatsMultiplier(quality, enhancement);
+      await this.userService.decreaseUserStats({
+        userEmail: inventoryItem.userEmail,
+        health: Math.floor(inventoryItem.item.health * multiplier),
+        mana: Math.floor(inventoryItem.item.mana * multiplier),
+        attack: Math.floor(inventoryItem.item.attack * multiplier),
+        str: Math.floor(inventoryItem.item.str * multiplier),
+        agi: Math.floor(inventoryItem.item.agi * multiplier),
+        int: Math.floor(inventoryItem.item.int * multiplier),
+        tx,
+      });
 
       return true;
     }
@@ -325,6 +405,19 @@ export class ItemsService {
         inventoryId: inventoryItem.id,
         userEmail: inventoryItem.userEmail,
         stack: 1,
+        tx,
+      });
+      const enhancement = inventoryItem?.enhancement ?? 0;
+      const quality = inventoryItem?.quality ?? 0;
+      const multiplier = Utils.itemStatsMultiplier(quality, enhancement);
+      await this.userService.increaseUserStats({
+        userEmail: inventoryItem.userEmail,
+        health: Math.floor(inventoryItem.item.health * multiplier),
+        mana: Math.floor(inventoryItem.item.mana * multiplier),
+        attack: Math.floor(inventoryItem.item.attack * multiplier),
+        str: Math.floor(inventoryItem.item.str * multiplier),
+        agi: Math.floor(inventoryItem.item.agi * multiplier),
+        int: Math.floor(inventoryItem.item.int * multiplier),
         tx,
       });
 

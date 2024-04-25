@@ -7,6 +7,26 @@ function isSuccess(chance: number): boolean {
   return randomNum < chance;
 }
 
+function enhanceChance(enhanceLevel: number): number {
+  let currentChance = 100;
+  for (let index = 0; index < enhanceLevel; index++) {
+    currentChance -= Math.round(currentChance * 0.1);
+  }
+  return currentChance;
+}
+
+function itemStatsMultiplier(quality: number, enhancement: number) {
+  return 1 + enhancement * 0.2 * (quality * 0.5);
+}
+
+function enhancePrice(enhanceLevel: number): number {
+  let currentPrice = 100;
+  for (let index = 0; index < enhanceLevel; index++) {
+    currentPrice += Math.round(currentPrice * 0.5);
+  }
+  return currentPrice;
+}
+
 function randomDamage(value: number, oscillationPercentage: number): number {
   // Calculate the minimum and maximum values based on the oscillation percentage
   const min = value - Math.round((value * oscillationPercentage) / 100);
@@ -47,11 +67,29 @@ function removeElementFromList<T>(args: { list: T[]; element: T }): boolean {
   }
   return false;
 }
+function formatMemory(memory?: number) {
+  if (!memory) return '';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
 
-export const utils = {
+  let index = 0;
+  let value = memory;
+
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index++;
+  }
+
+  return `${value.toFixed(2)} ${units[index]}`;
+}
+
+export const Utils = {
   isSuccess,
+  enhanceChance,
+  enhancePrice,
   getRandomNumberBetween,
   getLevelFromExp,
   randomDamage,
   removeElementFromList,
+  formatMemory,
+  itemStatsMultiplier,
 };
