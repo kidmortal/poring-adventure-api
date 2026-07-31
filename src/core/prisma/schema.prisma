@@ -126,6 +126,7 @@ model Item {
   inventory InventoryItem[]
   drop      Drop[]
   mail      Mail[]
+  products  StoreProduct[]
 }
 
 model Drop {
@@ -339,5 +340,10 @@ model StoreProduct {
   id            Int            @id @default(autoincrement())
   name          String         @unique
   displayName   String         @unique
+  // Rewards handed out when the purchase is claimed
+  silver        Int            @default(0)
+  item          Item?          @relation(fields: [itemId], references: [id])
+  itemId        Int?
+  itemStack     Int            @default(1)
   userPurchases UserPurchase[]
 }

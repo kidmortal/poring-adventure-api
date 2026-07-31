@@ -4,10 +4,12 @@ import { PurchaseController } from './purchase.controller';
 import { PurchaseGateway } from './purchase.gateway';
 import { NotificationModule } from 'src/services/notification/notification.module';
 import { WebsocketModule } from 'src/core/websocket/websocket.module';
+import { MailModule } from 'src/feature/mail/mail.module';
+import { RevenueCatService } from './revenuecat.service';
 
 @Module({
-  imports: [NotificationModule, WebsocketModule],
+  imports: [NotificationModule, WebsocketModule, MailModule],
   controllers: [PurchaseController],
-  providers: [PurchaseService, PurchaseGateway],
+  providers: [PurchaseService, PurchaseGateway, RevenueCatService],
 })
 export class PurchaseModule {}

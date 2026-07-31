@@ -6,25 +6,35 @@ import { Cache } from 'cache-manager';
 import { BattleService } from 'src/feature/battle/battle.service';
 import { Discord as DiscordUser } from '@prisma/client';
 
+/** Registration tokens are short lived: the player has 10 minutes to paste it on discord. */
+const REGISTER_TOKEN_TTL_MS = 1000 * 60 * 10;
+
+type RegisterToken = { token: string; userEmail: string; expiresAt: number };
+
 @Injectable()
 export class DiscordService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly battleService: BattleService,
-    @Inject(CACHE_MANAGER) private cache: Cache,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
-  private cacheLogger = new Logger('Cache - Discord');
-  private tokens: { [email: string]: string } = {};
+  private readonly cacheLogger = new Logger('Cache - Discord');
+  private readonly logger = new Logger('Discord - service');
+  private readonly registerTokens = new Map<string, RegisterToken>();
 
+  /** Returns the pending token for the user, or issues a fresh one when there is none. */
   createRegisterToken(args: { userEmail: string }) {
-    const registeredToken = this.tokens[args.userEmail];
-    if (registeredToken) {
-      return registeredToken;
-    } else {
-      const token = randomUUID();
-      this.tokens[args.userEmail] = token;
-      return token;
+    const pending = this.registerTokens.get(args.userEmail);
+    if (pending && pending.expiresAt > Date.now()) {
+      return pending.token;
     }
+    const token = randomUUID();
+    this.registerTokens.set(args.userEmail, {
+      token,
+      userEmail: args.userEmail,
+      expiresAt: Date.now() + REGISTER_TOKEN_TTL_MS,
+    });
+    return token;
   }
 
   findOne(args: { discordId: string }) {
@@ -34,20 +44,23 @@ export class DiscordService {
     });
   }
 
+  /** Links a discord profile to the account that generated `args.token`. */
   async register(args: RegisterDiscordProfileDto) {
-    console.log(args);
-    const hasToken = this._findTokenByToken({ token: args.token });
-    if (!hasToken) {
+    const pending = this._consumeToken({ token: args.token });
+    if (!pending) {
+      this.logger.warn('Registration attempted with an unknown or expired token');
       return false;
     }
-    const email = hasToken.key;
-    const updateProfile = await this.prisma.discord.upsert({
-      where: { userEmail: email },
-      create: { discordId: args.id, name: args.name, url: args.url, userEmail: email },
-      update: { discordId: args.id, name: args.name, url: args.url, userEmail: email },
+    const profile = { discordId: args.id, name: args.name, url: args.url, userEmail: pending.userEmail };
+    const registered = await this.prisma.discord.upsert({
+      where: { userEmail: pending.userEmail },
+      create: profile,
+      update: profile,
       include: { user: true },
     });
-    return updateProfile.user;
+    await this._clearProfileCache({ discordId: args.id });
+    this.logger.log(`Discord ${args.id} linked to ${pending.userEmail}`);
+    return registered.user;
   }
 
   inventory(args: { discordId: string }) {
@@ -62,34 +75,45 @@ export class DiscordService {
   }
 
   async getBattle(args: { discordId: string }) {
-    const user = await this._getDiscordProfileFromId({ discordId: args.discordId });
-    if (!user) return false;
-    const battle = this.battleService.getUserBattle(user.userEmail);
+    const profile = await this._getDiscordProfileFromId({ discordId: args.discordId });
+    if (!profile) return false;
+    const battle = this.battleService.getUserBattle(profile.userEmail);
     if (!battle) return false;
     return battle.toJson();
   }
 
   private async _getDiscordProfileFromId(args: { discordId: string }): Promise<DiscordUser> {
-    const cacheKey = `discord_user_${args.discordId}`;
-    const cachedDiscordUser = await this.cache.get(cacheKey);
+    const cacheKey = this._profileCacheKey(args.discordId);
+    const cachedDiscordUser = await this.cache.get<DiscordUser>(cacheKey);
     if (cachedDiscordUser) {
       this.cacheLogger.log(`returning cached ${cacheKey}`);
-      return cachedDiscordUser as DiscordUser;
+      return cachedDiscordUser;
     }
     const discordUser = await this.prisma.discord.findUnique({
       where: { discordId: args.discordId },
     });
-    this.cache.set(cacheKey, discordUser);
+    if (discordUser) {
+      await this.cache.set(cacheKey, discordUser);
+    }
     return discordUser;
   }
 
-  private _findTokenByToken(args: { token: string }) {
-    for (const entry of Object.entries(this.tokens)) {
-      const [key, value] = entry;
-      if (value === args.token) {
-        return { key, value };
-      }
+  private _clearProfileCache(args: { discordId: string }) {
+    return this.cache.del(this._profileCacheKey(args.discordId));
+  }
+
+  private _profileCacheKey(discordId: string) {
+    return `discord_user_${discordId}`;
+  }
+
+  /** Tokens are single use — looking one up also burns it. */
+  private _consumeToken(args: { token: string }) {
+    if (!args.token) return undefined;
+    for (const [userEmail, pending] of this.registerTokens) {
+      if (pending.token !== args.token) continue;
+      this.registerTokens.delete(userEmail);
+      return pending.expiresAt > Date.now() ? pending : undefined;
     }
-    return false;
+    return undefined;
   }
 }
