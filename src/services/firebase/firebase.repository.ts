@@ -1,20 +1,18 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { app } from 'firebase-admin';
+
+export const FIREBASE_APP = 'FIREBASE_APP';
 
 @Injectable()
 export class FirebaseRepository {
-  #db: FirebaseFirestore.Firestore;
-  #collection: FirebaseFirestore.CollectionReference;
+  constructor(@Inject(FIREBASE_APP) private readonly firebaseApp: app.App) {}
 
-  constructor(@Inject('FIREBASE_APP') private firebaseApp: app.App) {
-    this.#db = firebaseApp.firestore();
-    this.#collection = this.#db.collection('<collection_name>');
-  }
-
-  async validateEmail({ token }: { token: string }) {
-    const validation = await this.firebaseApp.auth().verifyIdToken(token);
-    if (validation.email) {
-      return validation.email;
+  /** Resolves the email behind a firebase id token, throwing when the token carries none. */
+  async validateEmail(args: { token: string }): Promise<string> {
+    const validation = await this.firebaseApp.auth().verifyIdToken(args.token);
+    if (!validation.email) {
+      throw new UnauthorizedException('Access token has no email associated with it');
     }
+    return validation.email;
   }
 }

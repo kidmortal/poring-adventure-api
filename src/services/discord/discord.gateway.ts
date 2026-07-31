@@ -57,7 +57,6 @@ export class DiscordGateway {
     this.logger.debug(`'get_discord_user_inventory' ${discordId}`);
     if (!discordId) return false;
 
-    const inventory = await this.discordService.inventory({ discordId });
-    return inventory;
+    return this.discordService.inventory({ discordId });
   }
 }

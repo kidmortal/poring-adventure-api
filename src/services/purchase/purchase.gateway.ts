@@ -1,7 +1,7 @@
 import { WebSocketGateway, SubscribeMessage, ConnectedSocket, MessageBody } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 
-import { Logger, UseFilters, UseGuards } from '@nestjs/common';
+import { BadRequestException, Logger, UseFilters, UseGuards } from '@nestjs/common';
 
 import { WebsocketExceptionsFilter } from 'src/core/websocket/websocketException.filter';
 import { PurchaseService } from './purchase.service';
@@ -25,14 +25,24 @@ export class PurchaseGateway {
   @SubscribeMessage('refund_purchase')
   async refundPurchase(@MessageBody() purchaseId: number, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
-    this.logger.debug('refund_purchase');
-    return this.purchaseService.requestRefund({ userEmail: email, purchaseId });
+    this.logger.debug(`refund_purchase ${purchaseId}`);
+
+    return this.purchaseService.requestRefund({ userEmail: email, purchaseId: this._parseId(purchaseId) });
   }
 
   @SubscribeMessage('claim_purchase')
   async claimPurchase(@MessageBody() purchaseId: number, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
-    this.logger.debug('claim_purchase');
-    return this.purchaseService.claimPurchase({ userEmail: email, purchaseId });
+    this.logger.debug(`claim_purchase ${purchaseId}`);
+
+    return this.purchaseService.claimPurchase({ userEmail: email, purchaseId: this._parseId(purchaseId) });
+  }
+
+  private _parseId(purchaseId: number) {
+    const id = Number(purchaseId);
+    if (!Number.isInteger(id)) {
+      throw new BadRequestException('A valid purchase id is required');
+    }
+    return id;
   }
 }

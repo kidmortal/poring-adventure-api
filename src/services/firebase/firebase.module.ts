@@ -1,37 +1,32 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
-import { FirebaseRepository } from './firebase.repository';
+import { FIREBASE_APP, FirebaseRepository } from './firebase.repository';
 
 const firebaseProvider = {
-  provide: 'FIREBASE_APP',
+  provide: FIREBASE_APP,
   inject: [ConfigService],
   useFactory: (configService: ConfigService) => {
-    const firebaseConfig = {
-      type: configService.get<string>('TYPE'),
-      project_id: configService.get<string>('PROJECT_ID'),
-      private_key_id: configService.get<string>('PRIVATE_KEY_ID'),
-      private_key: configService.get<string>('PRIVATE_KEY'),
-      client_email: configService.get<string>('CLIENT_EMAIL'),
-      client_id: configService.get<string>('CLIENT_ID'),
-      auth_uri: configService.get<string>('AUTH_URI'),
-      token_uri: configService.get<string>('TOKEN_URI'),
-      auth_provider_x509_cert_url: configService.get<string>('AUTH_CERT_URL'),
-      client_x509_cert_url: configService.get<string>('CLIENT_CERT_URL'),
-      universe_domain: configService.get<string>('UNIVERSAL_DOMAIN'),
-    } as admin.ServiceAccount;
+    const projectId = configService.get<string>('PROJECT_ID');
+    const clientEmail = configService.get<string>('CLIENT_EMAIL');
+    // Env vars keep the private key on a single line, so the newlines arrive escaped.
+    const privateKey = configService.get<string>('PRIVATE_KEY')?.replace(/\\n/g, '\n');
+
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error('Missing firebase credentials: PROJECT_ID, CLIENT_EMAIL and PRIVATE_KEY are required');
+    }
 
     return admin.initializeApp({
-      credential: admin.credential.cert(firebaseConfig),
-      databaseURL: `https://${firebaseConfig.projectId}.firebaseio.com`,
-      storageBucket: `${firebaseConfig.projectId}.appspot.com`,
+      credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
+      databaseURL: `https://${projectId}.firebaseio.com`,
+      storageBucket: `${projectId}.appspot.com`,
     });
   },
 };
 
 @Global()
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule.forRoot({ envFilePath: '.env' })],
   providers: [firebaseProvider, FirebaseRepository],
   exports: [FirebaseRepository],
 })

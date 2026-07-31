@@ -1,11 +1,14 @@
+import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 
 import * as Sentry from '@sentry/node';
 import { RevenueCatCustomer } from './entities/customer.entity';
-export class RevenueCatService {
-  constructor() {}
 
-  private client = axios.create({
+@Injectable()
+export class RevenueCatService {
+  private readonly logger = new Logger('RevenueCat');
+
+  private readonly client = axios.create({
     baseURL: 'https://api.revenuecat.com/v1/',
     headers: {
       Authorization: `Bearer ${process.env.REVENUE_CAT_REST_API_KEY}`,
@@ -15,42 +18,31 @@ export class RevenueCatService {
 
   async refundPurchase(args: { transactionId: string; appUserId: string }) {
     try {
-      await this.client.post(
-        `/subscribers/${args.appUserId}/transactions/${args.transactionId}/refund`,
-        {},
-      );
+      await this.client.post(`/subscribers/${args.appUserId}/transactions/${args.transactionId}/refund`, {});
       return true;
     } catch (error) {
-      console.log(error.response);
-      Sentry.captureException(error);
+      this._reportError(error, `Failed to refund transaction ${args.transactionId}`);
       return false;
     }
   }
 
+  /** Confirms with the store that `appUserId` really owns `transactionId`. */
   async userHasTransaction(args: { transactionId: string; appUserId: string }) {
-    let hasTransaction = false;
     try {
-      const customer = await this.client.get<RevenueCatCustomer>(
-        `/subscribers/${args.appUserId}`,
-        {},
+      const customer = await this.client.get<RevenueCatCustomer>(`/subscribers/${args.appUserId}`);
+      const transactionGroups = Object.values(customer.data.subscriber.non_subscriptions ?? {});
+      return transactionGroups.some((group) =>
+        group.some((transaction) => transaction.store_transaction_id === args.transactionId),
       );
-      const transactionsGroups = Object.values(
-        customer.data.subscriber.non_subscriptions,
-      );
-      transactionsGroups.forEach((transactionGroup) => {
-        const userTransaction = transactionGroup.find(
-          (transaction) =>
-            transaction.store_transaction_id === args.transactionId,
-        );
-        if (userTransaction) {
-          hasTransaction = true;
-        }
-      });
-      return hasTransaction;
     } catch (error) {
-      console.log(error.response);
-      Sentry.captureException(error);
-      return hasTransaction;
+      this._reportError(error, `Failed to load transactions of ${args.appUserId}`);
+      return false;
     }
+  }
+
+  private _reportError(error: unknown, context: string) {
+    Sentry.captureException(error);
+    const details = axios.isAxiosError(error) ? error.response?.data ?? error.message : error;
+    this.logger.warn(`${context}: ${JSON.stringify(details)}`);
   }
 }
