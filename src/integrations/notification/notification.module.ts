@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { NotificationService } from './notification.service';
-import { OneSignalNotificationService } from './notification.integration';
+import { OneSignalNotificationService } from './onesignal.service';
 
 @Module({
   exports: [NotificationService],

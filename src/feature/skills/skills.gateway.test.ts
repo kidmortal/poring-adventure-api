@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { UsersRepository } from 'src/feature/users/users.repository';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { SkillsService } from 'src/feature/skills/skills.service';
 import { SkillsGateway } from 'src/feature/skills/skills.gateway';
@@ -12,6 +14,8 @@ describe('Skill Gateway', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        UsersRepository,
+        { provide: CACHE_MANAGER, useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn() } },
         SkillsGateway,
         SkillsService,
         PrismaService,

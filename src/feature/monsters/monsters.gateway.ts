@@ -1,8 +1,4 @@
-import {
-  WebSocketGateway,
-  SubscribeMessage,
-  MessageBody,
-} from '@nestjs/websockets';
+import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
 
 import { Logger, UseFilters } from '@nestjs/common';
 import { MonstersService } from './monsters.service';

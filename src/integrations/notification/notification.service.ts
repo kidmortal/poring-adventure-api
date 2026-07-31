@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { OneSignalNotificationService } from './notification.integration';
+import { OneSignalNotificationService } from './onesignal.service';
 
 /**
  * Facade over the push notification provider, so the rest of the app never

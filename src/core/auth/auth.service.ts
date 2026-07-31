@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Socket } from 'socket.io';
-import { FirebaseRepository } from 'src/services/firebase/firebase.repository';
+import { FirebaseRepository } from 'src/integrations/firebase/firebase.repository';
 
 @Injectable()
 export class AuthService {

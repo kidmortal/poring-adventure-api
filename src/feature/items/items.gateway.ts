@@ -3,6 +3,7 @@ import { Socket } from 'socket.io';
 
 import { Logger, UseFilters, UseGuards } from '@nestjs/common';
 import { ItemsService } from './items.service';
+import { EquipmentService } from './equipment.service';
 import { WebsocketExceptionsFilter } from 'src/core/websocket/websocketException.filter';
 import { WebsocketAuthEmailGuard } from 'src/core/websocket/websocket.guard';
 
@@ -10,7 +11,10 @@ import { WebsocketAuthEmailGuard } from 'src/core/websocket/websocket.guard';
 @UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway({ cors: true })
 export class ItemsGateway {
-  constructor(private readonly itemService: ItemsService) {}
+  constructor(
+    private readonly itemService: ItemsService,
+    private readonly equipmentService: EquipmentService,
+  ) {}
   private logger = new Logger('Items');
 
   @SubscribeMessage('consume_item')
@@ -24,7 +28,7 @@ export class ItemsGateway {
   async equipItem(@MessageBody() dto: EquipItemDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('equip_item');
-    return this.itemService.equipItem({ userEmail: email, inventoryId: dto.inventoryId });
+    return this.equipmentService.equipItem({ userEmail: email, inventoryId: dto.inventoryId });
   }
 
   @SubscribeMessage('enhance_item')
@@ -45,6 +49,6 @@ export class ItemsGateway {
   async unequipItem(@MessageBody() dto: UnequipItemDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('unequip_item');
-    return this.itemService.unequipItem({ userEmail: email, inventoryId: dto.inventoryId });
+    return this.equipmentService.unequipItem({ userEmail: email, inventoryId: dto.inventoryId });
   }
 }
