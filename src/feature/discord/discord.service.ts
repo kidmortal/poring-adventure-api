@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { randomUUID } from 'crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -35,6 +35,18 @@ export class DiscordService {
       expiresAt: Date.now() + REGISTER_TOKEN_TTL_MS,
     });
     return token;
+  }
+
+  /**
+   * Resolves the game account behind a discord id. Every discord action goes
+   * through here, so an unlinked discord user can never act on someone's data.
+   */
+  async requireUserEmail(args: { discordId: string }) {
+    const profile = await this._getDiscordProfileFromId({ discordId: args.discordId });
+    if (!profile) {
+      throw new ForbiddenException('This discord account is not linked to a Poring profile, use /register first');
+    }
+    return profile.userEmail;
   }
 
   findOne(args: { discordId: string }) {
