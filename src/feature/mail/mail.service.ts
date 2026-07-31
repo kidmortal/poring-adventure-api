@@ -1,6 +1,7 @@
+import { UserWalletService } from 'src/feature/users/userWallet.service';
 import { Injectable } from '@nestjs/common';
 import { Mail } from '@prisma/client';
-import { ItemsService } from 'src/feature/items/items.service';
+import { InventoryService } from 'src/feature/items/inventory.service';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { TransactionContext } from 'src/core/prisma/types/prisma';
 import { UsersService } from 'src/feature/users/users.service';
@@ -9,10 +10,11 @@ import { WebsocketService } from 'src/core/websocket/websocket.service';
 @Injectable()
 export class MailService {
   constructor(
+    private readonly userWallet: UserWalletService,
     private readonly prisma: PrismaService,
     private readonly websocket: WebsocketService,
     private readonly userService: UsersService,
-    private readonly itemService: ItemsService,
+    private readonly inventory: InventoryService,
   ) {}
   async findAll(args: { userEmail: string }) {
     return this._notifyUserMailBox(args);
@@ -80,14 +82,14 @@ export class MailService {
     const mail = args.mail;
     if (mail) {
       if (mail.silver && mail.silver > 0) {
-        await this.userService.addSilverToUser({
+        await this.userWallet.addSilverToUser({
           userEmail: mail.userEmail,
           amount: mail.silver,
           tx,
         });
       }
       if (mail.itemId && mail.itemStack && mail.itemStack > 0) {
-        await this.itemService.addItemToInventory({
+        await this.inventory.addItemToInventory({
           userEmail: mail.userEmail,
           itemId: mail.itemId,
           stack: mail.itemStack,

@@ -1,9 +1,6 @@
 import { MonsterWithDrops, UserWithStats } from './battle';
 
-function generateBattleAttackOrder(
-  users: UserWithStats[],
-  monsters: MonsterWithDrops[],
-) {
+function generateBattleAttackOrder(users: UserWithStats[], monsters: MonsterWithDrops[]) {
   const mixedArray: string[] = [];
 
   const maxLength = Math.max(users.length, monsters.length);

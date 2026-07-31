@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
-import { RevenueCatPurchaseWebhook } from './entities/purchase.entity';
+import { RevenueCatPurchaseWebhook } from './purchase.entity';
 import { PrismaService } from 'src/core/prisma/prisma.service';
-import { RevenueCatService } from './revenuecat.service';
-import { NotificationService } from 'src/services/notification/notification.service';
+import { RevenueCatService } from 'src/integrations/revenuecat/revenuecat.service';
+import { NotificationService } from 'src/integrations/notification/notification.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { MailService } from 'src/feature/mail/mail.service';
 

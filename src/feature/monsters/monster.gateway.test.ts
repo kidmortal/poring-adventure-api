@@ -12,12 +12,7 @@ describe('Party Gateway', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [CacheModule.register({ ttl: 1000 * 60 * 10 })],
-      providers: [
-        MonsterGateway,
-        MonstersService,
-        PrismaService,
-        WebsocketService,
-      ],
+      providers: [MonsterGateway, MonstersService, PrismaService, WebsocketService],
     }).compile();
 
     service = module.get<MonstersService>(MonstersService);

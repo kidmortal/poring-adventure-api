@@ -4,7 +4,7 @@ import { AdminGateway } from './admin.gateway';
 import { UsersModule } from 'src/feature/users/users.module';
 import { WebsocketModule } from 'src/core/websocket/websocket.module';
 import { CacheModule } from '@nestjs/cache-manager';
-import { NotificationModule } from 'src/services/notification/notification.module';
+import { NotificationModule } from 'src/integrations/notification/notification.module';
 import { MailModule } from 'src/feature/mail/mail.module';
 
 @Module({

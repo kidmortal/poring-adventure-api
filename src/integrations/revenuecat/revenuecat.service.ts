@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 
 import * as Sentry from '@sentry/node';
-import { RevenueCatCustomer } from './entities/customer.entity';
+import { RevenueCatCustomer } from './customer.entity';
 
 @Injectable()
 export class RevenueCatService {
