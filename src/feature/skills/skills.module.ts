@@ -6,5 +6,6 @@ import { UsersModule } from 'src/feature/users/users.module';
 @Module({
   imports: [UsersModule],
   providers: [SkillsGateway, SkillsService],
+  exports: [SkillsService],
 })
 export class SkillsModule {}
