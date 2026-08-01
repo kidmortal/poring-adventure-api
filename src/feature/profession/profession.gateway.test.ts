@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { UsersService } from 'src/feature/users/users.service';
 import { CraftingService } from './crafting.service';
 import { GatheringService } from './gathering.service';
 import { ProfessionGateway } from './profession.gateway';
@@ -11,11 +12,13 @@ describe('Profession Gateway', () => {
   let professions: { learnProfession: jest.Mock; getUserProfessions: jest.Mock; getAllProfessions: jest.Mock };
   let gathering: { gather: jest.Mock; getAllNodes: jest.Mock };
   let crafting: { craft: jest.Mock; getAllRecipes: jest.Mock };
+  let users: { notifyUserUpdateWithProfile: jest.Mock };
 
   beforeEach(async () => {
     professions = { learnProfession: jest.fn(), getUserProfessions: jest.fn(), getAllProfessions: jest.fn() };
     gathering = { gather: jest.fn(), getAllNodes: jest.fn() };
     crafting = { craft: jest.fn(), getAllRecipes: jest.fn() };
+    users = { notifyUserUpdateWithProfile: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -23,16 +26,18 @@ describe('Profession Gateway', () => {
         { provide: ProfessionService, useValue: professions },
         { provide: GatheringService, useValue: gathering },
         { provide: CraftingService, useValue: crafting },
+        { provide: UsersService, useValue: users },
       ],
     }).compile();
 
     gateway = module.get<ProfessionGateway>(ProfessionGateway);
   });
 
-  it('learns a profession for the user on the handshake', async () => {
+  it('learns a profession and pushes the profile carrying it', async () => {
     await gateway.learnProfession({ professionId: 3 }, socket);
 
     expect(professions.learnProfession).toHaveBeenCalledWith({ userEmail: 'auth@email.com', professionId: 3 });
+    expect(users.notifyUserUpdateWithProfile).toHaveBeenCalledWith({ email: 'auth@email.com' });
   });
 
   it('gathers as the user on the handshake', async () => {

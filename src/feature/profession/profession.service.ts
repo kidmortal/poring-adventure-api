@@ -5,9 +5,9 @@ import { UsersRepository } from 'src/feature/users/users.repository';
 import { Utils } from 'src/utilities/utils';
 
 /**
- * The crafting and gathering trades. A profession is learned once and then
- * levels on its own, independently of the combat class and of the other
- * professions — mining never advances cooking.
+ * The crafting and gathering trades. A player commits to exactly one profession
+ * at a time: it levels on its own, independently of the combat class, and
+ * swapping to another one abandons the current one's level for good.
  */
 @Injectable()
 export class ProfessionService {
@@ -32,23 +32,41 @@ export class ProfessionService {
     });
   }
 
+  /** The one profession the player currently practices, or null while undecided. */
+  getUserProfession(args: { userEmail: string }) {
+    return this.prisma.userProfession.findFirst({
+      where: { userEmail: args.userEmail },
+      include: { profession: true },
+    });
+  }
+
+  /**
+   * Learns a profession, or swaps to it. A player only ever holds one, so
+   * swapping drops the current one entirely — its level and experience are gone
+   * and coming back later means starting over at level 1.
+   */
   async learnProfession(args: { userEmail: string; professionId: number }) {
     const profession = await this.prisma.profession.findUnique({ where: { id: args.professionId } });
     if (!profession) {
       throw new BadRequestException('Profession does not exist');
     }
 
-    const existing = await this.prisma.userProfession.findUnique({
-      where: { userEmail_professionId: { userEmail: args.userEmail, professionId: args.professionId } },
-    });
-    if (existing) {
+    const current = await this.getUserProfession({ userEmail: args.userEmail });
+    if (current?.professionId === args.professionId) {
       throw new BadRequestException('Profession already learned');
     }
 
-    this.logger.debug(`${args.userEmail} learned ${profession.name}`);
-    await this.prisma.userProfession.create({
-      data: { userEmail: args.userEmail, professionId: args.professionId },
+    await this.prisma.$transaction(async (tx) => {
+      if (current) {
+        this.logger.debug(`${args.userEmail} abandoned ${current.profession.name} at level ${current.level}`);
+        await tx.userProfession.deleteMany({ where: { userEmail: args.userEmail } });
+      }
+      await tx.userProfession.create({
+        data: { userEmail: args.userEmail, professionId: args.professionId },
+      });
     });
+
+    this.logger.debug(`${args.userEmail} learned ${profession.name}`);
     await this.repository.clearUserCache({ email: args.userEmail });
     return true;
   }
