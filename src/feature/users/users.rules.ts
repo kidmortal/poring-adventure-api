@@ -22,6 +22,19 @@ export function clampVital(args: { current: number; amount: number; max?: number
   return Number.isFinite(args.max) ? Math.min(raised, args.max) : raised;
 }
 
+/**
+ * Stamina refills once per calendar day. The comparison is on the UTC date so
+ * every player's day rolls over at the same instant, whatever their timezone.
+ */
+export function isNewDay(lastRefill: Date | undefined, now: Date) {
+  if (!lastRefill) return true;
+  return utcDay(lastRefill) !== utcDay(now);
+}
+
+function utcDay(date: Date) {
+  return `${date.getUTCFullYear()}-${date.getUTCMonth()}-${date.getUTCDate()}`;
+}
+
 /** Builds the prisma stats payload, defaulting every untouched stat to 0. */
 export function statDelta(changes: StatChanges, direction: 'increment' | 'decrement') {
   return {

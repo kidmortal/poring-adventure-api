@@ -3,6 +3,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { UsersRepository } from './users.repository';
+import { UserStaminaService } from './userStamina.service';
 
 /**
  * The user profile itself: account lifecycle, lookups and pushing profile
@@ -15,6 +16,7 @@ export class UsersService {
     private readonly websocket: WebsocketService,
     private readonly prisma: PrismaService,
     private readonly repository: UsersRepository,
+    private readonly stamina: UserStaminaService,
   ) {}
 
   notifyUserUpdate(args: { email: string; payload: any }) {
@@ -35,7 +37,9 @@ export class UsersService {
     return true;
   }
 
+  /** Reading the profile is the moment a new day's stamina is granted. */
   async findOne(args: { userEmail: string }) {
+    await this.stamina.refillIfNewDay({ userEmail: args.userEmail });
     await this.notifyUserUpdateWithProfile({ email: args.userEmail });
     return true;
   }
@@ -53,7 +57,7 @@ export class UsersService {
           },
         },
         stats: { create: { experience: 1 } },
-        professionId: createUserDto.professionId,
+        classId: createUserDto.classId,
       },
     });
   }
@@ -63,8 +67,8 @@ export class UsersService {
     return { users, count };
   }
 
-  getAllProfessions() {
-    return this.prisma.profession.findMany({ include: { skills: true } });
+  getAllClasses() {
+    return this.prisma.class.findMany({ include: { skills: true } });
   }
 
   getAllHeads() {

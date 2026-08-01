@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { UsersService } from './users.service';
 import { UsersRepository } from './users.repository';
+import { UserStaminaService } from './userStamina.service';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 
@@ -17,6 +18,7 @@ describe('User Service', () => {
       providers: [
         UsersService,
         UsersRepository,
+        UserStaminaService,
         PrismaService,
         WebsocketService,
         { provide: CACHE_MANAGER, useValue: cacheMock() },
@@ -33,6 +35,8 @@ describe('User Service', () => {
       const authEmail = 'auth@email.com';
       const fakeUser = { email: authEmail } as any;
       prisma.user.findUnique = jest.fn().mockResolvedValue(fakeUser);
+      // Reading the profile also checks the daily stamina refill.
+      prisma.stats.findUnique = jest.fn().mockResolvedValue({ staminaRefilledAt: new Date(), maxStamina: 50 });
       const sendMessageToSocket = jest.fn().mockResolvedValue(true);
       socket.sendMessageToSocket = sendMessageToSocket;
 
@@ -63,7 +67,7 @@ describe('User Service', () => {
   describe('create', () => {
     it('should create the user with appearance and starting stats', async () => {
       const createUserDto = {
-        professionId: 1,
+        classId: 1,
         costume: 'rogue',
         email: 'auth@email.com',
         gender: 'male',
@@ -86,7 +90,7 @@ describe('User Service', () => {
             },
           },
           stats: { create: { experience: 1 } },
-          professionId: createUserDto.professionId,
+          classId: createUserDto.classId,
         },
       });
       expect(returnUser).toBe(fakeNewUser);
@@ -106,14 +110,14 @@ describe('User Service', () => {
     });
   });
 
-  describe('getAllProfessions', () => {
-    it('should return list of professions', async () => {
+  describe('getAllClasses', () => {
+    it('should return list of classes', async () => {
       const fakeReturn = {} as any;
-      prisma.profession.findMany = jest.fn().mockResolvedValue(fakeReturn);
+      prisma.class.findMany = jest.fn().mockResolvedValue(fakeReturn);
 
-      const result = await service.getAllProfessions();
+      const result = await service.getAllClasses();
 
-      expect(prisma.profession.findMany).toHaveBeenCalled();
+      expect(prisma.class.findMany).toHaveBeenCalled();
       expect(result).toBe(fakeReturn);
     });
   });

@@ -5,6 +5,7 @@ import { PrismaService } from 'src/core/prisma/prisma.service';
 import { SkillsService } from 'src/feature/skills/skills.service';
 import { SkillsGateway } from 'src/feature/skills/skills.gateway';
 import { UsersService } from 'src/feature/users/users.service';
+import { UserStaminaService } from 'src/feature/users/userStamina.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 
 describe('Skill Gateway', () => {
@@ -20,6 +21,7 @@ describe('Skill Gateway', () => {
         SkillsService,
         PrismaService,
         UsersService,
+        UserStaminaService,
         WebsocketService,
       ],
     }).compile();

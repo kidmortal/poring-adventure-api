@@ -11,7 +11,7 @@ export class CreateUserDto {
   name: string;
 
   @IsNotEmpty()
-  professionId: number;
+  classId: number;
 
   @IsNotEmpty()
   costume: string;

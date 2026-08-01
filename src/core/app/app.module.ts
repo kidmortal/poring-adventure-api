@@ -25,6 +25,7 @@ import { UsersModule } from 'src/feature/users/users.module';
 import { MonstersModule } from 'src/feature/monsters/monsters.module';
 import { PartyModule } from 'src/feature/party/party.module';
 import { SkillsModule } from 'src/feature/skills/skills.module';
+import { ProfessionModule } from 'src/feature/profession/profession.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { SkillsModule } from 'src/feature/skills/skills.module';
     WebsocketModule,
     PartyModule,
     SkillsModule,
+    ProfessionModule,
     AdminModule,
     GuildModule,
     MailModule,

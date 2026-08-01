@@ -119,7 +119,7 @@ export class UserStatsService {
     return true;
   }
 
-  /** A level is worth one copy of the profession's per-level stat block. */
+  /** A level is worth one copy of the class's per-level stat block. */
   private async _applyLevels(args: {
     userEmail: string;
     amount: number;
@@ -129,18 +129,18 @@ export class UserStatsService {
     const tx = args.tx || this.prisma;
     const user = await tx.user.findUnique({
       where: { email: args.userEmail },
-      include: { profession: true },
+      include: { class: true },
     });
-    const { profession } = user;
+    const { class: userClass } = user;
     const gain = {
       userEmail: args.userEmail,
       level: args.amount,
-      health: profession.health * args.amount,
-      mana: profession.mana * args.amount,
-      attack: profession.attack * args.amount,
-      str: profession.str * args.amount,
-      agi: profession.agi * args.amount,
-      int: profession.int * args.amount,
+      health: userClass.health * args.amount,
+      mana: userClass.mana * args.amount,
+      attack: userClass.attack * args.amount,
+      str: userClass.str * args.amount,
+      agi: userClass.agi * args.amount,
+      int: userClass.int * args.amount,
       tx,
     };
     return this._applyStats(gain, args.direction);

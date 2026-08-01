@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { UsersRepository } from 'src/feature/users/users.repository';
+import { UserStaminaService } from './userStamina.service';
 import { UsersService } from './users.service';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
@@ -16,6 +17,7 @@ describe('User Gateway', () => {
         UsersGateway,
         UsersService,
         UsersRepository,
+        UserStaminaService,
         PrismaService,
         WebsocketService,
         { provide: CACHE_MANAGER, useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn() } },
@@ -54,7 +56,7 @@ describe('User Gateway', () => {
     it('should call create service and notify user when passing email on handshake auth ', async () => {
       const authEmail = 'auth@email.com';
       const createUserDto = {
-        professionId: 1,
+        classId: 1,
         costume: 'rogue',
         email: authEmail,
         gender: 'male',
@@ -85,13 +87,13 @@ describe('User Gateway', () => {
       expect(returnUser).toBe(fakeReturn);
     });
   });
-  describe('get_all_professions', () => {
-    it('should call get_all_professions service', async () => {
+  describe('get_all_classes', () => {
+    it('should call get_all_classes service', async () => {
       const fakeReturn = {} as any;
-      const getAllProfessions = jest.fn().mockReturnValue(fakeReturn);
-      jest.spyOn(service, 'getAllProfessions').mockImplementation(getAllProfessions);
+      const getAllClasses = jest.fn().mockReturnValue(fakeReturn);
+      jest.spyOn(service, 'getAllClasses').mockImplementation(getAllClasses);
       const returnUser = await gateway.getAllClasses();
-      expect(getAllProfessions).toHaveBeenCalled();
+      expect(getAllClasses).toHaveBeenCalled();
       expect(returnUser).toBe(fakeReturn);
     });
   });

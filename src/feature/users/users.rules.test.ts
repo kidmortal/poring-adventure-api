@@ -1,4 +1,4 @@
-import { clampVital, statDelta } from './users.rules';
+import { clampVital, isNewDay, statDelta } from './users.rules';
 
 describe('users rules', () => {
   describe('clampVital', () => {
@@ -42,6 +42,25 @@ describe('users rules', () => {
         maxHealth: { decrement: 10 },
         maxMana: { decrement: 3 },
       });
+    });
+  });
+
+  describe('isNewDay', () => {
+    it('refills when the last refill was on an earlier day', () => {
+      expect(isNewDay(new Date('2024-07-31T23:59:00Z'), new Date('2024-08-01T00:01:00Z'))).toBe(true);
+    });
+
+    it('does not refill twice on the same day', () => {
+      expect(isNewDay(new Date('2024-08-01T00:01:00Z'), new Date('2024-08-01T23:59:00Z'))).toBe(false);
+    });
+
+    it('compares the whole date, not just the day number', () => {
+      expect(isNewDay(new Date('2024-07-01T10:00:00Z'), new Date('2024-08-01T10:00:00Z'))).toBe(true);
+      expect(isNewDay(new Date('2023-08-01T10:00:00Z'), new Date('2024-08-01T10:00:00Z'))).toBe(true);
+    });
+
+    it('refills when no refill was ever recorded', () => {
+      expect(isNewDay(undefined, new Date())).toBe(true);
     });
   });
 });

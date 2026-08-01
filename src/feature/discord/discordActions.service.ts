@@ -13,6 +13,9 @@ import { MarketService } from 'src/feature/market/market.service';
 import { PartyService } from 'src/feature/party/party.service';
 import { MailService } from 'src/feature/mail/mail.service';
 import { SkillsService } from 'src/feature/skills/skills.service';
+import { ProfessionService } from 'src/feature/profession/profession.service';
+import { GatheringService } from 'src/feature/profession/gathering.service';
+import { CraftingService } from 'src/feature/profession/crafting.service';
 import { DiscordService } from './discord.service';
 
 /**
@@ -39,6 +42,9 @@ export class DiscordActionsService {
     private readonly partyService: PartyService,
     private readonly mailService: MailService,
     private readonly skillsService: SkillsService,
+    private readonly professionService: ProfessionService,
+    private readonly gatheringService: GatheringService,
+    private readonly craftingService: CraftingService,
   ) {}
 
   private email(discordId: string) {
@@ -310,7 +316,7 @@ export class DiscordActionsService {
     const user = await this.usersRepository.getFullUser({ userEmail: await this.email(args.discordId) });
     return {
       learned: user?.learnedSkills ?? [],
-      available: user?.profession?.skills ?? [],
+      available: user?.class?.skills ?? [],
     };
   }
 
@@ -324,6 +330,39 @@ export class DiscordActionsService {
 
   async unequipSkill(args: { discordId: string; skillId: number }) {
     return this.skillsService.unequip({ email: await this.email(args.discordId), skillId: args.skillId });
+  }
+
+  // ------------------------------------------------------------ professions
+
+  getAllProfessions() {
+    return this.professionService.getAllProfessions();
+  }
+
+  async getProfessions(args: { discordId: string }) {
+    return this.professionService.getUserProfessions({ userEmail: await this.email(args.discordId) });
+  }
+
+  async learnProfession(args: { discordId: string; professionId: number }) {
+    return this.professionService.learnProfession({
+      userEmail: await this.email(args.discordId),
+      professionId: args.professionId,
+    });
+  }
+
+  getGatheringNodes() {
+    return this.gatheringService.getAllNodes();
+  }
+
+  async gather(args: { discordId: string; nodeId: number }) {
+    return this.gatheringService.gather({ userEmail: await this.email(args.discordId), nodeId: args.nodeId });
+  }
+
+  getRecipes() {
+    return this.craftingService.getAllRecipes();
+  }
+
+  async craft(args: { discordId: string; recipeId: number }) {
+    return this.craftingService.craft({ userEmail: await this.email(args.discordId), recipeId: args.recipeId });
   }
 
   // ---------------------------------------------------------------- helpers

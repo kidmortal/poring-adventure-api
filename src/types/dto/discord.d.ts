@@ -41,3 +41,6 @@ declare type DiscordInviteToPartyDto = DiscordActionDto & { invitedDiscordId: st
 declare type DiscordKickFromPartyDto = DiscordActionDto & { kickedDiscordId: string };
 declare type DiscordPartyMessageDto = DiscordActionDto & { message: string };
 declare type DiscordSkillDto = DiscordActionDto & { skillId: number };
+declare type DiscordProfessionDto = DiscordActionDto & { professionId: number };
+declare type DiscordGatherDto = DiscordActionDto & { nodeId: number };
+declare type DiscordCraftDto = DiscordActionDto & { recipeId: number };

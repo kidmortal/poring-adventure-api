@@ -10,7 +10,7 @@ export type FullParty = Prisma.PartyGetPayload<{
       include: {
         stats: true;
         appearance: true;
-        profession: true;
+        class: true;
         learnedSkills: { include: { skill: true } };
         buffs: { include: { buff: true } };
       };
@@ -44,7 +44,7 @@ export class PartyRepository {
           include: {
             stats: true,
             appearance: true,
-            profession: true,
+            class: true,
             learnedSkills: { include: { skill: true } },
             buffs: { include: { buff: true } },
           },
