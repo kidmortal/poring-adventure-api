@@ -6,8 +6,13 @@ export type RolledDrop = { itemId: number; amount: number };
 /** Stamina a hired enhancement costs the blacksmith, whatever the item is. */
 export const ENHANCE_SERVICE_STAMINA_COST = 10;
 
-/** Profession experience the blacksmith earns per enhancement attempt. */
-export const ENHANCE_SERVICE_EXPERIENCE = 20;
+/** Every stamina point spent on a service is worth this much experience. */
+export const EXPERIENCE_PER_STAMINA = 2;
+
+/** What a service job pays the worker in profession experience. */
+export function serviceExperience(args: { staminaCost: number }) {
+  return args.staminaCost * EXPERIENCE_PER_STAMINA;
+}
 
 /** A hired job is priced off the stamina it burns, not off what it produces. */
 export function serviceFee(args: { staminaCost: number; pricePerStamina: number }) {
@@ -15,12 +20,17 @@ export function serviceFee(args: { staminaCost: number; pricePerStamina: number 
 }
 
 /**
- * A hired blacksmith enhances better than you do: every level adds two points
- * to the base chance. Capped short of certainty so a high level smith is worth
- * hiring without making enhancement free of risk.
+ * A hired blacksmith enhances better than you do: each of their levels adds a
+ * tenth of the base chance, so the boost is worth most where the odds are
+ * already decent and never turns a hopeless attempt into a sure thing.
  */
+export function hiredEnhanceBonus(args: { baseChance: number; blacksmithLevel: number }) {
+  const bonus = Math.round(args.baseChance * 0.1 * args.blacksmithLevel);
+  return Math.min(bonus, 100 - args.baseChance);
+}
+
 export function hiredEnhanceChance(args: { baseChance: number; blacksmithLevel: number }) {
-  return Math.min(args.baseChance + args.blacksmithLevel * 2, 95);
+  return args.baseChance + hiredEnhanceBonus(args);
 }
 
 /**
@@ -65,4 +75,46 @@ export function planIngredientConsumption(args: {
   }
 
   return plan;
+}
+
+/**
+ * Quality a craft can roll: 1 Common through 5 Legendary. Mythical is not on the
+ * table — it is not something a workshop produces.
+ */
+export type QualityChance = { quality: number; chance: number };
+
+/**
+ * How likely each quality is for a crafter of this level. Every level shifts
+ * weight out of Common and into the tiers above it, and each tier has a ceiling
+ * so a veteran is reliably good rather than guaranteed legendary. The rates are
+ * deliberately generous — a tier that used to need twenty levels lands around
+ * ten — because grinding to a first Rare was taking far too long.
+ */
+export function craftQualityChances(args: { level: number }): QualityChance[] {
+  const level = Math.max(args.level, 1);
+  const uncommon = Math.min(level * 6, 40);
+  const rare = Math.min(Math.floor(level * 3), 25);
+  const epic = Math.min(Math.floor(level * 1.2), 12);
+  const legendary = Math.min(Math.floor(level * 0.4), 8);
+  const common = 100 - uncommon - rare - epic - legendary;
+
+  return [
+    { quality: 1, chance: common },
+    { quality: 2, chance: uncommon },
+    { quality: 3, chance: rare },
+    { quality: 4, chance: epic },
+    { quality: 5, chance: legendary },
+  ];
+}
+
+/** Rolls one quality off that table. */
+export function rollCraftQuality(args: { level: number }): number {
+  const roll = Math.random() * 100;
+  let passed = 0;
+
+  for (const entry of craftQualityChances(args)) {
+    passed += entry.chance;
+    if (roll < passed) return entry.quality;
+  }
+  return 1;
 }

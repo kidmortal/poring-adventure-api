@@ -82,10 +82,16 @@ export class GuildRepository {
     const cached = await this.cache.get(cacheKey);
     if (cached) return cached;
 
+    // Carries what the guild profile shows — blessings, the running task and
+    // each member's class — so opening one from the ranking costs no request.
     const guildRanking = await this.prisma.guild.findMany({
       take: 10,
       orderBy: { experience: 'desc' },
-      include: { members: { include: { user: { include: { stats: true } } } } },
+      include: {
+        blessing: true,
+        currentGuildTask: { include: { task: { include: { target: true } } } },
+        members: { include: { user: { include: { stats: true, class: true, appearance: true } } } },
+      },
     });
     await this.cache.set(cacheKey, guildRanking);
     return guildRanking;

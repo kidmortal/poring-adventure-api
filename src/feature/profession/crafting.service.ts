@@ -4,7 +4,7 @@ import { InventoryService } from 'src/feature/items/inventory.service';
 import { UserStaminaService } from 'src/feature/users/userStamina.service';
 import { UsersService } from 'src/feature/users/users.service';
 import { ProfessionService } from './profession.service';
-import { planIngredientConsumption } from './profession.rules';
+import { planIngredientConsumption, rollCraftQuality } from './profession.rules';
 
 /**
  * Crafting: ingredients plus stamina in, one item out. Nothing is random —
@@ -38,7 +38,7 @@ export class CraftingService {
       throw new BadRequestException('Recipe does not exist');
     }
 
-    await this.professions.requireLearnedProfession({
+    const learned = await this.professions.requireLearnedProfession({
       userEmail: args.userEmail,
       professionId: recipe.professionId,
       requiredLevel: recipe.requiredLevel,
@@ -58,6 +58,9 @@ export class CraftingService {
       throw new BadRequestException('You are missing ingredients for this recipe');
     }
 
+    // The crafter's level is what decides how good the result comes out.
+    const quality = rollCraftQuality({ level: learned.level });
+
     await this.prisma.$transaction(async (tx) => {
       await this.stamina.consumeStamina({ userEmail: args.userEmail, amount: recipe.staminaCost, tx });
       for (const taken of consumption) {
@@ -72,6 +75,7 @@ export class CraftingService {
         userEmail: args.userEmail,
         itemId: recipe.itemId,
         stack: recipe.amount,
+        quality,
         tx,
       });
       await this.professions.addExperience({
@@ -82,8 +86,8 @@ export class CraftingService {
       });
     });
 
-    this.logger.debug(`${args.userEmail} crafted ${recipe.name}`);
+    this.logger.debug(`${args.userEmail} crafted ${recipe.name} at quality ${quality}`);
     await this.userService.notifyUserUpdateWithProfile({ email: args.userEmail });
-    return { recipe: recipe.name, amount: recipe.amount, experience: recipe.experience };
+    return { recipe: recipe.name, amount: recipe.amount, experience: recipe.experience, quality };
   }
 }
