@@ -20,15 +20,39 @@ describe('Profession Service', () => {
   });
 
   describe('learnProfession', () => {
-    it('creates the progression row for a profession the user does not have', async () => {
+    /** The swap runs in a transaction, so the tx client is what the writes land on. */
+    const mockTransaction = () => {
+      const tx = { userProfession: { create: jest.fn(), deleteMany: jest.fn() } };
+      prisma.$transaction = jest.fn().mockImplementation((callback) => callback(tx));
+      return tx;
+    };
+
+    it('creates the progression row for a user with no profession', async () => {
       prisma.profession.findUnique = jest.fn().mockResolvedValue({ id: 1, name: 'Mining' });
-      prisma.userProfession.findUnique = jest.fn().mockResolvedValue(null);
-      prisma.userProfession.create = jest.fn().mockResolvedValue({});
+      prisma.userProfession.findFirst = jest.fn().mockResolvedValue(null);
+      const tx = mockTransaction();
 
       const result = await service.learnProfession({ userEmail: 'test@test.com', professionId: 1 });
 
-      expect(prisma.userProfession.create).toHaveBeenCalledWith({
+      expect(tx.userProfession.deleteMany).not.toHaveBeenCalled();
+      expect(tx.userProfession.create).toHaveBeenCalledWith({
         data: { userEmail: 'test@test.com', professionId: 1 },
+      });
+      expect(result).toBe(true);
+    });
+
+    it('swaps professions by dropping the current one, level and all', async () => {
+      prisma.profession.findUnique = jest.fn().mockResolvedValue({ id: 2, name: 'Cooking' });
+      prisma.userProfession.findFirst = jest
+        .fn()
+        .mockResolvedValue({ id: 5, professionId: 1, level: 4, profession: { name: 'Mining' } });
+      const tx = mockTransaction();
+
+      const result = await service.learnProfession({ userEmail: 'test@test.com', professionId: 2 });
+
+      expect(tx.userProfession.deleteMany).toHaveBeenCalledWith({ where: { userEmail: 'test@test.com' } });
+      expect(tx.userProfession.create).toHaveBeenCalledWith({
+        data: { userEmail: 'test@test.com', professionId: 2 },
       });
       expect(result).toBe(true);
     });
@@ -41,15 +65,17 @@ describe('Profession Service', () => {
       );
     });
 
-    it('refuses to learn the same profession twice, which would reset its level', async () => {
+    it('refuses to re-learn the profession already practiced, which would reset its level', async () => {
       prisma.profession.findUnique = jest.fn().mockResolvedValue({ id: 1, name: 'Mining' });
-      prisma.userProfession.findUnique = jest.fn().mockResolvedValue({ id: 5, level: 4 });
-      prisma.userProfession.create = jest.fn();
+      prisma.userProfession.findFirst = jest
+        .fn()
+        .mockResolvedValue({ id: 5, professionId: 1, level: 4, profession: { name: 'Mining' } });
+      prisma.$transaction = jest.fn();
 
       await expect(service.learnProfession({ userEmail: 'test@test.com', professionId: 1 })).rejects.toThrow(
         'Profession already learned',
       );
-      expect(prisma.userProfession.create).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
   });
 

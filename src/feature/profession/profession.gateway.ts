@@ -4,6 +4,7 @@ import { Logger, UseFilters, UseGuards } from '@nestjs/common';
 
 import { WebsocketExceptionsFilter } from 'src/core/websocket/websocketException.filter';
 import { WebsocketAuthEmailGuard } from 'src/core/websocket/websocket.guard';
+import { UsersService } from 'src/feature/users/users.service';
 import { ProfessionService } from './profession.service';
 import { GatheringService } from './gathering.service';
 import { CraftingService } from './crafting.service';
@@ -17,6 +18,7 @@ export class ProfessionGateway {
     private readonly professionService: ProfessionService,
     private readonly gatheringService: GatheringService,
     private readonly craftingService: CraftingService,
+    private readonly userService: UsersService,
   ) {}
   private logger = new Logger('Websocket - professions');
 
@@ -37,7 +39,10 @@ export class ProfessionGateway {
   async learnProfession(@MessageBody() dto: ProfessionIdDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug(`learn_profession ${email}`);
-    return this.professionService.learnProfession({ userEmail: email, professionId: dto.professionId });
+    await this.professionService.learnProfession({ userEmail: email, professionId: dto.professionId });
+    // The learned trade rides along on the profile, so the client only needs
+    // the push to render it.
+    return this.userService.notifyUserUpdateWithProfile({ email });
   }
 
   @SubscribeMessage('get_gathering_nodes')
