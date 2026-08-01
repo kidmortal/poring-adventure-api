@@ -36,6 +36,7 @@ model User {
   purchases         UserPurchase[]
   professions       UserProfession[]
   serviceOffer      ServiceOffer?
+  notifications     Notification[]
   discord           Discord?
 }
 
@@ -348,6 +349,23 @@ model Mail {
   visualized Boolean
   user       User     @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   userEmail  String
+  createdAt  DateTime @default(now())
+}
+
+/// A record of something that happened to a player while they were away: a
+/// service of theirs being hired, and what it earned them. Purely informational
+/// — the silver and experience are already paid when the row is written.
+model Notification {
+  id         Int      @id @default(autoincrement())
+  user       User     @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  userEmail  String
+  /// What happened, so the client can pick an icon: hired_craft, hired_enhance.
+  type       String   @default("info")
+  title      String
+  message    String
+  silver     Int      @default(0)
+  experience Int      @default(0)
+  read       Boolean  @default(false)
   createdAt  DateTime @default(now())
 }
 

@@ -50,6 +50,11 @@ export class ServiceOfferService {
     if (!learned) {
       throw new BadRequestException('You have not learned a profession');
     }
+    // Gathering is done at a node, on your own: there is no job someone else
+    // could pay you to do.
+    if (learned.profession.kind !== 'crafting') {
+      throw new BadRequestException(`${learned.profession.name} cannot be hired out`);
+    }
     if (args.enhancing && !learned.profession.canEnhance) {
       throw new BadRequestException(`${learned.profession.name} cannot enhance items for others`);
     }

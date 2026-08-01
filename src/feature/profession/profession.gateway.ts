@@ -14,6 +14,7 @@ import {
   GatheringNodeIdDto,
   HireCraftDto,
   HireEnhanceDto,
+  InventoryIdDto,
   ProfessionIdDto,
   PublishServiceOfferDto,
   RecipeIdDto,
@@ -119,6 +120,13 @@ export class ProfessionGateway {
     const email = client.handshake.auth.email;
     this.logger.debug(`hire_craft ${email}`);
     return this.hiringService.hireCraft({ hirerEmail: email, offerId: dto.offerId, recipeId: dto.recipeId });
+  }
+
+  @SubscribeMessage('self_assisted_enhance')
+  async selfAssistedEnhance(@MessageBody() dto: InventoryIdDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`self_assisted_enhance ${email}`);
+    return this.hiringService.selfAssistedEnhance({ userEmail: email, inventoryId: dto.inventoryId });
   }
 
   @SubscribeMessage('hire_enhance')

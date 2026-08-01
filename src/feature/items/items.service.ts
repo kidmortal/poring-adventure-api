@@ -26,7 +26,8 @@ export class ItemsService {
 
   /**
    * Pays the enhancement price and rolls for success. The silver is spent
-   * either way — a failed roll simply leaves the item untouched.
+   * either way — a failed roll simply leaves the item untouched. Returns the
+   * outcome so the caller can show it, or false when the attempt was refused.
    */
   async enhanceItem(args: { userEmail: string; inventoryId: number }) {
     return this.prisma.$transaction(async (tx) => {
@@ -48,7 +49,10 @@ export class ItemsService {
         return this._deny(args.userEmail, 'Not enough silver');
       }
 
-      if (Utils.isSuccess(Utils.enhanceChance(nextEnhancement))) {
+      const chance = Utils.enhanceChance(nextEnhancement);
+      const success = Utils.isSuccess(chance);
+
+      if (success) {
         await this.inventory.removeItemFromInventory({ ...args, stack: 1, tx });
         await this.inventory.addItemToInventory({
           itemId: inventoryItem.itemId,
@@ -71,7 +75,13 @@ export class ItemsService {
 
       await this.userWallet.removeSilverFromUser({ userEmail: args.userEmail, amount: price, tx });
       await this.userService.notifyUserUpdateWithProfile({ email: args.userEmail });
-      return true;
+      return {
+        item: inventoryItem.item.name,
+        enhancement: success ? nextEnhancement : inventoryItem.enhancement,
+        success,
+        chance,
+        forgePrice: price,
+      };
     });
   }
 

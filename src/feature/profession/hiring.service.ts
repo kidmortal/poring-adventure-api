@@ -5,14 +5,16 @@ import { InventoryService } from 'src/feature/items/inventory.service';
 import { UserStaminaService } from 'src/feature/users/userStamina.service';
 import { UserWalletService } from 'src/feature/users/userWallet.service';
 import { UsersService } from 'src/feature/users/users.service';
+import { NotificationService } from 'src/feature/mail/notification.service';
 import { Utils } from 'src/utilities/utils';
 import { ProfessionService } from './profession.service';
 import { ServiceOfferService } from './serviceOffer.service';
 import {
-  ENHANCE_SERVICE_EXPERIENCE,
   ENHANCE_SERVICE_STAMINA_COST,
   hiredEnhanceChance,
   planIngredientConsumption,
+  rollCraftQuality,
+  serviceExperience,
   serviceFee,
 } from './profession.rules';
 
@@ -32,6 +34,7 @@ export class HiringService {
     private readonly wallet: UserWalletService,
     private readonly inventory: InventoryService,
     private readonly userService: UsersService,
+    private readonly notifications: NotificationService,
     private readonly websocket: WebsocketService,
   ) {}
   private readonly logger = new Logger('Hiring');
@@ -55,8 +58,10 @@ export class HiringService {
     }
 
     // The crafter's own level gates the job, exactly as if they crafted it for
-    // themselves — hiring is not a way around a recipe's requirements.
-    await this.professions.requireLearnedProfession({
+    // themselves — hiring is not a way around a recipe's requirements. It is
+    // also what the result's quality is rolled against, which is the reason to
+    // hire a good one.
+    const crafter = await this.professions.requireLearnedProfession({
       userEmail: offer.crafterEmail,
       professionId: recipe.professionId,
       requiredLevel: recipe.requiredLevel,
@@ -75,7 +80,8 @@ export class HiringService {
     }
 
     const fee = serviceFee({ staminaCost: recipe.staminaCost, pricePerStamina: offer.pricePerStamina });
-    await this._requireSilver({ userEmail: args.hirerEmail, amount: fee });
+    const hirer = await this._requireSilver({ userEmail: args.hirerEmail, amount: fee });
+    const quality = rollCraftQuality({ level: crafter.level });
 
     await this.prisma.$transaction(async (tx) => {
       // Throws when the crafter is out of stamina, which rolls back the payment
@@ -93,6 +99,7 @@ export class HiringService {
         userEmail: args.hirerEmail,
         itemId: recipe.itemId,
         stack: recipe.amount,
+        quality,
         tx,
       });
       await this.professions.addExperience({
@@ -107,6 +114,17 @@ export class HiringService {
         amount: fee,
         tx,
       });
+      // Logged inside the job, so a rolled back job leaves no record of pay
+      // that never happened.
+      await this.notifications.notify({
+        userEmail: offer.crafterEmail,
+        type: 'hired_craft',
+        title: `Crafted ${recipe.amount}x ${recipe.name} (quality ${quality})`,
+        message: `${hirer.name} hired you to craft ${recipe.name}. It cost you ${recipe.staminaCost} energy.`,
+        silver: fee,
+        experience: recipe.experience,
+        tx,
+      });
     });
 
     this.logger.debug(`${offer.crafterEmail} crafted ${recipe.name} for ${args.hirerEmail} (${fee} silver)`);
@@ -114,13 +132,16 @@ export class HiringService {
       email: offer.crafterEmail,
       text: `You crafted ${recipe.name} for ${fee} silver`,
     });
+    await this.notifications.push({ userEmail: offer.crafterEmail });
     await this._notifyBoth({ hirerEmail: args.hirerEmail, crafterEmail: offer.crafterEmail });
 
     return {
       recipe: recipe.name,
       amount: recipe.amount,
       experience: recipe.experience,
+      quality,
       crafter: offer.crafter.name,
+      crafterLevel: crafter.level,
       fee,
     };
   }
@@ -159,7 +180,7 @@ export class HiringService {
       staminaCost: ENHANCE_SERVICE_STAMINA_COST,
       pricePerStamina: offer.pricePerStamina,
     });
-    await this._requireSilver({ userEmail: args.hirerEmail, amount: forgePrice + fee });
+    const hirer = await this._requireSilver({ userEmail: args.hirerEmail, amount: forgePrice + fee });
 
     const chance = hiredEnhanceChance({
       baseChance: Utils.enhanceChance(nextEnhancement),
@@ -204,7 +225,18 @@ export class HiringService {
       await this.professions.addExperience({
         userEmail: offer.crafterEmail,
         professionId: offer.professionId,
-        amount: ENHANCE_SERVICE_EXPERIENCE,
+        amount: serviceExperience({ staminaCost: ENHANCE_SERVICE_STAMINA_COST }),
+        tx,
+      });
+      await this.notifications.notify({
+        userEmail: offer.crafterEmail,
+        type: 'hired_enhance',
+        title: success
+          ? `Enhanced a ${inventoryItem.item.name} to +${nextEnhancement}`
+          : `Failed to enhance a ${inventoryItem.item.name}`,
+        message: `${hirer.name} hired your forge at ${chance}% odds. It cost you ${ENHANCE_SERVICE_STAMINA_COST} energy.`,
+        silver: fee,
+        experience: serviceExperience({ staminaCost: ENHANCE_SERVICE_STAMINA_COST }),
         tx,
       });
     });
@@ -219,6 +251,7 @@ export class HiringService {
       success,
       fee,
     });
+    await this.notifications.push({ userEmail: offer.crafterEmail });
     await this._notifyBoth({ hirerEmail: args.hirerEmail, crafterEmail: offer.crafterEmail });
 
     return {
@@ -226,10 +259,101 @@ export class HiringService {
       enhancement: success ? nextEnhancement : inventoryItem.enhancement,
       success,
       chance,
+      baseChance: Utils.enhanceChance(nextEnhancement),
       blacksmith: offer.crafter.name,
       blacksmithLevel: blacksmith.level,
       forgePrice,
       fee,
+    };
+  }
+
+  /**
+   * A blacksmith working on their own item: no hire, no fee, but the same
+   * stamina cost and the same level bonus a customer would be paying for.
+   */
+  async selfAssistedEnhance(args: { userEmail: string; inventoryId: number }) {
+    const learned = await this.professions.getUserProfession({ userEmail: args.userEmail });
+    if (!learned?.profession.canEnhance) {
+      throw new BadRequestException('Only a blacksmith can do that');
+    }
+
+    const inventoryItem = await this.inventory.getOneInventoryItem({
+      userEmail: args.userEmail,
+      inventoryId: args.inventoryId,
+    });
+    if (!inventoryItem) {
+      throw new BadRequestException('You do not own that item');
+    }
+    if (inventoryItem.equipped) {
+      throw new BadRequestException('Cannot enhance equipped item');
+    }
+
+    const nextEnhancement = inventoryItem.enhancement + 1;
+    const forgePrice = Utils.enhancePrice(nextEnhancement);
+    await this._requireSilver({ userEmail: args.userEmail, amount: forgePrice });
+
+    const baseChance = Utils.enhanceChance(nextEnhancement);
+    const chance = hiredEnhanceChance({ baseChance, blacksmithLevel: learned.level });
+    const success = Utils.isSuccess(chance);
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.stamina.consumeStamina({
+        userEmail: args.userEmail,
+        amount: ENHANCE_SERVICE_STAMINA_COST,
+        tx,
+      });
+      await this.wallet.removeSilverFromUser({ userEmail: args.userEmail, amount: forgePrice, tx });
+
+      if (success) {
+        await this.inventory.removeItemFromInventory({
+          userEmail: args.userEmail,
+          inventoryId: args.inventoryId,
+          stack: 1,
+          tx,
+        });
+        await this.inventory.addItemToInventory({
+          userEmail: args.userEmail,
+          itemId: inventoryItem.itemId,
+          quality: inventoryItem.quality,
+          enhancement: nextEnhancement,
+          stack: 1,
+          tx,
+        });
+      }
+
+      await this.professions.addExperience({
+        userEmail: args.userEmail,
+        professionId: learned.professionId,
+        amount: serviceExperience({ staminaCost: ENHANCE_SERVICE_STAMINA_COST }),
+        tx,
+      });
+    });
+
+    this.logger.debug(
+      `${args.userEmail} worked their own ${inventoryItem.item.name} — ${success ? 'success' : 'failure'} at ${chance}%`,
+    );
+    if (success) {
+      this.websocket.sendTextNotification({
+        email: args.userEmail,
+        text: `You enhanced your ${inventoryItem.item.name}`,
+      });
+    } else {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `You failed to enhance your ${inventoryItem.item.name}`,
+      });
+    }
+    await this.userService.notifyUserUpdateWithProfile({ email: args.userEmail });
+
+    return {
+      item: inventoryItem.item.name,
+      enhancement: success ? nextEnhancement : inventoryItem.enhancement,
+      success,
+      chance,
+      baseChance,
+      blacksmithLevel: learned.level,
+      forgePrice,
+      fee: 0,
     };
   }
 
