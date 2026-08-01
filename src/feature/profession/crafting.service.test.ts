@@ -55,10 +55,26 @@ describe('Crafting Service', () => {
     expect(inventory.removeItemFromInventory).toHaveBeenCalledWith(
       expect.objectContaining({ inventoryId: 50, stack: 2 }),
     );
-    expect(inventory.addItemToInventory).toHaveBeenCalledWith(expect.objectContaining({ itemId: 20, stack: 1 }));
+    expect(inventory.addItemToInventory).toHaveBeenCalledWith(
+      expect.objectContaining({ itemId: 20, stack: 1, quality: expect.any(Number) }),
+    );
     expect(stamina.consumeStamina).toHaveBeenCalledWith(expect.objectContaining({ amount: 5 }));
     expect(professions.addExperience).toHaveBeenCalledWith(expect.objectContaining({ professionId: 4, amount: 15 }));
-    expect(result).toEqual({ recipe: 'Healing Potion', amount: 1, experience: 15 });
+    expect(result).toEqual(
+      expect.objectContaining({ recipe: 'Healing Potion', amount: 1, experience: 15, quality: expect.any(Number) }),
+    );
+  });
+
+  it('rolls the result quality against the crafter level', async () => {
+    prisma.recipe.findUnique = jest.fn().mockResolvedValue(recipe);
+    prisma.inventoryItem.findMany = jest.fn().mockResolvedValue([{ id: 50, itemId: 7, stack: 5 }]);
+    professions.requireLearnedProfession.mockResolvedValue({ level: 20 });
+    jest.spyOn(Math, 'random').mockReturnValue(0.999);
+
+    const result = await service.craft({ userEmail: 'test@test.com', recipeId: 1 });
+
+    expect(inventory.addItemToInventory).toHaveBeenCalledWith(expect.objectContaining({ quality: 5 }));
+    expect(result.quality).toBe(5);
   });
 
   it('refuses a recipe that does not exist', async () => {

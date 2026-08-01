@@ -39,6 +39,12 @@ export class HireCraftDto {
   recipeId: number;
 }
 
+/** A blacksmith working on one of their own items. */
+export class InventoryIdDto {
+  @IsNotEmpty()
+  inventoryId: number;
+}
+
 /** Hiring a blacksmith to enhance one item you own. */
 export class HireEnhanceDto {
   @IsNotEmpty()

@@ -1,6 +1,81 @@
-import { planIngredientConsumption, rollNodeDrops } from './profession.rules';
+import {
+  craftQualityChances,
+  rollCraftQuality,
+  ENHANCE_SERVICE_STAMINA_COST,
+  hiredEnhanceBonus,
+  hiredEnhanceChance,
+  planIngredientConsumption,
+  rollNodeDrops,
+  serviceExperience,
+  serviceFee,
+} from './profession.rules';
 
 describe('profession rules', () => {
+  describe('serviceFee', () => {
+    it('prices a job by the stamina it burns', () => {
+      expect(serviceFee({ staminaCost: 10, pricePerStamina: 50 })).toBe(500);
+    });
+  });
+
+  describe('serviceExperience', () => {
+    it('pays two experience per stamina point spent on the job', () => {
+      expect(serviceExperience({ staminaCost: ENHANCE_SERVICE_STAMINA_COST })).toBe(20);
+      expect(serviceExperience({ staminaCost: 5 })).toBe(10);
+    });
+  });
+
+  describe('craftQualityChances', () => {
+    it('always adds up to a whole roll', () => {
+      [1, 5, 12, 30, 99].forEach((level) => {
+        const total = craftQualityChances({ level }).reduce((sum, entry) => sum + entry.chance, 0);
+        expect(total).toBe(100);
+      });
+    });
+
+    it('moves weight out of common as the crafter levels', () => {
+      const novice = craftQualityChances({ level: 1 });
+      const veteran = craftQualityChances({ level: 20 });
+
+      expect(novice[0].chance).toBeGreaterThan(veteran[0].chance);
+      expect(veteran[4].chance).toBeGreaterThan(novice[4].chance);
+    });
+
+    it('caps every tier, so no level guarantees a legendary', () => {
+      const master = craftQualityChances({ level: 999 });
+
+      expect(master.find((entry) => entry.quality === 5)?.chance).toBe(8);
+      expect(master.find((entry) => entry.quality === 1)?.chance).toBe(15);
+    });
+  });
+
+  describe('rollCraftQuality', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it('lands on common for a low roll and on the best tier for a high one', () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0);
+      expect(rollCraftQuality({ level: 20 })).toBe(1);
+
+      jest.spyOn(Math, 'random').mockReturnValue(0.999);
+      expect(rollCraftQuality({ level: 20 })).toBe(5);
+    });
+  });
+
+  describe('hiredEnhanceBonus', () => {
+    it('adds a tenth of the base chance per blacksmith level', () => {
+      expect(hiredEnhanceBonus({ baseChance: 50, blacksmithLevel: 1 })).toBe(5);
+      expect(hiredEnhanceBonus({ baseChance: 50, blacksmithLevel: 3 })).toBe(15);
+    });
+
+    it('never pushes the odds past certainty', () => {
+      expect(hiredEnhanceChance({ baseChance: 90, blacksmithLevel: 20 })).toBe(100);
+      expect(hiredEnhanceBonus({ baseChance: 90, blacksmithLevel: 20 })).toBe(10);
+    });
+
+    it('is worth little where the odds are already bad', () => {
+      expect(hiredEnhanceBonus({ baseChance: 10, blacksmithLevel: 2 })).toBe(2);
+    });
+  });
+
   describe('rollNodeDrops', () => {
     afterEach(() => jest.restoreAllMocks());
 

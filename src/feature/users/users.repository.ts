@@ -52,13 +52,24 @@ export class UsersRepository {
     );
   }
 
+  /**
+   * The ranking page. It carries enough to render another player's profile —
+   * class, trade and worn gear — so opening one costs no extra round trip.
+   */
   getUsersPage(args: { page: number }) {
     return this._cached(`users_page_${args.page}`, () =>
       this.prisma.user.findMany({
         skip: (args.page - 1) * USERS_PER_PAGE,
         take: USERS_PER_PAGE,
         orderBy: { stats: { experience: 'desc' } },
-        include: { appearance: true, stats: true },
+        include: {
+          appearance: true,
+          stats: true,
+          class: true,
+          professions: { include: { profession: true } },
+          // Only what is worn: the rest of the inventory is nobody's business.
+          inventory: { where: { equipped: true }, include: { item: true } },
+        },
       }),
     );
   }

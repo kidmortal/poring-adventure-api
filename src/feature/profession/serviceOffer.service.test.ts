@@ -22,7 +22,7 @@ describe('Service Offer Service', () => {
     it('publishes under whichever profession the crafter currently practices', async () => {
       prisma.userProfession.findFirst = jest.fn().mockResolvedValue({
         professionId: 4,
-        profession: { name: 'Blacksmithing', canEnhance: true },
+        profession: { name: 'Blacksmithing', kind: 'crafting', canEnhance: true },
       });
 
       await service.publishOffer({ crafterEmail: CRAFTER, pricePerStamina: 50, crafting: true, enhancing: true });
@@ -38,12 +38,24 @@ describe('Service Offer Service', () => {
     it('refuses to sell enhancing from a profession that cannot enhance', async () => {
       prisma.userProfession.findFirst = jest.fn().mockResolvedValue({
         professionId: 5,
-        profession: { name: 'Cooking', canEnhance: false },
+        profession: { name: 'Cooking', kind: 'crafting', canEnhance: false },
       });
 
       await expect(
         service.publishOffer({ crafterEmail: CRAFTER, pricePerStamina: 50, crafting: true, enhancing: true }),
       ).rejects.toThrow('Cooking cannot enhance items for others');
+      expect(prisma.serviceOffer.upsert).not.toHaveBeenCalled();
+    });
+
+    it('refuses a gathering trade, which nobody can be hired for', async () => {
+      prisma.userProfession.findFirst = jest.fn().mockResolvedValue({
+        professionId: 1,
+        profession: { name: 'Mining', kind: 'gathering', canEnhance: false },
+      });
+
+      await expect(
+        service.publishOffer({ crafterEmail: CRAFTER, pricePerStamina: 50, crafting: true, enhancing: false }),
+      ).rejects.toThrow('Mining cannot be hired out');
       expect(prisma.serviceOffer.upsert).not.toHaveBeenCalled();
     });
 
@@ -58,7 +70,7 @@ describe('Service Offer Service', () => {
     it('refuses an offer that sells nothing, or sells it for nothing', async () => {
       prisma.userProfession.findFirst = jest.fn().mockResolvedValue({
         professionId: 4,
-        profession: { name: 'Blacksmithing', canEnhance: true },
+        profession: { name: 'Blacksmithing', kind: 'crafting', canEnhance: true },
       });
 
       await expect(
