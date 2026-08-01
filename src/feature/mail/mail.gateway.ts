@@ -1,10 +1,11 @@
-import { WebSocketGateway, SubscribeMessage, ConnectedSocket } from '@nestjs/websockets';
+import { WebSocketGateway, SubscribeMessage, ConnectedSocket, MessageBody } from '@nestjs/websockets';
 import { Logger, UseFilters, UseGuards } from '@nestjs/common';
 import { Socket } from 'socket.io';
 import { MailService } from './mail.service';
 import { NotificationService } from './notification.service';
 import { WebsocketExceptionsFilter } from 'src/core/websocket/websocketException.filter';
 import { WebsocketAuthEmailGuard } from 'src/core/websocket/websocket.guard';
+import { SendGiftDto } from './dto/gift.dto';
 
 @UseGuards(WebsocketAuthEmailGuard)
 @WebSocketGateway()
@@ -34,6 +35,20 @@ export class MailGateway {
     this.logger.debug('view_all_mail');
     return this.mailService.viewAll({ userEmail: email });
   }
+  @SubscribeMessage('send_gift')
+  sendGift(@MessageBody() dto: SendGiftDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`send_gift ${email} -> ${dto.receiverEmail}`);
+    return this.mailService.sendGift({
+      senderEmail: email,
+      receiverEmail: dto.receiverEmail,
+      silver: dto.silver,
+      inventoryId: dto.inventoryId,
+      stack: dto.stack,
+      message: dto.message,
+    });
+  }
+
   @SubscribeMessage('get_all_notifications')
   getNotifications(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;

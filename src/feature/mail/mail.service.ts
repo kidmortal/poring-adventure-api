@@ -1,5 +1,5 @@
 import { UserWalletService } from 'src/feature/users/userWallet.service';
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Mail } from '@prisma/client';
 import { InventoryService } from 'src/feature/items/inventory.service';
 import { PrismaService } from 'src/core/prisma/prisma.service';
@@ -16,6 +16,7 @@ export class MailService {
     private readonly userService: UsersService,
     private readonly inventory: InventoryService,
   ) {}
+  private readonly logger = new Logger('Mail');
   async findAll(args: { userEmail: string }) {
     return this._notifyUserMailBox(args);
   }
@@ -74,6 +75,93 @@ export class MailService {
         claimed: false,
       },
     });
+    return true;
+  }
+
+  /**
+   * A gift from one player to another. It travels as mail, so the receiver
+   * claims it like anything else, and nothing is skimmed on the way: what the
+   * sender puts in is exactly what arrives.
+   */
+  async sendGift(args: {
+    senderEmail: string;
+    receiverEmail: string;
+    silver?: number;
+    inventoryId?: number;
+    stack?: number;
+    message?: string;
+  }) {
+    if (args.senderEmail === args.receiverEmail) {
+      throw new BadRequestException('You cannot gift yourself');
+    }
+
+    const silver = Math.max(args.silver ?? 0, 0);
+    const stack = Math.max(args.stack ?? 0, 0);
+    const givesItem = !!args.inventoryId && stack > 0;
+    if (!silver && !givesItem) {
+      throw new BadRequestException('Put something in the gift first');
+    }
+
+    const [sender, receiver] = await Promise.all([
+      this.prisma.user.findUnique({ where: { email: args.senderEmail } }),
+      this.prisma.user.findUnique({ where: { email: args.receiverEmail } }),
+    ]);
+    if (!receiver) {
+      throw new BadRequestException('That player does not exist');
+    }
+    if (!sender || sender.silver < silver) {
+      throw new BadRequestException('You are too poor for that');
+    }
+
+    // Equipped, locked and listed stacks are off limits, exactly as they are
+    // for crafting and selling.
+    let itemId: number | undefined;
+    if (givesItem) {
+      const owned = await this.prisma.inventoryItem.findUnique({
+        where: { id: args.inventoryId, userEmail: args.senderEmail },
+        include: { marketListing: true },
+      });
+      if (!owned) {
+        throw new BadRequestException('You do not own that item');
+      }
+      if (owned.equipped || owned.locked || owned.marketListing) {
+        throw new BadRequestException('That item is not free to give');
+      }
+      if (owned.stack < stack) {
+        throw new BadRequestException(`You only have ${owned.stack} of those`);
+      }
+      itemId = owned.itemId;
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      if (silver) {
+        await this.userWallet.removeSilverFromUser({ userEmail: args.senderEmail, amount: silver, tx });
+      }
+      if (givesItem && args.inventoryId) {
+        await this.inventory.removeItemFromInventory({
+          userEmail: args.senderEmail,
+          inventoryId: args.inventoryId,
+          stack,
+          tx,
+        });
+      }
+      await tx.mail.create({
+        data: {
+          userEmail: args.receiverEmail,
+          sender: sender.name,
+          content: args.message?.trim() || `A gift from ${sender.name}`,
+          silver,
+          itemId,
+          itemStack: givesItem ? stack : null,
+          visualized: false,
+          claimed: false,
+        },
+      });
+    });
+
+    this.logger.debug(`${args.senderEmail} gifted ${args.receiverEmail}`);
+    await this._notifyUserMailBox({ userEmail: args.receiverEmail });
+    await this.userService.notifyUserUpdateWithProfile({ email: args.senderEmail });
     return true;
   }
 
