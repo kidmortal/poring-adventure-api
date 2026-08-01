@@ -3,6 +3,26 @@ import { Utils } from 'src/utilities/utils';
 type DropChance = { itemId: number; chance: number; minAmount: number; maxAmount: number };
 export type RolledDrop = { itemId: number; amount: number };
 
+/** Stamina a hired enhancement costs the blacksmith, whatever the item is. */
+export const ENHANCE_SERVICE_STAMINA_COST = 10;
+
+/** Profession experience the blacksmith earns per enhancement attempt. */
+export const ENHANCE_SERVICE_EXPERIENCE = 20;
+
+/** A hired job is priced off the stamina it burns, not off what it produces. */
+export function serviceFee(args: { staminaCost: number; pricePerStamina: number }) {
+  return args.staminaCost * args.pricePerStamina;
+}
+
+/**
+ * A hired blacksmith enhances better than you do: every level adds two points
+ * to the base chance. Capped short of certainty so a high level smith is worth
+ * hiring without making enhancement free of risk.
+ */
+export function hiredEnhanceChance(args: { baseChance: number; blacksmithLevel: number }) {
+  return Math.min(args.baseChance + args.blacksmithLevel * 2, 95);
+}
+
 /**
  * Every drop of a node is rolled once and independently, so a lucky gather can
  * return the whole table and an unlucky one nothing at all.

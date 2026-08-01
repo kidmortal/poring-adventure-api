@@ -8,7 +8,16 @@ import { UsersService } from 'src/feature/users/users.service';
 import { ProfessionService } from './profession.service';
 import { GatheringService } from './gathering.service';
 import { CraftingService } from './crafting.service';
-import { GatheringNodeIdDto, ProfessionIdDto, RecipeIdDto } from './dto/profession.dto';
+import { ServiceOfferService } from './serviceOffer.service';
+import { HiringService } from './hiring.service';
+import {
+  GatheringNodeIdDto,
+  HireCraftDto,
+  HireEnhanceDto,
+  ProfessionIdDto,
+  PublishServiceOfferDto,
+  RecipeIdDto,
+} from './dto/profession.dto';
 
 @UseGuards(WebsocketAuthEmailGuard)
 @UseFilters(WebsocketExceptionsFilter)
@@ -18,6 +27,8 @@ export class ProfessionGateway {
     private readonly professionService: ProfessionService,
     private readonly gatheringService: GatheringService,
     private readonly craftingService: CraftingService,
+    private readonly offerService: ServiceOfferService,
+    private readonly hiringService: HiringService,
     private readonly userService: UsersService,
   ) {}
   private logger = new Logger('Websocket - professions');
@@ -69,5 +80,55 @@ export class ProfessionGateway {
     const email = client.handshake.auth.email;
     this.logger.debug(`craft ${email}`);
     return this.craftingService.craft({ userEmail: email, recipeId: dto.recipeId });
+  }
+
+  @SubscribeMessage('get_service_offers')
+  async getServiceOffers() {
+    this.logger.debug('get_service_offers');
+    return this.offerService.getAllOffers();
+  }
+
+  @SubscribeMessage('get_user_service_offer')
+  async getUserServiceOffer(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`get_user_service_offer ${email}`);
+    return this.offerService.getUserOffer({ crafterEmail: email });
+  }
+
+  @SubscribeMessage('publish_service_offer')
+  async publishServiceOffer(@MessageBody() dto: PublishServiceOfferDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`publish_service_offer ${email}`);
+    return this.offerService.publishOffer({
+      crafterEmail: email,
+      pricePerStamina: dto.pricePerStamina,
+      crafting: dto.crafting,
+      enhancing: dto.enhancing,
+    });
+  }
+
+  @SubscribeMessage('remove_service_offer')
+  async removeServiceOffer(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`remove_service_offer ${email}`);
+    return this.offerService.removeOffer({ crafterEmail: email });
+  }
+
+  @SubscribeMessage('hire_craft')
+  async hireCraft(@MessageBody() dto: HireCraftDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`hire_craft ${email}`);
+    return this.hiringService.hireCraft({ hirerEmail: email, offerId: dto.offerId, recipeId: dto.recipeId });
+  }
+
+  @SubscribeMessage('hire_enhance')
+  async hireEnhance(@MessageBody() dto: HireEnhanceDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`hire_enhance ${email}`);
+    return this.hiringService.hireEnhance({
+      hirerEmail: email,
+      offerId: dto.offerId,
+      inventoryId: dto.inventoryId,
+    });
   }
 }
