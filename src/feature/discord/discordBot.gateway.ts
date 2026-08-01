@@ -355,4 +355,48 @@ export class DiscordBotGateway {
     this.logger.debug(`discord_unequip_skill ${dto.discordId}`);
     return this.actions.unequipSkill(dto);
   }
+
+  // ------------------------------------------------------------ professions
+
+  @SubscribeMessage('discord_get_all_professions')
+  getAllProfessions() {
+    this.logger.debug('discord_get_all_professions');
+    return this.actions.getAllProfessions();
+  }
+
+  @SubscribeMessage('discord_get_professions')
+  getProfessions(@MessageBody() dto: DiscordActionDto) {
+    this.logger.debug(`discord_get_professions ${dto.discordId}`);
+    return this.actions.getProfessions(dto);
+  }
+
+  @SubscribeMessage('discord_learn_profession')
+  learnProfession(@MessageBody() dto: DiscordProfessionDto) {
+    this.logger.debug(`discord_learn_profession ${dto.discordId}`);
+    return this.actions.learnProfession(dto);
+  }
+
+  @SubscribeMessage('discord_get_gathering_nodes')
+  getGatheringNodes() {
+    this.logger.debug('discord_get_gathering_nodes');
+    return this.actions.getGatheringNodes();
+  }
+
+  @SubscribeMessage('discord_gather')
+  gather(@MessageBody() dto: DiscordGatherDto) {
+    this.logger.debug(`discord_gather ${dto.discordId}`);
+    return this.actions.gather(dto);
+  }
+
+  @SubscribeMessage('discord_get_recipes')
+  getRecipes() {
+    this.logger.debug('discord_get_recipes');
+    return this.actions.getRecipes();
+  }
+
+  @SubscribeMessage('discord_craft')
+  craft(@MessageBody() dto: DiscordCraftDto) {
+    this.logger.debug(`discord_craft ${dto.discordId}`);
+    return this.actions.craft(dto);
+  }
 }

@@ -23,8 +23,8 @@ model User {
   appearance        Appearance?
   guildMember       GuildMember?
   stats             Stats?
-  profession        Profession?        @relation(fields: [professionId], references: [id])
-  professionId      Int?
+  class             Class?             @relation(fields: [classId], references: [id])
+  classId           Int?
   Party             Party?             @relation(fields: [partyId], references: [id])
   partyId           Int?
   inventory         InventoryItem[]
@@ -34,6 +34,7 @@ model User {
   buffs             UserBuff[]
   guildApplications GuildApplication[]
   purchases         UserPurchase[]
+  professions       UserProfession[]
   discord           Discord?
 }
 
@@ -60,6 +61,12 @@ model Stats {
   int        Int    @default(1)
   user       User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   userEmail  String @unique
+
+  /// Daily resource: refilled to maxStamina the first time the user is seen on
+  /// a new calendar day, tracked by staminaRefilledAt.
+  stamina           Int      @default(50)
+  maxStamina        Int      @default(50)
+  staminaRefilledAt DateTime @default(now())
 }
 
 model InventoryItem {
@@ -127,6 +134,10 @@ model Item {
   drop      Drop[]
   mail      Mail[]
   products  StoreProduct[]
+
+  gatheringDrops    GatheringDrop[]
+  craftedBy         Recipe[]           @relation("RecipeResult")
+  recipeIngredients RecipeIngredient[] @relation("RecipeIngredient")
 }
 
 model Drop {
@@ -171,18 +182,106 @@ model Party {
   members     User[]
 }
 
+/// The combat archetype picked at character creation: it owns the per-level
+/// stat block and the skill list. This is what used to be called Profession —
+/// that name now belongs to the crafting and gathering trades below.
+model Class {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
+  icon        String  @default("❔")
+  description String  @default("")
+  costume     String  @default("none")
+  attack      Int     @default(1)
+  health      Int     @default(1)
+  mana        Int     @default(1)
+  str         Int     @default(1)
+  agi         Int     @default(1)
+  int         Int     @default(1)
+  skills      Skill[]
+  users       User[]
+}
+
+/// A crafting or gathering trade. Professions have nothing to do with combat:
+/// they are learned on top of the class, level on their own, and every action
+/// they offer is paid for with stamina.
 model Profession {
-  id      Int     @id @default(autoincrement())
-  name    String
-  costume String  @default("none")
-  attack  Int     @default(1)
-  health  Int     @default(1)
-  mana    Int     @default(1)
-  str     Int     @default(1)
-  agi     Int     @default(1)
-  int     Int     @default(1)
-  skills  Skill[]
-  user    User[]
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  icon        String           @default("❔")
+  description String           @default("")
+  /// "gathering" — its nodes produce items; "crafting" — its recipes consume them.
+  kind        String           @default("gathering")
+  nodes       GatheringNode[]
+  recipes     Recipe[]
+  learnedBy   UserProfession[]
+}
+
+/// One profession a user has learned. Each carries its own progression, so a
+/// player levels mining and cooking independently.
+model UserProfession {
+  id           Int        @id @default(autoincrement())
+  user         User       @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  userEmail    String
+  profession   Profession @relation(fields: [professionId], references: [id], onDelete: Cascade)
+  professionId Int
+  level        Int        @default(1)
+  experience   Int        @default(0)
+  learnedAt    DateTime   @default(now())
+
+  @@unique([userEmail, professionId])
+}
+
+/// A gatherable spot. Paying its stamina cost rolls every drop once.
+model GatheringNode {
+  id            Int             @id @default(autoincrement())
+  name          String          @unique
+  image         String          @default("")
+  profession    Profession      @relation(fields: [professionId], references: [id], onDelete: Cascade)
+  professionId  Int
+  requiredLevel Int             @default(1)
+  staminaCost   Int             @default(5)
+  experience    Int             @default(10)
+  drops         GatheringDrop[]
+}
+
+model GatheringDrop {
+  id        Int           @id @default(autoincrement())
+  chance    Int
+  minAmount Int           @default(1)
+  maxAmount Int           @default(1)
+  node      GatheringNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  nodeId    Int
+  item      Item          @relation(fields: [itemId], references: [id])
+  itemId    Int
+
+  @@unique([nodeId, itemId])
+}
+
+/// Ingredients plus stamina in, one item out. Crafting never fails: the
+/// requiredLevel is what gates a recipe, not a roll.
+model Recipe {
+  id            Int                @id @default(autoincrement())
+  name          String             @unique
+  profession    Profession         @relation(fields: [professionId], references: [id], onDelete: Cascade)
+  professionId  Int
+  requiredLevel Int                @default(1)
+  staminaCost   Int                @default(5)
+  experience    Int                @default(10)
+  item          Item               @relation("RecipeResult", fields: [itemId], references: [id])
+  itemId        Int
+  amount        Int                @default(1)
+  ingredients   RecipeIngredient[]
+}
+
+model RecipeIngredient {
+  id       Int    @id @default(autoincrement())
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  recipeId Int
+  item     Item   @relation("RecipeIngredient", fields: [itemId], references: [id])
+  itemId   Int
+  amount   Int    @default(1)
+
+  @@unique([recipeId, itemId])
 }
 
 model Skill {
@@ -197,8 +296,8 @@ model Skill {
   description   String         @default("Skill Description")
   attribute     String
   multiplier    Int            @default(1)
-  profession    Profession     @relation(fields: [professionId], references: [id])
-  professionId  Int
+  class         Class          @relation(fields: [classId], references: [id])
+  classId       Int
   learnedSkill  LearnedSkill[]
   buff          Buff?          @relation(fields: [buffId], references: [id])
   buffId        Int?

@@ -8,7 +8,8 @@ export type FullUser = Prisma.UserGetPayload<{
   include: {
     appearance: true;
     inventory: { include: { item: true; marketListing: true } };
-    profession: { include: { skills: true } };
+    class: { include: { skills: true } };
+    professions: { include: { profession: true } };
     learnedSkills: { include: { skill: { include: { buff: true } } } };
     buffs: { include: { buff: true } };
     guildMember: true;
@@ -40,7 +41,8 @@ export class UsersRepository {
         include: {
           appearance: true,
           inventory: { include: { item: true, marketListing: true } },
-          profession: { include: { skills: true } },
+          class: { include: { skills: true } },
+          professions: { include: { profession: true } },
           learnedSkills: { include: { skill: { include: { buff: true } } } },
           buffs: { include: { buff: true } },
           guildMember: true,
