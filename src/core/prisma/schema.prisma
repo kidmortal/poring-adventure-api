@@ -35,6 +35,7 @@ model User {
   guildApplications GuildApplication[]
   purchases         UserPurchase[]
   professions       UserProfession[]
+  serviceOffer      ServiceOffer?
   discord           Discord?
 }
 
@@ -211,9 +212,29 @@ model Profession {
   description String           @default("")
   /// "gathering" — its nodes produce items; "crafting" — its recipes consume them.
   kind        String           @default("gathering")
+  /// Whether this profession may enhance items for other players.
+  canEnhance  Boolean          @default(false)
   nodes       GatheringNode[]
   recipes     Recipe[]
   learnedBy   UserProfession[]
+  offers      ServiceOffer[]
+}
+
+/// A crafter selling their stamina: other players pay silver per stamina point
+/// to have them craft or enhance on their behalf. One offer per crafter, since
+/// a player only practices one profession at a time.
+model ServiceOffer {
+  id              Int        @id @default(autoincrement())
+  crafter         User       @relation(fields: [crafterEmail], references: [email], onDelete: Cascade)
+  crafterEmail    String     @unique
+  profession      Profession @relation(fields: [professionId], references: [id], onDelete: Cascade)
+  professionId    Int
+  /// Silver charged per stamina point the job costs the crafter.
+  pricePerStamina Int        @default(50)
+  crafting        Boolean    @default(true)
+  /// Only professions with canEnhance may turn this on.
+  enhancing       Boolean    @default(false)
+  createdAt       DateTime   @default(now())
 }
 
 /// One profession a user has learned. Each carries its own progression, so a

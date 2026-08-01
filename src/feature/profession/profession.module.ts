@@ -6,9 +6,11 @@ import { WebsocketModule } from 'src/core/websocket/websocket.module';
 import { ProfessionService } from './profession.service';
 import { GatheringService } from './gathering.service';
 import { CraftingService } from './crafting.service';
+import { ServiceOfferService } from './serviceOffer.service';
+import { HiringService } from './hiring.service';
 import { ProfessionGateway } from './profession.gateway';
 
-const providers = [ProfessionService, GatheringService, CraftingService];
+const providers = [ProfessionService, GatheringService, CraftingService, ServiceOfferService, HiringService];
 
 @Module({
   imports: [UsersModule, ItemsModule, WebsocketModule],
