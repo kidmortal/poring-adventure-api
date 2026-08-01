@@ -1,7 +1,8 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Socket } from 'socket.io';
-import { FirebaseRepository } from 'src/services/firebase/firebase.repository';
+import { FirebaseRepository } from 'src/integrations/firebase/firebase.repository';
+import { DISCORD_SERVICE_EMAIL } from 'src/core/websocket/websocket.guard';
 
 @Injectable()
 export class AuthService {
@@ -42,7 +43,7 @@ export class AuthService {
     if (accessToken) {
       const hash = createHash('md5').update(process.env.DISCORD_API_TOKEN).digest('hex');
       if (accessToken === hash) {
-        const email = 'discord';
+        const email = DISCORD_SERVICE_EMAIL;
         client.handshake.auth.email = email;
         this.logger.debug(`Websocket connected - ${email}`);
         return true;

@@ -1,8 +1,10 @@
+import { UsersRepository } from 'src/feature/users/users.repository';
+import { UserStatsService } from 'src/feature/users/userStats.service';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { MailService } from 'src/feature/mail/mail.service';
-import { NotificationService } from 'src/services/notification/notification.service';
+import { NotificationService } from 'src/integrations/notification/notification.service';
 import { UsersService } from 'src/feature/users/users.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import * as os from 'os';
@@ -12,6 +14,8 @@ import { memoryUsage } from 'process';
 @Injectable()
 export class AdminService {
   constructor(
+    private readonly usersRepository: UsersRepository,
+    private readonly userStats: UserStatsService,
     private readonly notification: NotificationService,
     private readonly websocket: WebsocketService,
     private readonly userService: UsersService,
@@ -79,8 +83,8 @@ export class AdminService {
   }
 
   async fullHealUser(args: { userEmail: string; healEmail: string }) {
-    await this.userService.incrementUserHealth({ userEmail: args.healEmail, amount: 9999 });
-    await this.userService.incrementUserMana({ userEmail: args.healEmail, amount: 9999 });
+    await this.userStats.incrementUserHealth({ userEmail: args.healEmail, amount: 9999 });
+    await this.userStats.incrementUserMana({ userEmail: args.healEmail, amount: 9999 });
     this.userService.notifyUserUpdateWithProfile({ email: args.healEmail });
     this.websocket.sendTextNotification({ email: args.userEmail, text: 'User has been Fully healed' });
     this.websocket.sendTextNotification({ email: args.healEmail, text: 'You got fully healed by an Admin' });
@@ -90,8 +94,8 @@ export class AdminService {
   }
 
   async killUser(args: { userEmail: string; killEmail: string }) {
-    await this.userService.decrementUserHealth({ userEmail: args.killEmail, amount: 9999 });
-    await this.userService.decrementUserMana({ userEmail: args.killEmail, amount: 9999 });
+    await this.userStats.decrementUserHealth({ userEmail: args.killEmail, amount: 9999 });
+    await this.userStats.decrementUserMana({ userEmail: args.killEmail, amount: 9999 });
     this.userService.notifyUserUpdateWithProfile({ email: args.killEmail });
     this.websocket.sendTextNotification({ email: args.userEmail, text: 'User has been killed' });
     this.websocket.sendTextNotification({ email: args.killEmail, text: 'You got killed by an Admin' });
@@ -120,7 +124,7 @@ export class AdminService {
       const email = socket.email;
       if (!users[email] && email) {
         if (email != 'discord') {
-          const user = await this.userService._getUserWithEmail({
+          const user = await this.usersRepository.getFullUser({
             userEmail: socket.email,
           });
           users[email] = user;

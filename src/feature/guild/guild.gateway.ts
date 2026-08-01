@@ -5,12 +5,20 @@ import { GuildService } from './guild.service';
 import { Logger, UseFilters, UseGuards } from '@nestjs/common';
 import { WebsocketExceptionsFilter } from 'src/core/websocket/websocketException.filter';
 import { WebsocketAuthEmailGuard } from 'src/core/websocket/websocket.guard';
+import { GuildTaskService } from './guildTask.service';
+import { GuildBlessingService } from './guildBlessing.service';
+import { GuildApplicationService } from './guildApplication.service';
 
 @UseGuards(WebsocketAuthEmailGuard)
 @UseFilters(WebsocketExceptionsFilter)
 @WebSocketGateway()
 export class GuildGateway {
-  constructor(private readonly guildService: GuildService) {}
+  constructor(
+    private readonly guildService: GuildService,
+    private readonly taskService: GuildTaskService,
+    private readonly blessingService: GuildBlessingService,
+    private readonly applicationService: GuildApplicationService,
+  ) {}
   private logger = new Logger('Websocket - guilds');
 
   @SubscribeMessage('get_guild')
@@ -21,11 +29,10 @@ export class GuildGateway {
     return this.guildService.getGuildFromUser({ userEmail: email });
   }
 
-  @SubscribeMessage('apply_to_guild')
-  applyToGuild(@MessageBody() dto: ApplyToGuildDto, @ConnectedSocket() client: Socket) {
-    const email = client.handshake.auth.email;
-    this.logger.debug('apply_to_guild');
-    return this.guildService.applyToGuild({ userEmail: email, guildId: dto.guildId });
+  @SubscribeMessage('find_all_guild')
+  findAll() {
+    this.logger.debug('find_all_guild');
+    return this.guildService.findAll();
   }
 
   @SubscribeMessage('kick_from_guild')
@@ -42,11 +49,18 @@ export class GuildGateway {
     return this.guildService.quitFromGuild({ userEmail: email });
   }
 
+  @SubscribeMessage('apply_to_guild')
+  applyToGuild(@MessageBody() dto: ApplyToGuildDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('apply_to_guild');
+    return this.applicationService.applyToGuild({ userEmail: email, guildId: dto.guildId });
+  }
+
   @SubscribeMessage('accept_guild_application')
   acceptGuildApplication(@MessageBody() dto: AcceptGuildApplicationDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('accept_guild_application');
-    return this.guildService.acceptGuildApplication({
+    return this.applicationService.acceptGuildApplication({
       userEmail: email,
       applicationId: dto.applicationId,
     });
@@ -56,56 +70,54 @@ export class GuildGateway {
   refuseGuildApplication(@MessageBody() dto: RefuseGuildApplicationDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('refuse_guild_application');
-    return this.guildService.refuseGuildApplication({
+    return this.applicationService.refuseGuildApplication({
       userEmail: email,
       applicationId: dto.applicationId,
     });
   }
 
-  @SubscribeMessage('finish_current_task')
-  finishQuest(@ConnectedSocket() client: Socket) {
-    const email = client.handshake.auth.email;
-    this.logger.debug('finish_current_task');
-    return this.guildService.finishCurrentTask({ userEmail: email });
+  @SubscribeMessage('get_available_guild_tasks')
+  getTasks() {
+    this.logger.debug('get_available_guild_tasks');
+    return this.taskService.findAllGuildTasks();
   }
 
   @SubscribeMessage('accept_guild_task')
   acceptGuilkdTask(@MessageBody() dto: AcceptGuildTaskDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('accept_guild_task');
-    return this.guildService.acceptTask({ userEmail: email, taskId: dto.taskId });
+    return this.taskService.acceptTask({ userEmail: email, taskId: dto.taskId });
   }
 
   @SubscribeMessage('cancel_guild_task')
   cancelGuildTask(@MessageBody() dto: CancelGuildTaskDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('cancel_guild_task');
-    return this.guildService.cancelCurrentTask({ userEmail: email });
+    return this.taskService.cancelCurrentTask({ userEmail: email });
   }
 
-  @SubscribeMessage('find_all_guild')
-  findAll() {
-    this.logger.debug('find_all_guild');
-    return this.guildService.findAll();
+  @SubscribeMessage('finish_current_task')
+  finishQuest(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('finish_current_task');
+    return this.taskService.finishCurrentTask({ userEmail: email });
   }
 
   @SubscribeMessage('unlock_blessing')
   unlockBlessing(@MessageBody() dto: UnlockBlessingsDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('unlock_blessing');
-    return this.guildService.unlockGuildBlessings({ userEmail: email, guildId: dto.guildId });
+    return this.blessingService.unlockGuildBlessings({ userEmail: email, guildId: dto.guildId });
   }
 
   @SubscribeMessage('upgrade_blessing')
   upgradeBlessing(@MessageBody() dto: UpgradeBlessingsDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug(`upgrade_blessing ${dto.blessing}`);
-    return this.guildService.upgradeGuildBlessing({ userEmail: email, guildId: dto.guildId, blessing: dto.blessing });
-  }
-
-  @SubscribeMessage('get_available_guild_tasks')
-  getTasks() {
-    this.logger.debug('get_available_guild_tasks');
-    return this.guildService.findAllGuidTasks();
+    return this.blessingService.upgradeGuildBlessing({
+      userEmail: email,
+      guildId: dto.guildId,
+      blessing: dto.blessing,
+    });
   }
 }

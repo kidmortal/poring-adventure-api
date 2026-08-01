@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 
-import { FirebaseModule } from '../../services/firebase/firebase.module';
+import { FirebaseModule } from 'src/integrations/firebase/firebase.module';
 import { ItemsModule } from '../../feature/items/items.module';
 import { MarketModule } from '../../feature/market/market.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -18,13 +18,14 @@ import { PrismaModule } from 'src/core/prisma/prisma.module';
 import { AdminModule } from 'src/feature/admin/admin.module';
 import { GuildModule } from 'src/feature/guild/guild.module';
 import { MailModule } from 'src/feature/mail/mail.module';
-import { DiscordModule } from 'src/services/discord/discord.module';
-import { NotificationModule } from 'src/services/notification/notification.module';
-import { PurchaseModule } from 'src/services/purchase/purchase.module';
+import { DiscordModule } from 'src/feature/discord/discord.module';
+import { NotificationModule } from 'src/integrations/notification/notification.module';
+import { PurchaseModule } from 'src/feature/purchase/purchase.module';
 import { UsersModule } from 'src/feature/users/users.module';
 import { MonstersModule } from 'src/feature/monsters/monsters.module';
 import { PartyModule } from 'src/feature/party/party.module';
 import { SkillsModule } from 'src/feature/skills/skills.module';
+import { ProfessionModule } from 'src/feature/profession/profession.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { SkillsModule } from 'src/feature/skills/skills.module';
     WebsocketModule,
     PartyModule,
     SkillsModule,
+    ProfessionModule,
     AdminModule,
     GuildModule,
     MailModule,

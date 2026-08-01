@@ -1,24 +1,34 @@
+import { UsersRepository } from 'src/feature/users/users.repository';
+import { UserWalletService } from 'src/feature/users/userWallet.service';
+import { UserStatsService } from 'src/feature/users/userStats.service';
 import { Injectable, Logger } from '@nestjs/common';
 
 import { BattleInstance, UserWithStats } from './battle';
 import { MonstersService } from 'src/feature/monsters/monsters.service';
 import { UsersService } from 'src/feature/users/users.service';
-import { ItemsService } from 'src/feature/items/items.service';
+import { InventoryService } from 'src/feature/items/inventory.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { Cron } from '@nestjs/schedule';
 import { PartyService } from 'src/feature/party/party.service';
+import { PartyRepository } from 'src/feature/party/party.repository';
 import { BattleValidations } from './validators';
 import { GuildService } from 'src/feature/guild/guild.service';
+import { GuildTaskService } from 'src/feature/guild/guildTask.service';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 
 @Injectable()
 export class BattleService {
   constructor(
+    private readonly usersRepository: UsersRepository,
+    private readonly userWallet: UserWalletService,
+    private readonly userStats: UserStatsService,
     private readonly monsterService: MonstersService,
     private readonly userService: UsersService,
     private readonly partyService: PartyService,
-    private readonly itemService: ItemsService,
+    private readonly partyRepository: PartyRepository,
+    private readonly inventory: InventoryService,
     private readonly guildService: GuildService,
+    private readonly guildTaskService: GuildTaskService,
     private readonly prisma: PrismaService,
     private readonly socket: WebsocketService,
   ) {}
@@ -45,11 +55,11 @@ export class BattleService {
 
     if (!battle) {
       let users: UserWithStats[] = [];
-      const userData = await this.userService._getUserWithEmail({
+      const userData = await this.usersRepository.getFullUser({
         userEmail: args.userEmail,
       });
       if (userData.partyId) {
-        const fullPartyInfo = await this.partyService.getPartyFromId({ partyId: userData.partyId });
+        const fullPartyInfo = await this.partyRepository.getPartyFromId({ partyId: userData.partyId });
         const partyMembers = fullPartyInfo.members;
         users = partyMembers;
       } else {
@@ -125,20 +135,20 @@ export class BattleService {
       const remainingHealth = rewardUser.stats.health;
       const remainingMana = rewardUser.stats.mana;
       await this.prisma.$transaction(async (tx) => {
-        await this.userService.decreaseUserBuffs({ userEmail, tx });
-        await this.userService.addExpSilver({ userEmail, silver, exp, tx });
-        await this.userService.levelUpUser({
+        await this.userStats.decreaseUserBuffs({ userEmail, tx });
+        await this.userWallet.addExpSilver({ userEmail, silver, exp, tx });
+        await this.userStats.levelUpUser({
           user: rewardUser,
           expGain: exp,
           tx,
         });
-        await this.userService.updateUserHealthMana({
+        await this.userStats.updateUserHealthMana({
           userEmail,
           health: remainingHealth,
           mana: remainingMana,
           tx,
         });
-        await this.guildService.contributeToGuildTask({
+        await this.guildTaskService.contributeToGuildTask({
           userEmail,
           mapId,
           amount: monsterCount,
@@ -146,7 +156,7 @@ export class BattleService {
         });
 
         for await (const { itemId, stack } of dropedItems) {
-          await this.itemService.addItemToInventory({
+          await this.inventory.addItemToInventory({
             userEmail,
             itemId,
             stack,

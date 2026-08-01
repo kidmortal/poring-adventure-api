@@ -5,6 +5,7 @@ import { UsersModule } from 'src/feature/users/users.module';
 import { MarketGateway } from './market.gateway';
 import { WebsocketModule } from 'src/core/websocket/websocket.module';
 import { CacheModule } from '@nestjs/cache-manager';
+import { MarketRepository } from './market.repository';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { CacheModule } from '@nestjs/cache-manager';
     CacheModule.register({ ttl: 1000 * 60 * 10 }), // 10 minutes cache
   ],
   controllers: [],
-  providers: [MarketService, MarketGateway],
+  providers: [MarketService, MarketRepository, MarketGateway],
+  exports: [MarketService, MarketRepository],
 })
 export class MarketModule {}

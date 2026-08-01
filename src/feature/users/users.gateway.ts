@@ -50,11 +50,12 @@ export class UsersGateway {
     return this.userService.deleteUser(email);
   }
 
-  @SubscribeMessage('get_all_professions')
+  @SubscribeMessage('get_all_classes')
   async getAllClasses() {
-    this.logger.debug('get_all_professions');
-    return this.userService.getAllProfessions();
+    this.logger.debug('get_all_classes');
+    return this.userService.getAllClasses();
   }
+
   @SubscribeMessage('get_all_heads')
   async getAllHeads() {
     this.logger.debug('get_all_heads');

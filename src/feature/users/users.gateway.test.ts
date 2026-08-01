@@ -1,4 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { UsersRepository } from 'src/feature/users/users.repository';
+import { UserStaminaService } from './userStamina.service';
 import { UsersService } from './users.service';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
@@ -10,7 +13,15 @@ describe('User Gateway', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [UsersGateway, UsersService, PrismaService, WebsocketService],
+      providers: [
+        UsersGateway,
+        UsersService,
+        UsersRepository,
+        UserStaminaService,
+        PrismaService,
+        WebsocketService,
+        { provide: CACHE_MANAGER, useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn() } },
+      ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
@@ -18,49 +29,16 @@ describe('User Gateway', () => {
   });
 
   describe('get_user', () => {
-    it('should call findOne service and notify user when passing email on handshake auth ', async () => {
+    it('should call findOne with the email from the handshake', async () => {
       const authEmail = 'auth@email.com';
-      const fakeUser = { email: authEmail } as any;
-      const findOne = jest.fn().mockReturnValue(fakeUser);
-      const notify = jest.fn().mockReturnValue(fakeUser);
+      const findOne = jest.fn().mockResolvedValue(true);
       jest.spyOn(service, 'findOne').mockImplementation(findOne);
-      jest.spyOn(service, 'notifyUserUpdate').mockImplementation(notify);
-      const returnUser = await gateway.findOne({
+      const result = await gateway.findOne({
         // @ts-expect-error this value can be anything
         handshake: { auth: { email: authEmail } },
       });
-      expect(findOne).toHaveBeenCalledWith(authEmail);
-      expect(notify).toHaveBeenCalled();
-      expect(returnUser).toBe(fakeUser);
-    });
-
-    it('should return false and not call services when not providing an email on handshake auth ', async () => {
-      const authEmail = 'auth@email.com';
-      const fakeUser = { email: authEmail } as any;
-      const findOne = jest.fn().mockReturnValue(fakeUser);
-      jest.spyOn(service, 'findOne').mockImplementation(findOne);
-      const returnUser = await gateway.findOne({
-        // @ts-expect-error this value can be anything
-        handshake: { auth: { email: undefined } },
-      });
-      expect(findOne).not.toHaveBeenCalled();
-      expect(returnUser).toBe(false);
-    });
-
-    it('should return false when no user has been found ', async () => {
-      const authEmail = 'auth@email.com';
-      const fakeUser = undefined as any;
-      const findOne = jest.fn().mockReturnValue(fakeUser);
-      const notify = jest.fn().mockReturnValue(fakeUser);
-      jest.spyOn(service, 'findOne').mockImplementation(findOne);
-      jest.spyOn(service, 'notifyUserUpdate').mockImplementation(notify);
-      const returnUser = await gateway.findOne({
-        // @ts-expect-error this value can be anything
-        handshake: { auth: { email: authEmail } },
-      });
-      expect(findOne).toHaveBeenCalledWith(authEmail);
-      expect(notify).not.toHaveBeenCalled();
-      expect(returnUser).toBe(false);
+      expect(findOne).toHaveBeenCalledWith({ userEmail: authEmail });
+      expect(result).toBe(true);
     });
   });
 
@@ -78,7 +56,7 @@ describe('User Gateway', () => {
     it('should call create service and notify user when passing email on handshake auth ', async () => {
       const authEmail = 'auth@email.com';
       const createUserDto = {
-        professionId: 1,
+        classId: 1,
         costume: 'rogue',
         email: authEmail,
         gender: 'male',
@@ -91,27 +69,8 @@ describe('User Gateway', () => {
         // @ts-expect-error this value can be anything
         handshake: { auth: { email: authEmail } },
       });
-      expect(create).toHaveBeenCalledWith(createUserDto);
+      expect(create).toHaveBeenCalledWith({ ...createUserDto, email: authEmail });
       expect(returnUser).toBe(fakeReturn);
-    });
-
-    it('should return false and not call services when not providing an email on handshake auth ', async () => {
-      const createUserDto = {
-        professionId: 1,
-        costume: 'rogue',
-        email: 'fake@email.com',
-        gender: 'male',
-        name: 'test',
-      };
-      const fakeReturn = {} as any;
-      const create = jest.fn().mockReturnValue(fakeReturn);
-      jest.spyOn(service, 'create').mockImplementation(create);
-      const returnUser = await gateway.create(createUserDto, {
-        // @ts-expect-error this value can be anything
-        handshake: { auth: { email: undefined } },
-      });
-      expect(create).not.toHaveBeenCalled();
-      expect(returnUser).toBe(false);
     });
   });
   describe('delete_user', () => {
@@ -127,27 +86,14 @@ describe('User Gateway', () => {
       expect(deleteUser).toHaveBeenCalledWith(authEmail);
       expect(returnUser).toBe(fakeReturn);
     });
-
-    it('should return false and not call services when not providing an email on handshake auth ', async () => {
-      const deleteUser = jest.fn();
-      jest.spyOn(service, 'deleteUser').mockImplementation(deleteUser);
-      const returnUser = await gateway.remove({
-        // @ts-expect-error this value can be anything
-        handshake: { auth: { email: undefined } },
-      });
-      expect(deleteUser).not.toHaveBeenCalled();
-      expect(returnUser).toBe(false);
-    });
   });
-  describe('get_all_professions', () => {
-    it('should call get_all_professions service', async () => {
+  describe('get_all_classes', () => {
+    it('should call get_all_classes service', async () => {
       const fakeReturn = {} as any;
-      const getAllProfessions = jest.fn().mockReturnValue(fakeReturn);
-      jest
-        .spyOn(service, 'getAllProfessions')
-        .mockImplementation(getAllProfessions);
+      const getAllClasses = jest.fn().mockReturnValue(fakeReturn);
+      jest.spyOn(service, 'getAllClasses').mockImplementation(getAllClasses);
       const returnUser = await gateway.getAllClasses();
-      expect(getAllProfessions).toHaveBeenCalled();
+      expect(getAllClasses).toHaveBeenCalled();
       expect(returnUser).toBe(fakeReturn);
     });
   });

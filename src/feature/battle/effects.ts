@@ -1,10 +1,6 @@
 import { BattleInstance, DamageStepParams } from './battle';
 
-type Effect = (params: {
-  dmgStep: DamageStepParams;
-  image: string;
-  battle: BattleInstance;
-}) => {
+type Effect = (params: { dmgStep: DamageStepParams; image: string; battle: BattleInstance }) => {
   onAttack: () => void;
   onDefense: () => void;
 };
