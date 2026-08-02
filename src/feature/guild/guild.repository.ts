@@ -11,7 +11,7 @@ export type GuildWithMembers = Prisma.GuildGetPayload<{
     blessing: true;
     currentGuildTask: { include: { task: { include: { target: true } } } };
     members: {
-      include: { user: { include: { stats: true; appearance: true } } };
+      include: { user: { include: { stats: true; appearance: true; class: true } } };
     };
   };
 }>;
@@ -39,7 +39,8 @@ export class GuildRepository {
       include: {
         currentGuildTask: { include: { task: { include: { target: true } } } },
         members: {
-          include: { user: { include: { stats: true, appearance: true } } },
+          // Class comes along so the member modal can name what they play.
+          include: { user: { include: { stats: true, appearance: true, class: true } } },
           orderBy: { contribution: 'desc' },
         },
         guildApplications: {

@@ -73,22 +73,28 @@ export class GuildTaskService {
     });
     if (!member) return false;
 
-    await this.prisma.$transaction(async (tx) => {
+    // The transaction only writes: guild experience, the task row and every
+    // member's tokens. Reading the guild back and notifying is done after the
+    // commit, since both are far too slow to hold a transaction open for.
+    const reward = await this.prisma.$transaction(async (tx) => {
       const currentTask = await this.repository.getCurrentTask({ guildId: member.guildId, tx });
-      if (!currentTask || currentTask.remainingKills > 0) return;
+      if (!currentTask || currentTask.remainingKills > 0) return null;
 
       const { task, guildId } = currentTask;
       await this._addTaskPointsToGuild({ guildId, amount: task.taskPoints, tx });
       await tx.currentGuildTask.delete({ where: { guildId } });
       await this._distributeTokens({ guildId, amount: task.taskPoints, tx });
 
-      await this._refresh(guildId);
-      await this.notificationService.sendPushNotificationToTag({
-        tagKey: 'guild',
-        tagValue: String(guildId),
-        title: 'Guild Task Completed',
-        message: `${task.taskPoints} Task Points has been added to your account.`,
-      });
+      return { guildId, taskPoints: task.taskPoints };
+    });
+    if (!reward) return false;
+
+    await this._refresh(reward.guildId);
+    await this.notificationService.sendPushNotificationToTag({
+      tagKey: 'guild',
+      tagValue: String(reward.guildId),
+      title: 'Guild Task Completed',
+      message: `${reward.taskPoints} Task Points has been added to your account.`,
     });
     return true;
   }
@@ -146,17 +152,13 @@ export class GuildTaskService {
     return true;
   }
 
+  /** One statement for the whole guild — no member read, no per-member round trip. */
   private async _distributeTokens(args: { guildId: number; amount: number; tx: TransactionContext }) {
     const tx = args.tx ?? this.prisma;
-    const guild = await this.repository.getGuild({ guildId: args.guildId });
-    if (!guild) return;
-
-    for await (const member of guild.members) {
-      await tx.guildMember.update({
-        where: { id: member.id },
-        data: { guildTokens: { increment: args.amount } },
-      });
-    }
+    await tx.guildMember.updateMany({
+      where: { guildId: args.guildId },
+      data: { guildTokens: { increment: args.amount } },
+    });
   }
 
   private async _refresh(guildId: number) {
