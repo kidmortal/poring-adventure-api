@@ -15,6 +15,9 @@ enum SkillEffect {
   Infusion = 'infusion',
 }
 
+/** Each enraged swing is this much harder than the one before it. */
+const ENRAGE_DAMAGE_MULTIPLIER = 1.3;
+
 type DamageInfo = {
   image: string;
   name: string;
@@ -75,6 +78,12 @@ type CreateBattleParams = {
   socket: WebsocketService;
   updateUsers: (battle: BattleInstance) => Promise<void>;
   removeBattle: () => Promise<boolean>;
+  /** Set when the monster is a guild's standing boss, whose health pool is persisted. */
+  guildBossGuildId?: number;
+  /** Round after which the monster starts enraging. Left unset, it never does. */
+  enrageAfterRound?: number;
+  /** Who led the party in, when it was not a solo fight. */
+  partyLeaderEmail?: string;
 };
 
 export type BattleLog = {
@@ -106,9 +115,33 @@ export class BattleInstance {
   removeBattle: () => Promise<boolean>;
   private log: BattleLog[] = [];
   private drops: BattleDrop[] = [];
+  /** Damage each player has landed on the monsters, by email. Never decays. */
+  private damageDealt: { [email: string]: number } = {};
+  readonly guildBossGuildId?: number;
+  readonly partyLeaderEmail?: string;
+  private readonly enrageAfterRound?: number;
+  /** Passes through the attack order, counted from 1. */
+  private round = 1;
+  /** How many times the monster has swung while enraged. */
+  private enrageStacks = 0;
 
   get droppedItems() {
     return this.drops;
+  }
+
+  /**
+   * Hands over the damage landed so far and forgets it, so a fight that is
+   * settled twice — won, then reset — cannot bank the same hits again.
+   */
+  consumeDamage() {
+    const dealt = Object.entries(this.damageDealt).map(([userEmail, damage]) => ({ userEmail, damage }));
+    this.damageDealt = {};
+    return dealt;
+  }
+
+  /** Everyone who walked in, whether or not they landed a hit. */
+  get participantEmails() {
+    return this.users.map((user) => user.email);
   }
 
   get isMonsterAlive() {
@@ -141,13 +174,30 @@ export class BattleInstance {
     return this.attackerList[this.attackerTurn];
   }
 
-  constructor({ monsters, users, socket, updateUsers, removeBattle }: CreateBattleParams) {
+  constructor({
+    monsters,
+    users,
+    socket,
+    updateUsers,
+    removeBattle,
+    guildBossGuildId,
+    enrageAfterRound,
+    partyLeaderEmail,
+  }: CreateBattleParams) {
     this.socket = socket;
     this.users = this.generateUserBattleValues(users);
     this.monsters = monsters;
     this.attackerList = BattleUtils.generateBattleAttackOrder(users, monsters);
     this.updateUsers = updateUsers;
     this.removeBattle = removeBattle;
+    this.guildBossGuildId = guildBossGuildId;
+    this.enrageAfterRound = enrageAfterRound;
+    this.partyLeaderEmail = partyLeaderEmail;
+  }
+
+  /** True once the fight has run past the round the monster starts enraging on. */
+  private get isEnraged() {
+    return !!this.enrageAfterRound && this.round > this.enrageAfterRound;
   }
 
   // Functions that round be called periodically
@@ -169,6 +219,11 @@ export class BattleInstance {
       userLost: this.userLost,
       log: this.log,
       drops: this.drops,
+      round: this.round,
+      enrageStacks: this.enrageStacks,
+      // The client sends the player back to the guild rather than the map
+      // selection when this fight ends.
+      guildBoss: !!this.guildBossGuildId,
     };
   }
 
@@ -458,7 +513,7 @@ export class BattleInstance {
     const isMonsterAlive = monster?.health > 0;
 
     if (monster && isMonsterAlive) {
-      const monsterDamage = monster.attack;
+      const monsterDamage = this.enrageMonsterDamage(monster);
       const targetUser = this.getHighestAggroPlayer();
       return this.beforeDamageStep({
         attacker: 'monster',
@@ -475,6 +530,22 @@ export class BattleInstance {
     return false;
   }
 
+  /**
+   * Past the enrage round every swing lands harder than the last, so a boss the
+   * party cannot kill will eventually kill them instead of the fight running on
+   * forever.
+   */
+  private enrageMonsterDamage(monster: MonsterWithDrops) {
+    if (!this.isEnraged) return monster.attack;
+
+    const damage = BattleUtils.enragedDamage(monster.attack, this.enrageStacks, ENRAGE_DAMAGE_MULTIPLIER);
+    if (this.enrageStacks === 0) {
+      this.pushLog({ log: `${monster.name} is enraged and hits harder every turn`, icon: monster.image });
+    }
+    this.enrageStacks += 1;
+    return damage;
+  }
+
   private async processNextTurn() {
     const pastAttacker = this.attackerTurn;
     const attackerList = this.attackerList;
@@ -483,6 +554,8 @@ export class BattleInstance {
     if (pastAttacker < maxIndex) {
       return (this.attackerTurn = pastAttacker + 1);
     } else if (pastAttacker === maxIndex) {
+      // Back to the top of the order: everyone has had their turn.
+      this.round += 1;
       return (this.attackerTurn = 0);
     } else {
       return this.attackerTurn - 1;
@@ -549,6 +622,8 @@ export class BattleInstance {
     const randomDmg = Utils.randomDamage(damage.value, 20);
     if (attacker === 'user') {
       user.aggro += damage.aggro;
+      // Aggro decays every turn; this is the running total the guild boss pays out on.
+      this.damageDealt[user.email] = (this.damageDealt[user.email] ?? 0) + Math.max(randomDmg, 0);
       monster.health -= randomDmg;
       this.pushLog({
         log: `${user.name} Dealt ${randomDmg} damage to ${monster.name}`,

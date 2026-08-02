@@ -38,6 +38,7 @@ model User {
   serviceOffer      ServiceOffer?
   notifications     Notification[]
   discord           Discord?
+  guildBossDamage   GuildBossDamage[]
 }
 
 model Discord {
@@ -136,6 +137,8 @@ model Item {
   drop      Drop[]
   mail      Mail[]
   products  StoreProduct[]
+
+  guildStoreProduct GuildStoreProduct?
 
   gatheringDrops    GatheringDrop[]
   craftedBy         Recipe[]           @relation("RecipeResult")
@@ -406,6 +409,7 @@ model Guild {
   members           GuildMember[]
   guildApplications GuildApplication[]
   currentGuildTask  CurrentGuildTask?
+  currentGuildBoss  CurrentGuildBoss?
   blessing          GuildBlessing?
 }
 
@@ -450,7 +454,80 @@ model GuildMember {
   guild           Guild? @relation(fields: [guildId], references: [id])
   guildId         Int?
 
+  /// One boss entry per UTC day, spent on the fight that starts. Null means the
+  /// member has never fought one.
+  bossEntryUsedAt DateTime?
+
   @@unique([userEmail, guildId])
+}
+
+/// A boss a guild can summon. The numbers here are the easy-difficulty ones —
+/// the chosen difficulty multiplies them, see guildBoss.rules.
+model GuildBoss {
+  id                 Int                @id @default(autoincrement())
+  name               String             @unique
+  image              String
+  level              Int                @default(1)
+  health             Int                @default(20000)
+  attack             Int                @default(20)
+  /// Handed out on the kill: shards to the guild, tokens split by damage dealt.
+  taskPoints         Int                @default(100)
+  tokens             Int                @default(100)
+  /// Per fight, like any other monster.
+  silver             Int                @default(100)
+  exp                Int                @default(100)
+  requiredGuildLevel Int                @default(1)
+  currentGuildBoss   CurrentGuildBoss[]
+}
+
+/// The boss a guild currently has standing. Its health pool persists between
+/// fights: the guild wears it down over days, one entry per member per day.
+model CurrentGuildBoss {
+  id          Int               @id @default(autoincrement())
+  guild       Guild             @relation(fields: [guildId], references: [id])
+  guildId     Int               @unique
+  boss        GuildBoss         @relation(fields: [guildBossId], references: [id])
+  guildBossId Int
+  difficulty  String            @default("easy")
+  maxHealth   Int
+  health      Int
+  attack      Int
+  summonedAt  DateTime          @default(now())
+  damage      GuildBossDamage[]
+}
+
+/// What each member has banked against the standing boss. It decides their cut
+/// of the token pool when the boss finally dies, then goes away with it.
+model GuildBossDamage {
+  id                 Int              @id @default(autoincrement())
+  currentGuildBoss   CurrentGuildBoss @relation(fields: [currentGuildBossId], references: [id], onDelete: Cascade)
+  currentGuildBossId Int
+  user               User             @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  userEmail          String
+  /// The score, which is what the token payout is split by. A party banks its
+  /// damage evenly, so this is not what the member personally hit for.
+  damage             Int              @default(0)
+  /// What they personally hit for, kept so the ranking can show who carried a
+  /// fight even though the score is shared.
+  dealtDamage        Int              @default(0)
+  /// Identifies the party this member last fought the boss with, so the ranking
+  /// can show them linked. Null for a member who fought alone.
+  partyKey           String?
+  /// Who led that party, so the ranking can head the group with them.
+  partyLeaderEmail   String?
+
+  @@unique([currentGuildBossId, userEmail])
+}
+
+/// Sold for guild tokens, which members earn by contributing to guild tasks and
+/// by fighting the guild boss.
+model GuildStoreProduct {
+  id      Int     @id @default(autoincrement())
+  item    Item    @relation(fields: [itemId], references: [id])
+  itemId  Int     @unique
+  price   Int
+  stack   Int     @default(1)
+  enabled Boolean @default(true)
 }
 
 model GuildApplication {

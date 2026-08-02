@@ -23,6 +23,17 @@ declare type ApplyToGuildDto = {
   guildId: number;
 };
 
+declare type SummonGuildBossDto = {
+  bossId: number;
+  /** easy | normal | hard | nightmare — validated server side. */
+  difficulty: string;
+};
+
+declare type BuyGuildStoreProductDto = {
+  productId: number;
+  amount?: number;
+};
+
 declare type CreateGuildDto = {
   name: string;
   description: string;

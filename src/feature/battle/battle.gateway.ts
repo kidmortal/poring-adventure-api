@@ -19,6 +19,13 @@ export class BattleGateway {
     return this.battleService.create({ userEmail: email, mapId: dto.mapId });
   }
 
+  @SubscribeMessage('battle_create_guild_boss')
+  async createGuildBoss(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`battle_create_guild_boss ${email}`);
+    return this.battleService.createGuildBossBattle({ userEmail: email });
+  }
+
   @SubscribeMessage('battle_update')
   async update(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;

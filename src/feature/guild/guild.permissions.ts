@@ -8,6 +8,8 @@ export const GuildPermission = {
   MANAGE_TASKS: 1,
   MANAGE_APPLICATIONS: 1,
   MANAGE_BLESSINGS: 2,
+  /** Summoning binds the whole guild to a health pool for days, so it sits with the blessings. */
+  MANAGE_BOSS: 2,
 } as const;
 
 @Injectable()

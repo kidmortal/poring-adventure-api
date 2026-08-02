@@ -13,6 +13,7 @@ export type FullUser = Prisma.UserGetPayload<{
     learnedSkills: { include: { skill: { include: { buff: true } } } };
     buffs: { include: { buff: true } };
     guildMember: true;
+    guildApplications: true;
     stats: true;
   };
 }>;
@@ -46,6 +47,9 @@ export class UsersRepository {
           learnedSkills: { include: { skill: { include: { buff: true } } } },
           buffs: { include: { buff: true } },
           guildMember: true,
+          // Their own pending applications, so a guild they have asked to join
+          // can say so instead of offering to apply again.
+          guildApplications: true,
           stats: true,
         },
       }),

@@ -8,6 +8,8 @@ import { WebsocketAuthEmailGuard } from 'src/core/websocket/websocket.guard';
 import { GuildTaskService } from './guildTask.service';
 import { GuildBlessingService } from './guildBlessing.service';
 import { GuildApplicationService } from './guildApplication.service';
+import { GuildBossService } from './guildBoss.service';
+import { GuildStoreService } from './guildStore.service';
 
 @UseGuards(WebsocketAuthEmailGuard)
 @UseFilters(WebsocketExceptionsFilter)
@@ -18,6 +20,8 @@ export class GuildGateway {
     private readonly taskService: GuildTaskService,
     private readonly blessingService: GuildBlessingService,
     private readonly applicationService: GuildApplicationService,
+    private readonly bossService: GuildBossService,
+    private readonly storeService: GuildStoreService,
   ) {}
   private logger = new Logger('Websocket - guilds');
 
@@ -101,6 +105,46 @@ export class GuildGateway {
     const email = client.handshake.auth.email;
     this.logger.debug('finish_current_task');
     return this.taskService.finishCurrentTask({ userEmail: email });
+  }
+
+  @SubscribeMessage('get_guild_bosses')
+  getGuildBosses() {
+    this.logger.debug('get_guild_bosses');
+    return this.bossService.findAllBosses();
+  }
+
+  @SubscribeMessage('get_guild_boss')
+  getCurrentGuildBoss(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('get_guild_boss');
+    return this.bossService.notifyUserWithBoss({ userEmail: email });
+  }
+
+  @SubscribeMessage('summon_guild_boss')
+  summonGuildBoss(@MessageBody() dto: SummonGuildBossDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`summon_guild_boss ${dto.bossId} ${dto.difficulty}`);
+    return this.bossService.summon({ userEmail: email, bossId: dto.bossId, difficulty: dto.difficulty });
+  }
+
+  @SubscribeMessage('dismiss_guild_boss')
+  dismissGuildBoss(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('dismiss_guild_boss');
+    return this.bossService.dismiss({ userEmail: email });
+  }
+
+  @SubscribeMessage('get_guild_store')
+  getGuildStore() {
+    this.logger.debug('get_guild_store');
+    return this.storeService.findAllProducts();
+  }
+
+  @SubscribeMessage('buy_guild_store_product')
+  buyGuildStoreProduct(@MessageBody() dto: BuyGuildStoreProductDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`buy_guild_store_product ${dto.productId}`);
+    return this.storeService.buy({ userEmail: email, productId: dto.productId, amount: dto.amount ?? 1 });
   }
 
   @SubscribeMessage('unlock_blessing')

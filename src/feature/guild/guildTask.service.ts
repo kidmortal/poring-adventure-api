@@ -81,7 +81,7 @@ export class GuildTaskService {
       if (!currentTask || currentTask.remainingKills > 0) return null;
 
       const { task, guildId } = currentTask;
-      await this._addTaskPointsToGuild({ guildId, amount: task.taskPoints, tx });
+      await this.addTaskPointsToGuild({ guildId, amount: task.taskPoints, tx });
       await tx.currentGuildTask.delete({ where: { guildId } });
       await this._distributeTokens({ guildId, amount: task.taskPoints, tx });
 
@@ -135,8 +135,11 @@ export class GuildTaskService {
     return this._refresh(guildId);
   }
 
-  /** Task points double as guild experience, so the guild may level up or down. */
-  private async _addTaskPointsToGuild(args: { guildId: number; amount: number; tx?: TransactionContext }) {
+  /**
+   * Task points double as guild experience, so the guild may level up or down.
+   * Shared with the guild boss, which pays out in the same currency.
+   */
+  async addTaskPointsToGuild(args: { guildId: number; amount: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
     const guild = await tx.guild.findUnique({ where: { id: args.guildId } });
     const correctLevel = Utils.getLevelFromExp(guild.experience + args.amount);

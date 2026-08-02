@@ -14,8 +14,16 @@ import { PartyRepository } from 'src/feature/party/party.repository';
 import { BattleValidations } from './validators';
 import { GuildService } from 'src/feature/guild/guild.service';
 import { GuildTaskService } from 'src/feature/guild/guildTask.service';
+import { GuildBossService } from 'src/feature/guild/guildBoss.service';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { TRANSACTION_OPTIONS } from 'src/core/prisma/types/prisma';
+
+/**
+ * The guild boss carries a pool far too big for one party, so it turns on them
+ * after five rounds rather than letting an unwinnable fight drag on. The damage
+ * banked up to that point is kept either way.
+ */
+const GUILD_BOSS_ENRAGE_ROUND = 5;
 
 @Injectable()
 export class BattleService {
@@ -30,6 +38,7 @@ export class BattleService {
     private readonly inventory: InventoryService,
     private readonly guildService: GuildService,
     private readonly guildTaskService: GuildTaskService,
+    private readonly guildBossService: GuildBossService,
     private readonly prisma: PrismaService,
     private readonly socket: WebsocketService,
   ) {}
@@ -88,6 +97,69 @@ export class BattleService {
   }
 
   /**
+   * The guild boss fight. Unlike a map battle it is gated before it starts —
+   * one entry per member per UTC day, guild members only — and what it does to
+   * the boss is banked against a health pool that outlives the battle.
+   */
+  async createGuildBossBattle(args: { userEmail: string }) {
+    const battle = this.getUserBattle(args.userEmail);
+    if (battle) {
+      battle.notifyUsers();
+      return true;
+    }
+
+    const userData = await this.usersRepository.getFullUser({ userEmail: args.userEmail });
+    let users: UserWithStats[] = [userData];
+    let partyLeaderEmail: string | undefined;
+    if (userData.partyId) {
+      const fullPartyInfo = await this.partyRepository.getPartyFromId({ partyId: userData.partyId });
+      users = fullPartyInfo.members;
+      partyLeaderEmail = fullPartyInfo.leaderEmail;
+    }
+
+    const prepared = await this.guildBossService.prepareFight({
+      userEmail: args.userEmail,
+      partyEmails: users.map((user) => user.email),
+    });
+    if (!prepared) return false;
+
+    const { boss } = prepared;
+    // The monster is built for this fight only: the health it stands up with is
+    // whatever the guild has left it, and it drops nothing on its own.
+    const monster = {
+      id: -boss.id,
+      name: boss.boss.name,
+      image: boss.boss.image,
+      level: boss.boss.level,
+      boss: true,
+      attack: boss.attack,
+      health: boss.health,
+      silver: boss.boss.silver,
+      exp: boss.boss.exp,
+      mapId: 0,
+      drops: [],
+    };
+
+    const newBattleInstance = new BattleInstance({
+      socket: this.socket,
+      users,
+      monsters: [monster],
+      updateUsers: (b) => this.updateStatsAndRewards(b),
+      removeBattle: () => this._remove(args.userEmail),
+      guildBossGuildId: prepared.guildId,
+      enrageAfterRound: GUILD_BOSS_ENRAGE_ROUND,
+      partyLeaderEmail,
+    });
+    BattleValidations.validateBattleInstanceStart(newBattleInstance);
+
+    await this.guildBossService.consumeEntries({ guildId: prepared.guildId, emails: prepared.emails });
+
+    newBattleInstance.notifyUsers();
+    this.battleList.push(newBattleInstance);
+    return true;
+  }
+
+  /**
    * Running from a fight ends it for the whole party, so it is not everyone's
    * call: the leader may do it at any point, anyone else only on their own
    * turn. A solo fight or a finished one is nobody else's business.
@@ -104,9 +176,24 @@ export class BattleService {
       return false;
     }
 
+    // Running from the boss, or being wiped by it, still counts: the damage was
+    // dealt and the entry was spent either way.
+    await this._bankGuildBossDamage(battle);
     battle.removeBattle();
     battle.notifyBattleRemoved();
     return true;
+  }
+
+  /** No-op for a normal fight; consumeDamage empties itself so it cannot double up. */
+  private async _bankGuildBossDamage(battle: BattleInstance) {
+    if (!battle.guildBossGuildId) return;
+
+    await this.guildBossService.applyDamage({
+      guildId: battle.guildBossGuildId,
+      damageByUser: battle.consumeDamage(),
+      participants: battle.participantEmails,
+      partyLeaderEmail: battle.partyLeaderEmail,
+    });
   }
 
   private async _canEndBattle(args: { battle: BattleInstance; userEmail: string }) {
@@ -202,6 +289,9 @@ export class BattleService {
       }
       await this.userService.notifyUserUpdateWithProfile({ email: userEmail });
     }
+
+    // Last, so the kill payout lands after everyone's own rewards are committed.
+    await this._bankGuildBossDamage(battle);
   }
 
   getUserBattle(userEmail: string): BattleInstance | undefined {

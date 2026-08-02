@@ -17,6 +17,17 @@ function generateBattleAttackOrder(users: UserWithStats[], monsters: MonsterWith
   return mixedArray;
 }
 
+/**
+ * A monster that has been left standing too long hits harder with every swing,
+ * so a fight it cannot win outright still ends. `stacks` is how many times it
+ * has already attacked while enraged — the first enraged hit is the plain one.
+ */
+function enragedDamage(baseDamage: number, stacks: number, multiplier: number) {
+  if (stacks <= 0) return baseDamage;
+  return Math.floor(baseDamage * Math.pow(multiplier, stacks));
+}
+
 export const BattleUtils = {
   generateBattleAttackOrder,
+  enragedDamage,
 };
