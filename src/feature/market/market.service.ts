@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/core/prisma/prisma.service';
+import { TRANSACTION_OPTIONS } from 'src/core/prisma/types/prisma';
 import { InventoryService } from 'src/feature/items/inventory.service';
 import { UserWalletService } from 'src/feature/users/userWallet.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
@@ -106,7 +107,7 @@ export class MarketService {
         tx,
       });
       return listing.inventory?.item?.category as ItemCategory;
-    });
+    }, TRANSACTION_OPTIONS);
 
     await this._invalidate(category);
     return true;

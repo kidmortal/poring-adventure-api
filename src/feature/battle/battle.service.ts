@@ -15,6 +15,7 @@ import { BattleValidations } from './validators';
 import { GuildService } from 'src/feature/guild/guild.service';
 import { GuildTaskService } from 'src/feature/guild/guildTask.service';
 import { PrismaService } from 'src/core/prisma/prisma.service';
+import { TRANSACTION_OPTIONS } from 'src/core/prisma/types/prisma';
 
 @Injectable()
 export class BattleService {
@@ -134,6 +135,9 @@ export class BattleService {
       const rewardUser = battle.getUserFromBattle(userEmail);
       const remainingHealth = rewardUser.stats.health;
       const remainingMana = rewardUser.stats.mana;
+      // The database is remote, so a dozen sequential writes can outrun the
+      // default five second interactive budget.
+      let contributedGuildId: number | null = null;
       await this.prisma.$transaction(async (tx) => {
         await this.userStats.decreaseUserBuffs({ userEmail, tx });
         await this.userWallet.addExpSilver({ userEmail, silver, exp, tx });
@@ -148,7 +152,7 @@ export class BattleService {
           mana: remainingMana,
           tx,
         });
-        await this.guildTaskService.contributeToGuildTask({
+        contributedGuildId = await this.guildTaskService.contributeToGuildTask({
           userEmail,
           mapId,
           amount: monsterCount,
@@ -165,8 +169,12 @@ export class BattleService {
             tx,
           });
         }
-      });
+      }, TRANSACTION_OPTIONS);
 
+      // Both re-read and push, so they wait until the rewards are committed.
+      if (contributedGuildId) {
+        await this.guildTaskService.refreshGuild(contributedGuildId);
+      }
       await this.userService.notifyUserUpdateWithProfile({ email: userEmail });
     }
   }

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/core/prisma/prisma.service';
+import { TRANSACTION_OPTIONS } from 'src/core/prisma/types/prisma';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { InventoryService } from 'src/feature/items/inventory.service';
 import { UserStaminaService } from 'src/feature/users/userStamina.service';
@@ -125,7 +126,7 @@ export class HiringService {
         experience: recipe.experience,
         tx,
       });
-    });
+    }, TRANSACTION_OPTIONS);
 
     this.logger.debug(`${offer.crafterEmail} crafted ${recipe.name} for ${args.hirerEmail} (${fee} silver)`);
     this.websocket.sendTextNotification({
@@ -239,17 +240,15 @@ export class HiringService {
         experience: serviceExperience({ staminaCost: ENHANCE_SERVICE_STAMINA_COST }),
         tx,
       });
-    });
+    }, TRANSACTION_OPTIONS);
 
     this.logger.debug(
       `${offer.crafterEmail} enhanced ${inventoryItem.item.name} for ${args.hirerEmail} — ${success ? 'success' : 'failure'} at ${chance}%`,
     );
-    this._notifyEnhanceResult({
-      hirerEmail: args.hirerEmail,
-      offer: { crafterEmail: offer.crafterEmail, crafterName: offer.crafter.name },
-      itemName: inventoryItem.item.name,
-      success,
-      fee,
+    // Only the smith is told: the hirer is looking at the roll's animation.
+    this.websocket.sendTextNotification({
+      email: offer.crafterEmail,
+      text: `You worked on a ${inventoryItem.item.name} for ${fee} silver`,
     });
     await this.notifications.push({ userEmail: offer.crafterEmail });
     await this._notifyBoth({ hirerEmail: args.hirerEmail, crafterEmail: offer.crafterEmail });
@@ -327,22 +326,13 @@ export class HiringService {
         amount: serviceExperience({ staminaCost: ENHANCE_SERVICE_STAMINA_COST }),
         tx,
       });
-    });
+    }, TRANSACTION_OPTIONS);
 
     this.logger.debug(
       `${args.userEmail} worked their own ${inventoryItem.item.name} — ${success ? 'success' : 'failure'} at ${chance}%`,
     );
-    if (success) {
-      this.websocket.sendTextNotification({
-        email: args.userEmail,
-        text: `You enhanced your ${inventoryItem.item.name}`,
-      });
-    } else {
-      this.websocket.sendErrorNotification({
-        email: args.userEmail,
-        text: `You failed to enhance your ${inventoryItem.item.name}`,
-      });
-    }
+    // The outcome is returned to the screen that asked for it, so there is
+    // nothing to announce here.
     await this.userService.notifyUserUpdateWithProfile({ email: args.userEmail });
 
     return {
@@ -366,30 +356,6 @@ export class HiringService {
       throw new BadRequestException('You are too poor for that');
     }
     return user;
-  }
-
-  private _notifyEnhanceResult(args: {
-    hirerEmail: string;
-    offer: { crafterEmail: string; crafterName: string };
-    itemName: string;
-    success: boolean;
-    fee: number;
-  }) {
-    if (args.success) {
-      this.websocket.sendTextNotification({
-        email: args.hirerEmail,
-        text: `${args.offer.crafterName} enhanced your ${args.itemName}`,
-      });
-    } else {
-      this.websocket.sendErrorNotification({
-        email: args.hirerEmail,
-        text: `${args.offer.crafterName} failed to enhance your ${args.itemName}`,
-      });
-    }
-    this.websocket.sendTextNotification({
-      email: args.offer.crafterEmail,
-      text: `You worked on a ${args.itemName} for ${args.fee} silver`,
-    });
   }
 
   /** Both sides changed: silver, stamina, inventory and profession level. */

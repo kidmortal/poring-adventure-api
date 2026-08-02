@@ -3,7 +3,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Mail } from '@prisma/client';
 import { InventoryService } from 'src/feature/items/inventory.service';
 import { PrismaService } from 'src/core/prisma/prisma.service';
-import { TransactionContext } from 'src/core/prisma/types/prisma';
+import { TRANSACTION_OPTIONS, TransactionContext } from 'src/core/prisma/types/prisma';
 import { UsersService } from 'src/feature/users/users.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 
@@ -38,7 +38,7 @@ export class MailService {
       for await (const mail of claimableMails) {
         await this._claimMail({ mail, tx });
       }
-    });
+    }, TRANSACTION_OPTIONS);
 
     await this._notifyUserMailBox(args);
     await this.userService.notifyUserUpdateWithProfile({
@@ -157,7 +157,7 @@ export class MailService {
           claimed: false,
         },
       });
-    });
+    }, TRANSACTION_OPTIONS);
 
     this.logger.debug(`${args.senderEmail} gifted ${args.receiverEmail}`);
     await this._notifyUserMailBox({ userEmail: args.receiverEmail });

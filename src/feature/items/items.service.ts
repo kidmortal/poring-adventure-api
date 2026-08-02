@@ -52,6 +52,8 @@ export class ItemsService {
       const chance = Utils.enhanceChance(nextEnhancement);
       const success = Utils.isSuccess(chance);
 
+      // No notification either way: the outcome is returned, and the screen
+      // that asked for the roll is the one that shows it.
       if (success) {
         await this.inventory.removeItemFromInventory({ ...args, stack: 1, tx });
         await this.inventory.addItemToInventory({
@@ -61,15 +63,6 @@ export class ItemsService {
           stack: 1,
           userEmail: args.userEmail,
           tx,
-        });
-        this.websocket.sendTextNotification({
-          email: args.userEmail,
-          text: 'You have successfully enhanced your item',
-        });
-      } else {
-        this.websocket.sendErrorNotification({
-          email: args.userEmail,
-          text: 'You have failed to enhance your item',
         });
       }
 

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/core/prisma/prisma.service';
+import { TRANSACTION_OPTIONS } from 'src/core/prisma/types/prisma';
 import { InventoryService } from 'src/feature/items/inventory.service';
 import { UserStaminaService } from 'src/feature/users/userStamina.service';
 import { UsersService } from 'src/feature/users/users.service';
@@ -84,7 +85,7 @@ export class CraftingService {
         amount: recipe.experience,
         tx,
       });
-    });
+    }, TRANSACTION_OPTIONS);
 
     this.logger.debug(`${args.userEmail} crafted ${recipe.name} at quality ${quality}`);
     await this.userService.notifyUserUpdateWithProfile({ email: args.userEmail });

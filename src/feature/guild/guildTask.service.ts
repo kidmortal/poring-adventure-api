@@ -94,13 +94,19 @@ export class GuildTaskService {
   }
 
   /** Called by the battle loop whenever a member kills on the task's map. */
+  /**
+   * Credits kills to the guild's running task. Returns the guild that was
+   * touched, or null — the caller pushes the update once its transaction has
+   * committed, since re-reading the whole guild is far too slow to do inside
+   * one.
+   */
   async contributeToGuildTask(args: { userEmail: string; mapId: number; amount: number; tx?: TransactionContext }) {
     const tx = args.tx ?? this.prisma;
     const member = await this.repository.getUserGuildMember({ userEmail: args.userEmail, tx });
-    if (!member) return false;
+    if (!member) return null;
 
     const task = await this.repository.getCurrentTask({ guildId: member.guildId, tx });
-    if (!task || task.remainingKills <= 0 || task.task.mapId !== args.mapId) return false;
+    if (!task || task.remainingKills <= 0 || task.task.mapId !== args.mapId) return null;
 
     await tx.currentGuildTask.update({
       where: { id: task.id },
@@ -113,8 +119,14 @@ export class GuildTaskService {
         guildTokens: { increment: args.amount },
       },
     });
-    await this._refresh(member.guildId);
-    return true;
+    // Only the cache is touched here; the push waits for the caller's commit.
+    await this.repository.clearGuildCache({ guildId: member.guildId });
+    return member.guildId;
+  }
+
+  /** Re-reads the guild and pushes it to its members. Never call inside a transaction. */
+  async refreshGuild(guildId: number) {
+    return this._refresh(guildId);
   }
 
   /** Task points double as guild experience, so the guild may level up or down. */
