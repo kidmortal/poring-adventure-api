@@ -31,3 +31,8 @@ declare type RemovePartyDto = {
 declare type QuitPartyDto = {
   partyId: number;
 };
+
+declare type PromotePartyMemberDto = {
+  partyId: number;
+  promotedEmail: string;
+};

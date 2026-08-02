@@ -96,6 +96,25 @@ export class PartyService {
     return true;
   }
 
+  /**
+   * Hands leadership to another member. Only the current leader may do it, and
+   * only to someone already in the party.
+   */
+  async promote(args: { partyId: number; userEmail: string; promotedEmail: string }) {
+    const party = await this.repository.getPartyFromId({ partyId: args.partyId });
+    if (!party || party.leaderEmail !== args.userEmail) return false;
+    if (args.promotedEmail === args.userEmail) return false;
+
+    const promoted = party.members.find((member) => member.email === args.promotedEmail);
+    if (!promoted) return false;
+
+    await this.repository.setPartyLeader({ partyId: args.partyId, leaderEmail: args.promotedEmail });
+    await this.repository.clearPartyCache({ partyId: args.partyId });
+    await this.notifier.partyWithData({ partyId: args.partyId });
+    this.websocket.sendTextNotification({ email: args.promotedEmail, text: 'You are now the party leader' });
+    return true;
+  }
+
   async kick(args: { partyId: number; userEmail: string; kickedEmail: string }) {
     const party = await this.repository.getPartyFromId({ partyId: args.partyId });
     if (!party || party.leaderEmail !== args.userEmail) return false;

@@ -131,6 +131,16 @@ export class BattleInstance {
     return this.monsters[0].mapId;
   }
 
+  /** A fight with a single player has nobody else to strand by leaving. */
+  get isSolo() {
+    return this.users.length <= 1;
+  }
+
+  /** Whose turn it currently is, by name. */
+  get currentTurnName() {
+    return this.attackerList[this.attackerTurn];
+  }
+
   constructor({ monsters, users, socket, updateUsers, removeBattle }: CreateBattleParams) {
     this.socket = socket;
     this.users = this.generateUserBattleValues(users);

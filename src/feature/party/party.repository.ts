@@ -74,6 +74,13 @@ export class PartyRepository {
   }
 
   /** Joins (`partyId`) or leaves (`null`); the caller says which cache to drop. */
+  setPartyLeader(args: { partyId: number; leaderEmail: string }) {
+    return this.prisma.party.update({
+      where: { id: args.partyId },
+      data: { leaderEmail: args.leaderEmail },
+    });
+  }
+
   setUserParty(args: { email: string; partyId: number | null }) {
     return this.prisma.user.update({
       where: { email: args.email },

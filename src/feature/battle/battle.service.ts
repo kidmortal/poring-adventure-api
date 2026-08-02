@@ -87,14 +87,39 @@ export class BattleService {
     return true;
   }
 
+  /**
+   * Running from a fight ends it for the whole party, so it is not everyone's
+   * call: the leader may do it at any point, anyone else only on their own
+   * turn. A solo fight or a finished one is nobody else's business.
+   */
   async finishBattle(args: { userEmail: string }) {
     const battle = this.getUserBattle(args.userEmail);
-    if (battle) {
-      battle.removeBattle();
-      battle.notifyBattleRemoved();
-      return true;
+    if (!battle) return false;
+
+    if (!(await this._canEndBattle({ battle, userEmail: args.userEmail }))) {
+      this.socket.sendErrorNotification({
+        email: args.userEmail,
+        text: 'Only the party leader can run outside their turn',
+      });
+      return false;
     }
-    return false;
+
+    battle.removeBattle();
+    battle.notifyBattleRemoved();
+    return true;
+  }
+
+  private async _canEndBattle(args: { battle: BattleInstance; userEmail: string }) {
+    if (args.battle.battleFinished || args.battle.isSolo) return true;
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: args.userEmail },
+      include: { Party: true },
+    });
+    if (!user) return false;
+    if (user.Party?.leaderEmail === args.userEmail) return true;
+
+    return args.battle.currentTurnName === user.name;
   }
 
   private async _remove(userEmail: string) {

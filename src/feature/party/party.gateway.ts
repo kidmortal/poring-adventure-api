@@ -63,6 +63,13 @@ export class PartyGateway {
     return this.partyService.invite({ userEmail: email, invitedEmail: dto.invitedEmail, partyId: dto.partyId });
   }
 
+  @SubscribeMessage('promote_party_member')
+  promote(@MessageBody() dto: PromotePartyMemberDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug('promote_party_member');
+    return this.partyService.promote({ partyId: dto.partyId, userEmail: email, promotedEmail: dto.promotedEmail });
+  }
+
   @SubscribeMessage('kick_from_party')
   kick(@MessageBody() dto: KickFromPartyDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
