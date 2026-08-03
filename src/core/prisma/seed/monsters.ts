@@ -61,6 +61,16 @@ type MapSeed = {
   name: string;
   /** Sprite the map card is illustrated with — its boss, every time. */
   asset: string;
+  /**
+   * Crafting materials every monster on the map drops, on top of its own table.
+   *
+   * This is the bridge between the two economies. A fighter farms materials they
+   * have no profession to use and sells them to a crafter who cannot farm them;
+   * that single loop is what makes the player market feel like it has people in
+   * it. The rates are far above the 5–10% gear drops on purpose — materials are
+   * meant to flow, not to be chased.
+   */
+  materials: DropSeed[];
   monsters: MonsterSeed[];
 };
 
@@ -68,6 +78,11 @@ const MAPS: MapSeed[] = [
   {
     name: 'Poring Forest',
     asset: 'KING_PORING',
+    materials: [
+      { itemName: 'Copper Ore', chance: 30, maxAmount: 2 },
+      { itemName: 'Green Herb', chance: 30, maxAmount: 2 },
+      { itemName: 'Raw Fish', chance: 25, maxAmount: 2 },
+    ],
     monsters: [
       {
         name: 'Poring',
@@ -94,6 +109,11 @@ const MAPS: MapSeed[] = [
   {
     name: 'Willow Swamp',
     asset: 'ELDER_WILOW',
+    materials: [
+      { itemName: 'Iron Ore', chance: 30, maxAmount: 2 },
+      { itemName: 'Blue Herb', chance: 30, maxAmount: 2 },
+      { itemName: 'Swamp Reed', chance: 25, maxAmount: 2 },
+    ],
     monsters: [
       { name: 'Spore', asset: 'SPORE', level: 11 },
       { name: 'Vitata', asset: 'VITATA', level: 13 },
@@ -106,6 +126,11 @@ const MAPS: MapSeed[] = [
   {
     name: 'Cemetery',
     asset: 'KADES',
+    materials: [
+      { itemName: 'Silver Ore', chance: 28, maxAmount: 2 },
+      { itemName: 'Grave Moss', chance: 28, maxAmount: 2 },
+      { itemName: 'Fish Scale', chance: 22, maxAmount: 2 },
+    ],
     monsters: [
       { name: 'Familiar', asset: 'FARMILIAR', level: 21 },
       { name: 'Mini Demon', asset: 'MINI_DEMON', level: 24 },
@@ -116,6 +141,11 @@ const MAPS: MapSeed[] = [
   {
     name: 'Scorching Desert',
     asset: 'ANCIENT_MUMMY',
+    materials: [
+      { itemName: 'Gold Ore', chance: 25, maxAmount: 2 },
+      { itemName: 'Sun Blossom', chance: 25, maxAmount: 2 },
+      { itemName: 'Raw Fish', chance: 20, maxAmount: 3 },
+    ],
     monsters: [
       { name: 'Scorpion', asset: 'SCORPION', level: 31 },
       { name: 'Hornet', asset: 'HORNET', level: 33 },
@@ -127,6 +157,11 @@ const MAPS: MapSeed[] = [
   {
     name: 'Demon Sanctuary',
     asset: 'BAPHOMET',
+    materials: [
+      { itemName: 'Demon Ore', chance: 22, maxAmount: 2 },
+      { itemName: 'Void Bloom', chance: 22, maxAmount: 2 },
+      { itemName: 'Fish Scale', chance: 20, maxAmount: 3 },
+    ],
     monsters: [
       { name: 'Explosion', asset: 'EXPLOSION', level: 42 },
       { name: 'Harpy', asset: 'HARPY', level: 45 },
@@ -173,8 +208,9 @@ export async function seedMonsters() {
         ...(monster.boss ? bossStats(monster.level) : normalStats(monster.level)),
       });
       // Only the declared drops are touched — a loot table added by hand on a
-      // live database is left where it is.
-      await seedDrops(monsterId, monster.drops ?? []);
+      // live database is left where it is. The map's materials come last so a
+      // monster that lists one itself keeps its own rate.
+      await seedDrops(monsterId, [...map.materials, ...(monster.drops ?? [])]);
       monsterCount++;
     }
   }

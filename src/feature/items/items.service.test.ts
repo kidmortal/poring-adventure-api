@@ -32,7 +32,7 @@ describe('Items Service', () => {
     equipped: false,
     quality: 1,
     enhancement: 2,
-    item: { name: 'Bronze Sword' },
+    item: { name: 'Bronze Sword', category: 'weapon' },
   };
 
   beforeEach(async () => {
@@ -123,6 +123,76 @@ describe('Items Service', () => {
 
       expect(result).toBe(false);
       expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('refuses anything that is not equipment, which has no stats to raise', async () => {
+      inventory.getOneInventoryItem.mockResolvedValue({
+        ...ownedItem,
+        item: { name: 'Healing Potion', category: 'consumable' },
+      });
+
+      const result = await service.enhanceItem({ userEmail: USER, inventoryId: 7 });
+
+      expect(result).toBe(false);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(websocket.sendErrorNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Only equipment can be enhanced' }),
+      );
+    });
+
+    it('takes a level back when a roll above the setback threshold fails', async () => {
+      inventory.getOneInventoryItem.mockResolvedValue({ ...ownedItem, enhancement: 7 });
+      jest.spyOn(Utils, 'isSuccess').mockReturnValue(false);
+
+      const result = await service.enhanceItem({ userEmail: USER, inventoryId: 7 });
+
+      expect(inventory.addItemToInventory).toHaveBeenCalledWith(expect.objectContaining({ enhancement: 6 }));
+      expect(result).toMatchObject({ enhancement: 6, success: false, setback: true });
+    });
+
+    it('never drops below the floor, however unlucky the run', async () => {
+      inventory.getOneInventoryItem.mockResolvedValue({ ...ownedItem, enhancement: 5 });
+      jest.spyOn(Utils, 'isSuccess').mockReturnValue(false);
+
+      const result = await service.enhanceItem({ userEmail: USER, inventoryId: 7 });
+
+      expect(inventory.addItemToInventory).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ enhancement: 5, success: false, setback: false });
+    });
+  });
+
+  describe('consumeItem', () => {
+    const potion = {
+      id: 9,
+      itemId: 50,
+      userEmail: USER,
+      stack: 1,
+      equipped: false,
+      quality: 5,
+      enhancement: 0,
+      item: { name: 'Healing Potion', category: 'consumable', health: 50, mana: null, buff: null, partyWide: false },
+    };
+
+    beforeEach(() => {
+      inventory.getOneInventoryItem.mockResolvedValue(potion);
+    });
+
+    it('scales what it restores by the quality it was crafted at', async () => {
+      const stats = { incrementUserHealth: jest.fn(), incrementUserMana: jest.fn(), applyBuff: jest.fn() };
+      (service as unknown as { userStats: typeof stats }).userStats = stats;
+
+      const result = await service.consumeItem({ userEmail: USER, inventoryId: 9, stack: 1 });
+
+      // Legendary is ×1.6, so the 50 on the item is worth 80 in the hand.
+      expect(stats.incrementUserHealth).toHaveBeenCalledWith(expect.objectContaining({ amount: 80 }));
+      expect(result).toMatchObject({ item: 'Healing Potion', health: 80, quality: 5 });
+    });
+
+    it('turns down anything that is not a consumable', async () => {
+      inventory.getOneInventoryItem.mockResolvedValue(ownedItem);
+
+      expect(await service.consumeItem({ userEmail: USER, inventoryId: 7, stack: 1 })).toBe(false);
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
   });

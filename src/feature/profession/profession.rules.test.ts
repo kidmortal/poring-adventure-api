@@ -1,11 +1,16 @@
 import {
+  BASE_MAX_STAMINA,
   craftQualityChances,
+  enhancementAfterFailure,
+  failureCostsALevel,
   rollCraftQuality,
   ENHANCE_SERVICE_STAMINA_COST,
   hiredEnhanceBonus,
   hiredEnhanceChance,
+  maxStaminaForProfession,
   planIngredientConsumption,
   rollNodeDrops,
+  SETBACK_FLOOR,
   serviceExperience,
   serviceFee,
 } from './profession.rules';
@@ -159,5 +164,51 @@ describe('profession rules', () => {
 
       expect(plan).toBeNull();
     });
+  });
+});
+
+describe('Enhancement setback', () => {
+  it('leaves the item where it is below the threshold — the silver is the only loss', () => {
+    for (let current = 0; current < 5; current++) {
+      expect(enhancementAfterFailure({ current })).toBe(current);
+      expect(failureCostsALevel({ current })).toBe(false);
+    }
+  });
+
+  it('costs a level once the item is past the threshold', () => {
+    expect(enhancementAfterFailure({ current: 6 })).toBe(5);
+    expect(enhancementAfterFailure({ current: 7 })).toBe(6);
+    expect(enhancementAfterFailure({ current: 9 })).toBe(8);
+    expect(failureCostsALevel({ current: 7 })).toBe(true);
+  });
+
+  it('never falls below the floor, so no run of luck erases a week of work', () => {
+    let enhancement = 9;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      enhancement = enhancementAfterFailure({ current: enhancement });
+    }
+    expect(enhancement).toBe(SETBACK_FLOOR);
+  });
+
+  it('protects the level the floor sits on', () => {
+    expect(enhancementAfterFailure({ current: 5 })).toBe(5);
+  });
+});
+
+describe('Stamina from profession level', () => {
+  it('starts every player on the base budget', () => {
+    expect(maxStaminaForProfession({ level: 1 })).toBe(BASE_MAX_STAMINA);
+  });
+
+  it('adds a point every two levels', () => {
+    expect(maxStaminaForProfession({ level: 2 })).toBe(BASE_MAX_STAMINA + 1);
+    expect(maxStaminaForProfession({ level: 20 })).toBe(BASE_MAX_STAMINA + 10);
+    expect(maxStaminaForProfession({ level: 50 })).toBe(BASE_MAX_STAMINA + 25);
+  });
+
+  it('never goes backwards as the level climbs', () => {
+    for (let level = 1; level < 50; level++) {
+      expect(maxStaminaForProfession({ level: level + 1 })).toBeGreaterThanOrEqual(maxStaminaForProfession({ level }));
+    }
   });
 });

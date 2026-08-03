@@ -9,9 +9,17 @@ import { GatheringService } from './gathering.service';
 import { CraftingService } from './crafting.service';
 import { ServiceOfferService } from './serviceOffer.service';
 import { HiringService } from './hiring.service';
+import { CommissionService } from './commission.service';
 import { ProfessionGateway } from './profession.gateway';
 
-const providers = [ProfessionService, GatheringService, CraftingService, ServiceOfferService, HiringService];
+const providers = [
+  ProfessionService,
+  GatheringService,
+  CraftingService,
+  ServiceOfferService,
+  HiringService,
+  CommissionService,
+];
 
 @Module({
   imports: [UsersModule, ItemsModule, WebsocketModule, MailModule],

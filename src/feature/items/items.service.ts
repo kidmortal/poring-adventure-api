@@ -5,8 +5,11 @@ import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { UsersService } from 'src/feature/users/users.service';
 import { UserStatsService } from 'src/feature/users/userStats.service';
 import { UserWalletService } from 'src/feature/users/userWallet.service';
+import { enhancementAfterFailure } from 'src/feature/profession/profession.rules';
 import { Utils } from 'src/utilities/utils';
+import { EQUIPABLE_CATEGORIES } from './entities/categories';
 import { InventoryService } from './inventory.service';
+import { buffDurationForQuality, consumablePotency } from './items.rules';
 
 /**
  * What a player can do *to* an item: enhance it, or consume it.
@@ -40,6 +43,9 @@ export class ItemsService {
     if (inventoryItem.equipped) {
       return this._deny(args.userEmail, 'Cannot enhance equipped item');
     }
+    if (!EQUIPABLE_CATEGORIES.includes(inventoryItem.item.category)) {
+      return this._deny(args.userEmail, 'Only equipment can be enhanced');
+    }
 
     // Only the silver is in question, so this reads the one column instead of
     // the profile with its inventory, skills, buffs and guild attached.
@@ -59,16 +65,21 @@ export class ItemsService {
 
     const chance = Utils.enhanceChance(nextEnhancement);
     const success = Utils.isSuccess(chance);
+    // High enhancement is a standing relationship with a smith rather than a
+    // one-time errand: past +6 a failure takes a level back, though never below
+    // the floor, so no single click can undo a week of work.
+    const enhancement = success ? nextEnhancement : enhancementAfterFailure({ current: inventoryItem.enhancement });
+    const setback = enhancement < inventoryItem.enhancement;
 
     // What has to be atomic, and nothing else: paying for the attempt and
     // applying what it rolled.
     await this.prisma.$transaction(async (tx) => {
-      if (success) {
+      if (enhancement !== inventoryItem.enhancement) {
         await this.inventory.removeItemFromInventory({ ...args, stack: 1, tx });
         await this.inventory.addItemToInventory({
           itemId: inventoryItem.itemId,
           quality: inventoryItem.quality,
-          enhancement: nextEnhancement,
+          enhancement,
           stack: 1,
           userEmail: args.userEmail,
           tx,
@@ -84,8 +95,9 @@ export class ItemsService {
 
     return {
       item: inventoryItem.item.name,
-      enhancement: success ? nextEnhancement : inventoryItem.enhancement,
+      enhancement,
       success,
+      setback,
       chance,
       forgePrice: price,
     };
@@ -95,22 +107,87 @@ export class ItemsService {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async upgradeItem(args: { userEmail: string; inventoryId: number }) {}
 
-  /** Consumables restore health and mana, then leave the inventory. */
+  /**
+   * Eats or drinks one stack: restores what it restores, grants what it grants,
+   * and leaves the inventory either way.
+   *
+   * Both halves are scaled by the stack's quality, which used to be ignored
+   * outright — a Legendary potion healed exactly as much as a Common one, so a
+   * master alchemist's work was worth nothing more than a beginner's. A meal
+   * marked `partyWide` feeds everyone in the party, which is what makes a cook
+   * something a group brings along rather than a personal luxury.
+   */
   async consumeItem(args: { userEmail: string; inventoryId: number; stack: number }) {
-    return this.prisma.$transaction(async (tx) => {
-      const inventoryItem = await this.inventory.getOneInventoryItem({ ...args, tx });
-      if (inventoryItem?.item.category !== 'consumable') return false;
+    const inventoryItem = await this.inventory.getOneInventoryItem(args);
+    if (inventoryItem?.item.category !== 'consumable') return false;
 
-      const { item } = inventoryItem;
-      if (item.health) {
-        await this.userStats.incrementUserHealth({ userEmail: args.userEmail, amount: item.health, tx });
+    const { item, quality } = inventoryItem;
+    const health = consumablePotency({ base: item.health, quality });
+    const mana = consumablePotency({ base: item.mana, quality });
+    const fed = item.buff ? await this._buffTargets({ item, userEmail: args.userEmail }) : [];
+
+    await this.prisma.$transaction(async (tx) => {
+      if (health) {
+        await this.userStats.incrementUserHealth({ userEmail: args.userEmail, amount: health, tx });
       }
-      if (item.mana) {
-        await this.userStats.incrementUserMana({ userEmail: args.userEmail, amount: item.mana, tx });
+      if (mana) {
+        await this.userStats.incrementUserMana({ userEmail: args.userEmail, amount: mana, tx });
+      }
+      for (const email of fed) {
+        await this.userStats.applyBuff({
+          userEmail: email,
+          buff: item.buff,
+          duration: buffDurationForQuality({ duration: item.buff.duration, quality }),
+          tx,
+        });
       }
       await this.inventory.removeItemFromInventory({ ...args, tx });
-      return true;
     }, TRANSACTION_OPTIONS);
+
+    // Everyone the meal reached sees it, not only whoever paid for it.
+    for (const email of fed) {
+      await this.userService.notifyUserUpdateWithProfile({ email });
+    }
+    if (!fed.includes(args.userEmail)) {
+      await this.userService.notifyUserUpdateWithProfile({ email: args.userEmail });
+    }
+
+    return {
+      item: item.name,
+      quality,
+      health,
+      mana,
+      buff: item.buff
+        ? {
+            name: item.buff.name,
+            image: item.buff.image,
+            duration: buffDurationForQuality({ duration: item.buff.duration, quality }),
+            attackBonus: item.buff.attackBonus,
+            healthBonus: item.buff.healthBonus,
+            fed: fed.length,
+          }
+        : null,
+    };
+  }
+
+  /**
+   * Who a buffed consumable actually reaches. A party-wide meal covers the
+   * whole party — including the eater — and everything else covers one person.
+   */
+  private async _buffTargets(args: { item: { partyWide: boolean }; userEmail: string }) {
+    if (!args.item.partyWide) return [args.userEmail];
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: args.userEmail },
+      select: { partyId: true },
+    });
+    if (!user?.partyId) return [args.userEmail];
+
+    const party = await this.prisma.user.findMany({
+      where: { partyId: user.partyId },
+      select: { email: true },
+    });
+    return party.map((member) => member.email);
   }
 
   private _deny(email: string, text: string) {

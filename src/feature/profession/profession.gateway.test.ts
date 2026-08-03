@@ -6,6 +6,7 @@ import { ProfessionGateway } from './profession.gateway';
 import { ProfessionService } from './profession.service';
 import { ServiceOfferService } from './serviceOffer.service';
 import { HiringService } from './hiring.service';
+import { CommissionService } from './commission.service';
 
 const socket = { handshake: { auth: { email: 'auth@email.com' } } } as any;
 
@@ -16,6 +17,7 @@ describe('Profession Gateway', () => {
   let crafting: { craft: jest.Mock; getAllRecipes: jest.Mock };
   let offers: { getAllOffers: jest.Mock; getUserOffer: jest.Mock; publishOffer: jest.Mock; removeOffer: jest.Mock };
   let hiring: { hireCraft: jest.Mock; hireEnhance: jest.Mock };
+  let commissions: { getBoard: jest.Mock; deliver: jest.Mock };
   let users: { notifyUserUpdateWithProfile: jest.Mock };
 
   beforeEach(async () => {
@@ -24,6 +26,7 @@ describe('Profession Gateway', () => {
     crafting = { craft: jest.fn(), getAllRecipes: jest.fn() };
     offers = { getAllOffers: jest.fn(), getUserOffer: jest.fn(), publishOffer: jest.fn(), removeOffer: jest.fn() };
     hiring = { hireCraft: jest.fn(), hireEnhance: jest.fn() };
+    commissions = { getBoard: jest.fn(), deliver: jest.fn() };
     users = { notifyUserUpdateWithProfile: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -34,6 +37,7 @@ describe('Profession Gateway', () => {
         { provide: CraftingService, useValue: crafting },
         { provide: ServiceOfferService, useValue: offers },
         { provide: HiringService, useValue: hiring },
+        { provide: CommissionService, useValue: commissions },
         { provide: UsersService, useValue: users },
       ],
     }).compile();

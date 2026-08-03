@@ -3,6 +3,7 @@ import { PrismaService } from 'src/core/prisma/prisma.service';
 import { TRANSACTION_OPTIONS } from 'src/core/prisma/types/prisma';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { InventoryService } from 'src/feature/items/inventory.service';
+import { ItemsValidator } from 'src/feature/items/items.validator';
 import { UserStaminaService } from 'src/feature/users/userStamina.service';
 import { UserWalletService } from 'src/feature/users/userWallet.service';
 import { UsersService } from 'src/feature/users/users.service';
@@ -12,6 +13,7 @@ import { ProfessionService } from './profession.service';
 import { ServiceOfferService } from './serviceOffer.service';
 import {
   ENHANCE_SERVICE_STAMINA_COST,
+  enhancementAfterFailure,
   hiredEnhanceChance,
   planIngredientConsumption,
   rollCraftQuality,
@@ -174,6 +176,7 @@ export class HiringService {
     if (inventoryItem.equipped) {
       throw new BadRequestException('Cannot enhance equipped item');
     }
+    ItemsValidator.isEnhanceable({ category: inventoryItem.item.category });
 
     const nextEnhancement = inventoryItem.enhancement + 1;
     const forgePrice = Utils.enhancePrice(nextEnhancement);
@@ -188,6 +191,7 @@ export class HiringService {
       blacksmithLevel: blacksmith.level,
     });
     const success = Utils.isSuccess(chance);
+    const enhancement = success ? nextEnhancement : enhancementAfterFailure({ current: inventoryItem.enhancement });
 
     await this.prisma.$transaction(async (tx) => {
       await this.stamina.consumeStamina({
@@ -206,7 +210,7 @@ export class HiringService {
         tx,
       });
 
-      if (success) {
+      if (enhancement !== inventoryItem.enhancement) {
         await this.inventory.removeItemFromInventory({
           userEmail: args.hirerEmail,
           inventoryId: args.inventoryId,
@@ -217,7 +221,7 @@ export class HiringService {
           userEmail: args.hirerEmail,
           itemId: inventoryItem.itemId,
           quality: inventoryItem.quality,
-          enhancement: nextEnhancement,
+          enhancement,
           stack: 1,
           tx,
         });
@@ -255,8 +259,9 @@ export class HiringService {
 
     return {
       item: inventoryItem.item.name,
-      enhancement: success ? nextEnhancement : inventoryItem.enhancement,
+      enhancement,
       success,
+      setback: enhancement < inventoryItem.enhancement,
       chance,
       baseChance: Utils.enhanceChance(nextEnhancement),
       blacksmith: offer.crafter.name,
@@ -286,6 +291,7 @@ export class HiringService {
     if (inventoryItem.equipped) {
       throw new BadRequestException('Cannot enhance equipped item');
     }
+    ItemsValidator.isEnhanceable({ category: inventoryItem.item.category });
 
     const nextEnhancement = inventoryItem.enhancement + 1;
     const forgePrice = Utils.enhancePrice(nextEnhancement);
@@ -294,6 +300,7 @@ export class HiringService {
     const baseChance = Utils.enhanceChance(nextEnhancement);
     const chance = hiredEnhanceChance({ baseChance, blacksmithLevel: learned.level });
     const success = Utils.isSuccess(chance);
+    const enhancement = success ? nextEnhancement : enhancementAfterFailure({ current: inventoryItem.enhancement });
 
     await this.prisma.$transaction(async (tx) => {
       await this.stamina.consumeStamina({
@@ -303,7 +310,7 @@ export class HiringService {
       });
       await this.wallet.removeSilverFromUser({ userEmail: args.userEmail, amount: forgePrice, tx });
 
-      if (success) {
+      if (enhancement !== inventoryItem.enhancement) {
         await this.inventory.removeItemFromInventory({
           userEmail: args.userEmail,
           inventoryId: args.inventoryId,
@@ -314,7 +321,7 @@ export class HiringService {
           userEmail: args.userEmail,
           itemId: inventoryItem.itemId,
           quality: inventoryItem.quality,
-          enhancement: nextEnhancement,
+          enhancement,
           stack: 1,
           tx,
         });
@@ -337,8 +344,9 @@ export class HiringService {
 
     return {
       item: inventoryItem.item.name,
-      enhancement: success ? nextEnhancement : inventoryItem.enhancement,
+      enhancement,
       success,
+      setback: enhancement < inventoryItem.enhancement,
       chance,
       baseChance,
       blacksmithLevel: learned.level,

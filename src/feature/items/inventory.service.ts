@@ -21,7 +21,9 @@ export class InventoryService {
     const tx = args.tx || this.prisma;
     return tx.inventoryItem.findUnique({
       where: { id: args.inventoryId, userEmail: args.userEmail },
-      include: { item: true, marketListing: true },
+      // The buff rides along because a consumable's whole effect can live on it,
+      // and every caller that consumes one would otherwise re-read the item.
+      include: { item: { include: { buff: true } }, marketListing: true },
     });
   }
 

@@ -9,6 +9,17 @@ export const ItemsValidator = {
     }
   },
 
+  /**
+   * Only gear carries a stat block, so only gear has anything to enhance. This
+   * used to go unchecked, which let a player pay the forge price to put a +3 on
+   * a healing potion and get nothing at all for it.
+   */
+  isEnhanceable: (args: { category: string }) => {
+    if (!EQUIPABLE_CATEGORIES.includes(args.category)) {
+      throw new BadRequestException('Only equipment can be enhanced');
+    }
+  },
+
   /** Gear is tiered, so wearing it is gated on the character's own level. */
   meetsRequiredLevel: (args: { requiredLevel: number; level: number; itemName: string }) => {
     if (args.level < args.requiredLevel) {

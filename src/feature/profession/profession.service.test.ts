@@ -22,7 +22,12 @@ describe('Profession Service', () => {
   describe('learnProfession', () => {
     /** The swap runs in a transaction, so the tx client is what the writes land on. */
     const mockTransaction = () => {
-      const tx = { userProfession: { create: jest.fn(), deleteMany: jest.fn() } };
+      const tx = {
+        userProfession: { create: jest.fn(), deleteMany: jest.fn() },
+        // Learning resets the stamina ceiling to a level-1 trade's, so the swap
+        // reads and writes the stats row on its way through.
+        stats: { findUnique: jest.fn().mockResolvedValue({ stamina: 50, maxStamina: 50 }), update: jest.fn() },
+      };
       prisma.$transaction = jest.fn().mockImplementation((callback) => callback(tx));
       return tx;
     };

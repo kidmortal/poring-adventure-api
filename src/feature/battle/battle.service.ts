@@ -7,6 +7,7 @@ import { BattleInstance, UserWithStats } from './battle';
 import { MonstersService } from 'src/feature/monsters/monsters.service';
 import { UsersService } from 'src/feature/users/users.service';
 import { InventoryService } from 'src/feature/items/inventory.service';
+import { buffDurationForQuality, consumablePotency } from 'src/feature/items/items.rules';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { Cron } from '@nestjs/schedule';
 import { PartyService } from 'src/feature/party/party.service';
@@ -239,6 +240,70 @@ export class BattleService {
     battle.processUserAttack({ email: userEmail });
     return true;
   }
+  /**
+   * Drinking a potion in the middle of a fight — Alchemy's whole reason to
+   * exist. Only items flagged `battleUse` qualify: food is a thing you eat
+   * beforehand, and letting it be eaten mid-fight would make the cook a worse
+   * alchemist rather than a different profession.
+   *
+   * The turn is checked before the stack is taken, so a mistimed click costs
+   * nothing, and the inventory write lands before the battle applies the effect
+   * so a crash cannot leave the drink both spent and unspent.
+   */
+  async useItem(args: { userEmail: string; inventoryId: number }) {
+    const battle = this.getUserBattle(args.userEmail);
+    if (!battle) return false;
+    if (battle.battleFinished) return false;
+    if (!battle.isTurnOf(args.userEmail)) {
+      this.socket.sendErrorNotification({ email: args.userEmail, text: 'Wait for your turn' });
+      return false;
+    }
+
+    const inventoryItem = await this.inventory.getOneInventoryItem({
+      userEmail: args.userEmail,
+      inventoryId: args.inventoryId,
+    });
+    if (!inventoryItem || inventoryItem.item.category !== 'consumable') return false;
+    if (!inventoryItem.item.battleUse) {
+      this.socket.sendErrorNotification({
+        email: args.userEmail,
+        text: `${inventoryItem.item.name} cannot be used in a fight`,
+      });
+      return false;
+    }
+
+    const { item, quality } = inventoryItem;
+    await this.inventory.removeItemFromInventory({
+      userEmail: args.userEmail,
+      inventoryId: args.inventoryId,
+      stack: 1,
+    });
+
+    // Escape Powder buys its way past the party-leader rule: anyone holding one
+    // can call the retreat, which is the point of carrying it.
+    if (item.battleEffect === 'escape') {
+      await this._bankGuildBossDamage(battle);
+      battle.pushLog({ icon: item.image, log: `${item.name} filled the air — the party slipped away` });
+      battle.removeBattle();
+      battle.notifyBattleRemoved();
+      await this.userService.notifyUserUpdateWithProfile({ email: args.userEmail });
+      return true;
+    }
+
+    await battle.processUserConsume({
+      email: args.userEmail,
+      itemName: item.name,
+      image: item.image,
+      health: consumablePotency({ base: item.health, quality }),
+      mana: consumablePotency({ base: item.mana, quality }),
+      buff: item.buff ?? undefined,
+      buffDuration: item.buff ? buffDurationForQuality({ duration: item.buff.duration, quality }) : undefined,
+    });
+
+    await this.userService.notifyUserUpdateWithProfile({ email: args.userEmail });
+    return true;
+  }
+
   async cast(args: { email: string; skillId: number; targetName: string }) {
     const battle = this.getUserBattle(args.email);
     if (!battle) return false;

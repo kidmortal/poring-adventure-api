@@ -1,6 +1,13 @@
+import { Buff } from '@prisma/client';
 import { BattleInstance, DamageStepParams } from './battle';
 
-type Effect = (params: { dmgStep: DamageStepParams; image: string; battle: BattleInstance }) => {
+type Effect = (params: {
+  dmgStep: DamageStepParams;
+  image: string;
+  battle: BattleInstance;
+  /** The buff this effect came from — meals read their percentages off it. */
+  buff: Buff;
+}) => {
   onAttack: () => void;
   onDefense: () => void;
 };
@@ -31,6 +38,29 @@ const effects: EffectMap = {
       },
     };
   },
+  /**
+   * A meal. Unlike the skill buffs above it carries no fixed numbers of its own:
+   * the percentages come off the buff row, so a cook's new recipe is a seed
+   * entry rather than another branch in here.
+   *
+   * The health share is a damage reduction rather than a larger health pool,
+   * because a buff that raised maxHealth mid-fight would have to be unwound
+   * when it expired, and food is eaten before the fight anyway.
+   */
+  well_fed: (params) => {
+    return {
+      onAttack: () => {
+        if (params.buff.attackBonus) {
+          params.dmgStep.damage.value *= 1 + params.buff.attackBonus / 100;
+        }
+      },
+      onDefense: () => {
+        if (params.buff.healthBonus) {
+          params.dmgStep.damage.value *= 1 - Math.min(params.buff.healthBonus, 50) / 100;
+        }
+      },
+    };
+  },
   invincible: (params) => {
     return {
       onAttack: () => {},
@@ -54,6 +84,7 @@ export function runEffect({
   dmgStep: DamageStepParams;
   image: string;
   battle: BattleInstance;
+  buff: Buff;
   role: 'attacker' | 'defender';
 }) {
   const effectFuntion = effects[effect];

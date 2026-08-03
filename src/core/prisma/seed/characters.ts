@@ -86,7 +86,20 @@ const CLASSES = [
   },
 ];
 
-const BUFFS = [
+type BuffSeed = {
+  name: string;
+  effect: string;
+  duration: number;
+  image: string;
+  pose: string;
+  persist: boolean;
+  maxStack: number;
+  /** Percentages the "well_fed" effect reads. A meal is data, not code. */
+  attackBonus?: number;
+  healthBonus?: number;
+};
+
+const BUFFS: BuffSeed[] = [
   {
     name: 'Power up',
     effect: 'power_up',
@@ -112,6 +125,67 @@ const BUFFS = [
     duration: 99,
     image: `${BUFFS_FOLDER}/invincible.webp`,
     pose: 'enhanced',
+    persist: true,
+    maxStack: 1,
+  },
+
+  /**
+   * The cook's line. These persist, because a meal is eaten before a fight and
+   * would be pointless if it evaporated on the way to one — they tick down per
+   * battle instead, which is what makes the demand for food come back every day.
+   *
+   * maxStack is the ceiling on banked duration, not on how many buffs show at
+   * once: eating four meals in a row cannot store twenty battles of +10% attack.
+   */
+  {
+    name: 'Well Fed',
+    effect: 'well_fed',
+    duration: 3,
+    image: `${BUFFS_FOLDER}/well_fed.webp`,
+    pose: 'default',
+    persist: true,
+    maxStack: 2,
+    attackBonus: 10,
+  },
+  {
+    name: 'Hearty',
+    effect: 'well_fed',
+    duration: 3,
+    image: `${BUFFS_FOLDER}/hearty.webp`,
+    pose: 'default',
+    persist: true,
+    maxStack: 2,
+    healthBonus: 15,
+  },
+  {
+    name: 'Spiced',
+    effect: 'well_fed',
+    duration: 4,
+    image: `${BUFFS_FOLDER}/spiced.webp`,
+    pose: 'default',
+    persist: true,
+    maxStack: 2,
+    attackBonus: 10,
+    healthBonus: 10,
+  },
+  {
+    name: 'Feasted',
+    effect: 'well_fed',
+    duration: 3,
+    image: `${BUFFS_FOLDER}/feasted.webp`,
+    pose: 'default',
+    persist: true,
+    maxStack: 2,
+    attackBonus: 10,
+  },
+
+  /** The alchemist's insurance: catches one killing blow, then is spent. */
+  {
+    name: 'Second Wind',
+    effect: 'second_wind',
+    duration: 3,
+    image: `${BUFFS_FOLDER}/second_wind.webp`,
+    pose: 'default',
     persist: true,
     maxStack: 1,
   },

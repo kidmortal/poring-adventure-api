@@ -10,7 +10,9 @@ import { GatheringService } from './gathering.service';
 import { CraftingService } from './crafting.service';
 import { ServiceOfferService } from './serviceOffer.service';
 import { HiringService } from './hiring.service';
+import { CommissionService } from './commission.service';
 import {
+  CommissionIdDto,
   GatheringNodeIdDto,
   HireCraftDto,
   HireEnhanceDto,
@@ -30,6 +32,7 @@ export class ProfessionGateway {
     private readonly craftingService: CraftingService,
     private readonly offerService: ServiceOfferService,
     private readonly hiringService: HiringService,
+    private readonly commissionService: CommissionService,
     private readonly userService: UsersService,
   ) {}
   private logger = new Logger('Websocket - professions');
@@ -81,6 +84,20 @@ export class ProfessionGateway {
     const email = client.handshake.auth.email;
     this.logger.debug(`craft ${email}`);
     return this.craftingService.craft({ userEmail: email, recipeId: dto.recipeId });
+  }
+
+  @SubscribeMessage('get_commissions')
+  async getCommissions(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`get_commissions ${email}`);
+    return this.commissionService.getBoard({ userEmail: email });
+  }
+
+  @SubscribeMessage('deliver_commission')
+  async deliverCommission(@MessageBody() dto: CommissionIdDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`deliver_commission ${email}`);
+    return this.commissionService.deliver({ userEmail: email, commissionId: dto.commissionId });
   }
 
   @SubscribeMessage('get_service_offers')

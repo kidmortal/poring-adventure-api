@@ -187,7 +187,7 @@ describe('Hiring Service', () => {
         quality: 1,
         enhancement: 0,
         equipped: false,
-        item: { name: 'Iron Sword' },
+        item: { name: 'Iron Sword', category: 'weapon' },
       });
     });
 
@@ -218,15 +218,18 @@ describe('Hiring Service', () => {
         quality: 1,
         enhancement: 8,
         equipped: false,
-        item: { name: 'Iron Sword' },
+        item: { name: 'Iron Sword', category: 'weapon' },
       });
       jest.spyOn(Math, 'random').mockReturnValue(0.99);
 
       const result = await service.hireEnhance({ hirerEmail: HIRER, offerId: 1, inventoryId: 30 });
 
       expect(result.success).toBe(false);
-      expect(result.enhancement).toBe(8);
-      expect(inventory.addItemToInventory).not.toHaveBeenCalled();
+      // Past the setback threshold a failure costs a level, so the item comes
+      // back off the forge at +7 rather than untouched at +8.
+      expect(result.enhancement).toBe(7);
+      expect(result.setback).toBe(true);
+      expect(inventory.addItemToInventory).toHaveBeenCalledWith(expect.objectContaining({ enhancement: 7 }));
       expect(wallet.transferSilverFromUserToUser).toHaveBeenCalled();
       // Two experience per stamina point the job costs the smith.
       expect(professions.addExperience).toHaveBeenCalledWith(
@@ -242,7 +245,7 @@ describe('Hiring Service', () => {
         quality: 1,
         enhancement: 3,
         equipped: false,
-        item: { name: 'Iron Sword' },
+        item: { name: 'Iron Sword', category: 'weapon' },
       });
 
       const result = await service.hireEnhance({ hirerEmail: HIRER, offerId: 1, inventoryId: 30 });
@@ -260,7 +263,7 @@ describe('Hiring Service', () => {
         quality: 1,
         enhancement: 0,
         equipped: true,
-        item: { name: 'Iron Sword' },
+        item: { name: 'Iron Sword', category: 'weapon' },
       });
 
       await expect(service.hireEnhance({ hirerEmail: HIRER, offerId: 1, inventoryId: 30 })).rejects.toThrow(
@@ -287,7 +290,7 @@ describe('Hiring Service', () => {
         quality: 1,
         enhancement: 0,
         equipped: false,
-        item: { name: 'Iron Sword' },
+        item: { name: 'Iron Sword', category: 'weapon' },
       });
       prisma.user.findUnique = jest.fn().mockResolvedValue({ email: CRAFTER, silver: 100000 });
     });
@@ -312,7 +315,7 @@ describe('Hiring Service', () => {
         quality: 1,
         enhancement: 3,
         equipped: false,
-        item: { name: 'Iron Sword' },
+        item: { name: 'Iron Sword', category: 'weapon' },
       });
 
       const result = await service.selfAssistedEnhance({ userEmail: CRAFTER, inventoryId: 30 });
@@ -342,7 +345,7 @@ describe('Hiring Service', () => {
         quality: 1,
         enhancement: 0,
         equipped: true,
-        item: { name: 'Iron Sword' },
+        item: { name: 'Iron Sword', category: 'weapon' },
       });
 
       await expect(service.selfAssistedEnhance({ userEmail: CRAFTER, inventoryId: 30 })).rejects.toThrow(

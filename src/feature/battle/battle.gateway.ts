@@ -48,6 +48,13 @@ export class BattleGateway {
     this.logger.debug(`battle_attack ${email}`);
     return this.battleService.attack(email);
   }
+  @SubscribeMessage('battle_use_item')
+  async useItem(@MessageBody() dto: BattleUseItemDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`battle_use_item ${email}`);
+    return this.battleService.useItem({ userEmail: email, inventoryId: dto.inventoryId });
+  }
+
   @SubscribeMessage('battle_cast')
   async cast(@MessageBody() dto: BattleCastDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;

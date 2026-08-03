@@ -15,6 +15,14 @@ enum SkillEffect {
   Infusion = 'infusion',
 }
 
+/** Buff effects the engine acts on directly rather than through `runEffect`. */
+enum BuffEffect {
+  SecondWind = 'second_wind',
+}
+
+/** How much health a Revive Draught leaves you standing on. */
+const SECOND_WIND_HEALTH = 0.3;
+
 /** Each enraged swing is this much harder than the one before it. */
 const ENRAGE_DAMAGE_MULTIPLIER = 1.3;
 
@@ -359,6 +367,61 @@ export class BattleInstance {
     return false;
   }
 
+  /**
+   * Drinking something mid-fight. It costs the turn, which is the entire trade
+   * against a Priest: a party without one can substitute silver for a heal, and
+   * pay for it in tempo rather than in a party slot.
+   *
+   * The stack is already gone from the inventory by the time this runs — the
+   * caller owns the database, this owns what happens at the table.
+   */
+  async processUserConsume(args: {
+    email: string;
+    itemName: string;
+    image: string;
+    health: number;
+    mana: number;
+    buff?: Buff;
+    buffDuration?: number;
+  }) {
+    if (!this.isUserTurn(args)) return false;
+    const user = this.getUserFromBattle(args.email);
+    if (!user) return false;
+
+    const restored: string[] = [];
+    if (args.health) {
+      this.healUser({ user, amount: args.health });
+      restored.push(`${args.health} health`);
+    }
+    if (args.mana) {
+      this.infuseUser({ user, amount: args.mana });
+      restored.push(`${args.mana} mana`);
+    }
+    if (args.buff) {
+      // Pushed as its own copy, because decreaseOrRemoveBuffs ticks the buff
+      // object down and a shared row would drain every drinker at once.
+      user.buffs.push({
+        id: 0,
+        userEmail: user.email,
+        buffId: args.buff.id,
+        duration: args.buffDuration ?? args.buff.duration,
+        buff: { ...args.buff, duration: args.buffDuration ?? args.buff.duration },
+      });
+      restored.push(args.buff.name);
+    }
+
+    this.pushLog({
+      icon: args.image,
+      log: `${user.name} used ${args.itemName}${restored.length ? ` — ${restored.join(', ')}` : ''}`,
+    });
+    return this.afterDamageStep();
+  }
+
+  /** Whether it is this player's move, for callers that must check before writing. */
+  isTurnOf(email: string) {
+    return this.isUserTurn({ email });
+  }
+
   private async processCastTargetEnemy(args: {
     user: UserWithStats;
     skill: LearnedSkillWithSkill;
@@ -499,9 +562,28 @@ export class BattleInstance {
   private async damageUser(args: { user: UserWithStats; amount: number }) {
     args.user.stats.health -= args.amount;
     if (args.user.stats.health <= 0) {
+      if (this.spendSecondWind(args.user)) return;
       args.user.stats.health = 0;
       args.user.isDead = true;
     }
+  }
+
+  /**
+   * A Revive Draught catches the blow that would have killed you and is used up
+   * doing it. This is the thing a party can buy instead of bringing a Priest:
+   * one death undone, paid for in silver rather than a party slot.
+   */
+  private spendSecondWind(user: UserWithStats) {
+    const index = user.buffs.findIndex(({ buff }) => buff.effect === BuffEffect.SecondWind);
+    if (index < 0) return false;
+
+    const [{ buff }] = user.buffs.splice(index, 1);
+    user.stats.health = Math.max(Math.floor(user.stats.maxHealth * SECOND_WIND_HEALTH), 1);
+    this.pushLog({
+      icon: buff.image,
+      log: `${user.name} was pulled back from death and stands at ${user.stats.health} health`,
+    });
+    return true;
   }
 
   private async processMonsterAttack() {
@@ -589,6 +671,7 @@ export class BattleInstance {
             dmgStep: args,
             role: 'defender',
             image: buff.image,
+            buff,
             battle: this,
           });
         });
@@ -602,6 +685,7 @@ export class BattleInstance {
             dmgStep: args,
             role: 'attacker',
             image: buff.image,
+            buff,
             battle: this,
           });
         });

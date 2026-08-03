@@ -33,6 +33,50 @@ export function hiredEnhanceChance(args: { baseChance: number; blacksmithLevel: 
   return args.baseChance + hiredEnhanceBonus(args);
 }
 
+/** The daily budget a player starts with, before any trade is learned. */
+export const BASE_MAX_STAMINA = 50;
+
+/** Profession levels per extra point of daily stamina. */
+export const LEVELS_PER_STAMINA = 2;
+
+/**
+ * The stamina ceiling a crafter of this level has earned.
+ *
+ * Stamina is the only genuinely scarce resource in the game, and a profession
+ * whose ceiling never moves is one where mastery only buys better odds on the
+ * same fifty points. Every two levels adds one, so a level-20 crafter works a
+ * sixth again as much in a day as a beginner — a real ceiling increase, and
+ * still nowhere near uncapped combat.
+ */
+export function maxStaminaForProfession(args: { level: number }) {
+  return BASE_MAX_STAMINA + Math.floor(Math.max(args.level, 1) / LEVELS_PER_STAMINA);
+}
+
+/** Below this, a failed enhancement only costs silver. At or above it, it bites. */
+export const SETBACK_FROM_ENHANCEMENT = 6;
+
+/** However bad the run of luck, an item never falls below this. */
+export const SETBACK_FLOOR = 5;
+
+/**
+ * Where a failed attempt leaves the item. Under +6 nothing moves and the silver
+ * is simply gone; from +6 up a failure costs a level, but never past the floor,
+ * so a bad night can undo an evening's work and never a week's.
+ *
+ * This is what keeps a blacksmith in business: high enhancement stops being an
+ * errand you run once and becomes a standing relationship with someone whose
+ * level makes the odds worth paying for.
+ */
+export function enhancementAfterFailure(args: { current: number }) {
+  if (args.current < SETBACK_FROM_ENHANCEMENT) return args.current;
+  return Math.max(args.current - 1, SETBACK_FLOOR);
+}
+
+/** Whether a failed attempt at this level will actually take something away. */
+export function failureCostsALevel(args: { current: number }) {
+  return enhancementAfterFailure(args) < args.current;
+}
+
 /**
  * Every drop of a node is rolled once and independently, so a lucky gather can
  * return the whole table and an unlucky one nothing at all.

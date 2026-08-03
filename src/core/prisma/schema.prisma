@@ -39,6 +39,7 @@ model User {
   notifications     Notification[]
   discord           Discord?
   guildBossDamage   GuildBossDamage[]
+  commissions       UserCommission[]
 }
 
 model Discord {
@@ -138,6 +139,24 @@ model Item {
   int       Int?
   health    Int?
   mana      Int?
+
+  /// A consumable that grants this buff when eaten. Cooking's whole niche: a
+  /// meal is worth eating before a fight rather than during one.
+  buff   Buff? @relation(fields: [buffId], references: [id])
+  buffId Int?
+
+  /// Whether the consumable may be used during a fight, at the cost of a turn.
+  /// Alchemy's niche — food is deliberately left out of combat.
+  battleUse Boolean @default(false)
+
+  /// A meal that feeds the whole party rather than the one who ate it.
+  partyWide Boolean @default(false)
+
+  /// An action the consumable performs instead of restoring anything —
+  /// currently only "escape". Alchemy's utility line, the things a Priest
+  /// cannot do at any level.
+  battleEffect String?
+
   inventory InventoryItem[]
   drop      Drop[]
   mail      Mail[]
@@ -148,6 +167,7 @@ model Item {
   gatheringDrops    GatheringDrop[]
   craftedBy         Recipe[]           @relation("RecipeResult")
   recipeIngredients RecipeIngredient[] @relation("RecipeIngredient")
+  commissions       Commission[]
 }
 
 model Drop {
@@ -227,6 +247,7 @@ model Profession {
   recipes     Recipe[]
   learnedBy   UserProfession[]
   offers      ServiceOffer[]
+  commissions Commission[]
 }
 
 /// A crafter selling their stamina: other players pay silver per stamina point
@@ -397,8 +418,55 @@ model Buff {
   pose     String     @default("default")
   persist  Boolean    @default(false)
   maxStack Int        @default(1)
+
+  /// Percentages the "well_fed" effect reads. Kept as columns rather than
+  /// encoded in the effect string so a new meal is a seed row, not new code.
+  attackBonus Int @default(0)
+  healthBonus Int @default(0)
+
   userBuff UserBuff[]
   skill    Skill[]
+  items    Item[]
+}
+
+/// A standing NPC contract: hand over N of an item, get paid for it. This is
+/// the price floor under every crafted good — a crafter always has one buyer,
+/// even when no player wants what they make. The offered set rotates per player
+/// per day, so demand regenerates instead of saturating permanently.
+model Commission {
+  id            Int              @id @default(autoincrement())
+  item          Item             @relation(fields: [itemId], references: [id])
+  itemId        Int
+  amount        Int              @default(1)
+  silver        Int
+  /// Profession experience the delivery is worth to the crafter.
+  experience    Int              @default(0)
+  requiredLevel Int              @default(1)
+  profession    Profession       @relation(fields: [professionId], references: [id], onDelete: Cascade)
+  professionId  Int
+  takenBy       UserCommission[]
+
+  /// The profession belongs in the key: a cook and a fisherman can both be
+  /// asked for six raw fish, and those are two different contracts.
+  @@unique([professionId, itemId, amount])
+}
+
+/// One filled contract. Which contracts a player is *offered* is derived from
+/// their email and the day rather than stored, so the board is stable without a
+/// write; a row here exists only once the goods have been handed over. The day
+/// in the key is what caps the board — a contract can be filled once a day, and
+/// tomorrow's board is a different draw.
+model UserCommission {
+  id           Int        @id @default(autoincrement())
+  user         User       @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  userEmail    String
+  commission   Commission @relation(fields: [commissionId], references: [id], onDelete: Cascade)
+  commissionId Int
+  deliveredAt  DateTime   @default(now())
+  /// UTC calendar day the contract belonged to, as "YYYY-M-D".
+  offeredOn    String
+
+  @@unique([userEmail, commissionId, offeredOn])
 }
 
 model Guild {

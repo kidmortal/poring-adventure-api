@@ -6,6 +6,7 @@ import { UserWalletService } from 'src/feature/users/userWallet.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { ItemCategory } from 'src/feature/items/constants';
 import { MarketRepository } from './market.repository';
+import { listingFee, settleSale } from './market.rules';
 
 @Injectable()
 export class MarketService {
@@ -55,15 +56,37 @@ export class MarketService {
       }
     }
 
-    await this.repository.createOrIncrementListing({
-      price: args.price,
-      stack: args.stack,
-      inventoryId: inventoryItem.id,
-      sellerEmail: args.sellerEmail,
+    // Charged before anything is posted, and never given back: a listing that
+    // costs nothing is a listing worth posting at any price, which is how the
+    // board fills with speculation nobody intends to sell at.
+    const fee = listingFee({ price: args.price, stacks: args.stack });
+    const seller = await this.prisma.user.findUnique({
+      where: { email: args.sellerEmail },
+      select: { silver: true },
     });
+    if (!seller) {
+      throw new BadRequestException('User not registered');
+    }
+    if (seller.silver < fee) {
+      return this._deny(args.sellerEmail, `Listing costs ${fee} silver in fees, and you do not have it`);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      if (fee > 0) {
+        await this.userWallet.removeSilverFromUser({ userEmail: args.sellerEmail, amount: fee, tx });
+      }
+      await this.repository.createOrIncrementListing({
+        price: args.price,
+        stack: args.stack,
+        inventoryId: inventoryItem.id,
+        sellerEmail: args.sellerEmail,
+        tx,
+      });
+    }, TRANSACTION_OPTIONS);
+
     this.websocket.sendTextNotification({
       email: args.sellerEmail,
-      text: `Listed ${args.stack}x ${inventoryItem.item.name} on Market!`,
+      text: `Listed ${args.stack}x ${inventoryItem.item.name} on Market${fee > 0 ? ` for ${fee} silver in fees` : ''}!`,
     });
     await this._invalidate(inventoryItem.item.category as ItemCategory);
     return true;
@@ -82,8 +105,11 @@ export class MarketService {
         throw new BadRequestException('Listing not found');
       }
 
-      const totalPrice = listing.price * args.stacks;
-      if (buyer.silver < totalPrice) {
+      // The buyer pays what the board says; the tax comes out of the seller's
+      // half and simply stops existing, which is the point — it is the only
+      // sink in the game that scales with how much trading is going on.
+      const { total, tax, payout } = settleSale({ price: listing.price, stacks: args.stacks });
+      if (buyer.silver < total) {
         throw new BadRequestException('You are too poor for that');
       }
 
@@ -93,12 +119,14 @@ export class MarketService {
         decrementStacks: args.stacks,
         tx,
       });
-      await this.userWallet.transferSilverFromUserToUser({
-        senderEmail: buyer.email,
-        receiverEmail: listing.sellerEmail,
-        amount: totalPrice,
-        tx,
-      });
+      await this.userWallet.removeSilverFromUser({ userEmail: buyer.email, amount: total, tx });
+      await this.userWallet.addSilverToUser({ userEmail: listing.sellerEmail, amount: payout, tx });
+      if (tax > 0) {
+        this.websocket.sendTextNotification({
+          email: listing.sellerEmail,
+          text: `Sold ${args.stacks}x for ${payout} silver, after ${tax} in market tax`,
+        });
+      }
       await this.inventory.transferItemFromUserToUser({
         senderEmail: listing.sellerEmail,
         receiverEmail: buyer.email,

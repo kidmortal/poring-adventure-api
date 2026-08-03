@@ -18,6 +18,12 @@ export class RecipeIdDto {
   recipeId: number;
 }
 
+/** Filling one contract off today's board. */
+export class CommissionIdDto {
+  @IsNotEmpty()
+  commissionId: number;
+}
+
 /** Publishing an offer: the profession is whichever one the crafter practices. */
 export class PublishServiceOfferDto {
   @IsNotEmpty()

@@ -17,16 +17,20 @@ import { seedEquipment, seedEquipmentDrops } from './equipment';
 import { seedBuffs, seedClasses, seedHeads, seedSkills } from './characters';
 import { seedMonsters } from './monsters';
 import { seedGatheringNodes, seedProfessions, seedRecipes } from './professions';
+import { seedCommissions } from './commissions';
 import { seedGuildBosses, seedGuildStore, seedGuildTasks } from './guild';
 import { seedStoreProducts } from './store';
 
-/** Order matters: everything below items resolves an item by name. */
+/**
+ * Order matters: everything below items resolves an item by name, and buffs
+ * come before items because a meal points at the buff eating it grants.
+ */
 const STEPS = [
+  seedBuffs,
   seedItems,
   seedEquipment,
   seedHeads,
   seedClasses,
-  seedBuffs,
   seedSkills,
   seedMonsters,
   // Needs both the gear and the monsters that drop it.
@@ -34,6 +38,8 @@ const STEPS = [
   seedProfessions,
   seedGatheringNodes,
   seedRecipes,
+  // Needs both the professions and everything they can be asked to hand over.
+  seedCommissions,
   seedGuildTasks,
   seedGuildBosses,
   seedGuildStore,

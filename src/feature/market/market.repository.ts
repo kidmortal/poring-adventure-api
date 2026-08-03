@@ -56,8 +56,15 @@ export class MarketRepository {
     });
   }
 
-  createOrIncrementListing(args: { price: number; stack: number; inventoryId: number; sellerEmail: string }) {
-    return this.prisma.marketListing.upsert({
+  createOrIncrementListing(args: {
+    price: number;
+    stack: number;
+    inventoryId: number;
+    sellerEmail: string;
+    tx?: TransactionContext;
+  }) {
+    const tx = args.tx || this.prisma;
+    return tx.marketListing.upsert({
       where: { sellerEmail: args.sellerEmail, inventoryId: args.inventoryId },
       create: {
         price: args.price,

@@ -4,6 +4,15 @@ A design plan for making the six professions worth playing and worth buying from
 Everything below is measured against what is actually in the repository today, not
 against how the systems were meant to feel.
 
+> **Status: implemented.** All four phases are built, server and client. The four
+> open questions in §10 were settled as: crafting is a *supplement* to combat
+> income, profession level raises max stamina by one per two levels, food buffs
+> tick per battle, and the enhancement setback starts at +6 with a floor at +5.
+> Two things changed during the build: quality scales a meal's *duration* rather
+> than its percentages (simpler to reason about when meals stack), and Antidote
+> was dropped since debuffs still do not exist for it to clear. Measured board
+> payouts are recorded in `seed/commissions.ts`.
+
 ---
 
 ## 1. What is already built

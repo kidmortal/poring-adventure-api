@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Buff } from '@prisma/client';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { TransactionContext } from 'src/core/prisma/types/prisma';
 import { UserWithStats } from 'src/feature/battle/battle';
@@ -70,6 +71,32 @@ export class UserStatsService {
       tx: args.tx,
     });
     return true;
+  }
+
+  /**
+   * Grants a buff, or extends one the user already has.
+   *
+   * Duration is capped at the buff's own `maxStack` multiple of its base, so a
+   * cook cannot hand someone a hundred battles of +10% attack in one sitting —
+   * food has to be eaten as it is needed, which is the whole reason the demand
+   * for it regenerates.
+   */
+  async applyBuff(args: { userEmail: string; buff: Buff; duration: number; tx?: TransactionContext }) {
+    const tx = args.tx ?? this.prisma;
+    const ceiling = args.buff.duration * Math.max(args.buff.maxStack, 1);
+
+    const existing = await tx.userBuff.findUnique({
+      where: { userEmail_buffId: { userEmail: args.userEmail, buffId: args.buff.id } },
+    });
+    const duration = Math.min((existing?.duration ?? 0) + args.duration, ceiling);
+
+    await tx.userBuff.upsert({
+      where: { userEmail_buffId: { userEmail: args.userEmail, buffId: args.buff.id } },
+      create: { userEmail: args.userEmail, buffId: args.buff.id, duration },
+      update: { duration },
+    });
+    await this.repository.clearUserCache({ email: args.userEmail });
+    return duration;
   }
 
   async decreaseUserBuffs(args: { userEmail: string; tx?: TransactionContext }) {

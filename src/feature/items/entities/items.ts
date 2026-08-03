@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
 
 export type FullInventoryItem = Prisma.InventoryItemGetPayload<{
-  include: { item: true; marketListing: true };
+  include: { item: { include: { buff: true } }; marketListing: true };
 }>;
