@@ -13,10 +13,12 @@ export class BattleGateway {
   private logger = new Logger('Websocket');
 
   @SubscribeMessage('battle_create')
-  async create(@MessageBody() dto: BattleCreateDto, @ConnectedSocket() client: Socket) {
+  async create(@MessageBody() dto: BattleCreateDto | number, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug(`battle_create ${email}`);
-    return this.battleService.create({ userEmail: email, mapId: dto.mapId });
+    // Clients on an older bundle send the map id on its own rather than in a dto.
+    const mapId = typeof dto === 'number' ? dto : dto?.mapId;
+    return this.battleService.create({ userEmail: email, mapId });
   }
 
   @SubscribeMessage('battle_create_guild_boss')

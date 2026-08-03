@@ -76,6 +76,15 @@ export class BattleService {
         users = [userData];
       }
       const monsterData = await this.monsterService.findOneFromMap(args.mapId);
+      // An unknown or empty map has nothing to fight, and a battle built around
+      // a missing monster throws deeper in on its first health check.
+      if (!monsterData) {
+        this.socket.sendErrorNotification({
+          email: args.userEmail,
+          text: 'There is nothing to fight on that map',
+        });
+        return false;
+      }
 
       const monsters = [monsterData];
       const newBattleInstance: BattleInstance = new BattleInstance({

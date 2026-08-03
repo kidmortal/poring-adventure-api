@@ -16,6 +16,11 @@ export class MonstersService {
     private readonly prisma: PrismaService,
   ) {}
   async findAllFromMap(mapId: number): Promise<MapWithMonster[]> {
+    // Prisma drops an `undefined` filter rather than matching nothing, so a
+    // missing map id would otherwise select every monster in the game and the
+    // caller would pick one at random from all of them.
+    if (!Number.isInteger(mapId)) return [];
+
     const cacheKey = `map_monsters_${mapId}`;
     const cachedMap = await this.cache.get(cacheKey);
     if (cachedMap) {

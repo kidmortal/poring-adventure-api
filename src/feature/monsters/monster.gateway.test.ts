@@ -8,6 +8,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 describe('Party Gateway', () => {
   let service: MonstersService;
   let gateway: MonsterGateway;
+  let prisma: PrismaService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -17,6 +18,7 @@ describe('Party Gateway', () => {
 
     service = module.get<MonstersService>(MonstersService);
     gateway = module.get<MonsterGateway>(MonsterGateway);
+    prisma = module.get<PrismaService>(PrismaService);
   });
 
   describe('get_monster_from_map', () => {
@@ -28,6 +30,27 @@ describe('Party Gateway', () => {
       const response = await gateway.getMonsterFromMap(mapId);
       expect(findOneFromMap).toHaveBeenCalledWith(mapId);
       expect(response).toBe(fakeReturn);
+    });
+  });
+  describe('findAllFromMap', () => {
+    it('should only query the map it was given', async () => {
+      const findMany = jest.fn().mockResolvedValue([]);
+      jest.spyOn(prisma.monster, 'findMany').mockImplementation(findMany);
+
+      await service.findAllFromMap(3);
+
+      expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { mapId: 3 } }));
+    });
+
+    it('should return nothing rather than query every map when the id is missing', async () => {
+      const findMany = jest.fn().mockResolvedValue([]);
+      jest.spyOn(prisma.monster, 'findMany').mockImplementation(findMany);
+
+      const monsters = await service.findAllFromMap(undefined as unknown as number);
+
+      // Prisma would ignore an undefined filter and hand back the whole table.
+      expect(findMany).not.toHaveBeenCalled();
+      expect(monsters).toEqual([]);
     });
   });
   describe('get_maps', () => {
