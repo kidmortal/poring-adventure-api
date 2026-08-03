@@ -46,7 +46,7 @@ const BOSSES = [
 
 /** Priced in guild tokens. Both potions are ordinary items elsewhere. */
 const STORE = [
-  { itemName: 'Healing Potion', price: 15, stack: 1 },
+  { itemName: 'Health Potion', price: 15, stack: 1 },
   { itemName: 'Mana Potion', price: 15, stack: 1 },
 ];
 

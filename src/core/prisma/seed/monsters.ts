@@ -79,20 +79,20 @@ const MAPS: MapSeed[] = [
     name: 'Poring Forest',
     asset: 'KING_PORING',
     materials: [
-      { itemName: 'Copper Ore', chance: 30, maxAmount: 2 },
-      { itemName: 'Green Herb', chance: 30, maxAmount: 2 },
-      { itemName: 'Raw Fish', chance: 25, maxAmount: 2 },
+      { itemName: 'Slime Jelly', chance: 35, maxAmount: 2 },
+      { itemName: 'Worm', chance: 25, maxAmount: 2 },
+      { itemName: 'Egg', chance: 20, maxAmount: 2 },
     ],
     monsters: [
       {
         name: 'Poring',
         asset: 'PORING',
         level: 1,
-        drops: [{ itemName: 'Slice of Cake', chance: 80, maxAmount: 2 }],
+        drops: [{ itemName: 'Round Cookie', chance: 80, maxAmount: 2 }],
       },
       { name: 'Fabre', asset: 'FABRE', level: 2 },
       { name: 'Poporing', asset: 'POPORING', level: 4 },
-      { name: 'Lunatic', asset: 'LUNATIC', level: 6, drops: [{ itemName: 'Bread', chance: 80, maxAmount: 3 }] },
+      { name: 'Lunatic', asset: 'LUNATIC', level: 6, drops: [{ itemName: 'Bread Bun', chance: 80, maxAmount: 3 }] },
       { name: 'Fire Poring', asset: 'FIRE_PORING', level: 8 },
       {
         name: 'King Poring',
@@ -100,8 +100,8 @@ const MAPS: MapSeed[] = [
         level: 10,
         boss: true,
         drops: [
-          { itemName: 'Large Health Potion', chance: 40, maxAmount: 3 },
-          { itemName: 'Large Mana Potion', chance: 40, maxAmount: 3 },
+          { itemName: 'Health Potion', chance: 40, maxAmount: 3 },
+          { itemName: 'Mana Potion', chance: 40, maxAmount: 3 },
         ],
       },
     ],
@@ -110,9 +110,9 @@ const MAPS: MapSeed[] = [
     name: 'Willow Swamp',
     asset: 'ELDER_WILOW',
     materials: [
-      { itemName: 'Iron Ore', chance: 30, maxAmount: 2 },
-      { itemName: 'Blue Herb', chance: 30, maxAmount: 2 },
-      { itemName: 'Swamp Reed', chance: 25, maxAmount: 2 },
+      { itemName: 'Serpent Tail', chance: 30, maxAmount: 2 },
+      { itemName: 'Beetle', chance: 30, maxAmount: 2 },
+      { itemName: 'Raw Meat', chance: 25, maxAmount: 2 },
     ],
     monsters: [
       { name: 'Spore', asset: 'SPORE', level: 11 },
@@ -127,9 +127,9 @@ const MAPS: MapSeed[] = [
     name: 'Cemetery',
     asset: 'KADES',
     materials: [
-      { itemName: 'Silver Ore', chance: 28, maxAmount: 2 },
-      { itemName: 'Grave Moss', chance: 28, maxAmount: 2 },
-      { itemName: 'Fish Scale', chance: 22, maxAmount: 2 },
+      { itemName: 'Bone Fragment', chance: 32, maxAmount: 2 },
+      { itemName: 'Bat Wing', chance: 28, maxAmount: 2 },
+      { itemName: 'Shadow Orb', chance: 20, maxAmount: 1 },
     ],
     monsters: [
       { name: 'Familiar', asset: 'FARMILIAR', level: 21 },
@@ -142,9 +142,10 @@ const MAPS: MapSeed[] = [
     name: 'Scorching Desert',
     asset: 'ANCIENT_MUMMY',
     materials: [
-      { itemName: 'Gold Ore', chance: 25, maxAmount: 2 },
-      { itemName: 'Sun Blossom', chance: 25, maxAmount: 2 },
-      { itemName: 'Raw Fish', chance: 20, maxAmount: 3 },
+      { itemName: 'Beast Claw', chance: 30, maxAmount: 2 },
+      { itemName: 'Poison Pouch', chance: 25, maxAmount: 2 },
+      { itemName: 'Raw Meat', chance: 30, maxAmount: 3 },
+      { itemName: 'Ivory Horn', chance: 20, maxAmount: 1 },
     ],
     monsters: [
       { name: 'Scorpion', asset: 'SCORPION', level: 31 },
@@ -158,9 +159,10 @@ const MAPS: MapSeed[] = [
     name: 'Demon Sanctuary',
     asset: 'BAPHOMET',
     materials: [
-      { itemName: 'Demon Ore', chance: 22, maxAmount: 2 },
-      { itemName: 'Void Bloom', chance: 22, maxAmount: 2 },
-      { itemName: 'Fish Scale', chance: 20, maxAmount: 3 },
+      { itemName: 'Dark Wing', chance: 28, maxAmount: 2 },
+      { itemName: 'Crystal Heart', chance: 22, maxAmount: 1 },
+      { itemName: 'Phoenix Feather', chance: 20, maxAmount: 1 },
+      { itemName: 'Cheese Wedge', chance: 20, maxAmount: 2 },
     ],
     monsters: [
       { name: 'Explosion', asset: 'EXPLOSION', level: 42 },

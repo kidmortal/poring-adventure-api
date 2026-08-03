@@ -12,6 +12,14 @@ against how the systems were meant to feel.
 > than its percentages (simpler to reason about when meals stack), and Antidote
 > was dropped since debuffs still do not exist for it to clear. Measured board
 > payouts are recorded in `seed/commissions.ts`.
+>
+> **Content pass, 2026-08-03.** The whole item roster was rebuilt against the
+> real Sirv asset library: 52 materials on five bands per gathering trade, 31
+> consumables across a five-tier health ladder, a four-tier mana ladder and a
+> fourteen-step meal line, plus 99 commissions. `seed/assets.ts` now holds the
+> uploaded file names and every seeded image resolves through it, because the
+> first pass invented a dozen images that did not exist. `retireLegacyConsumables.ts`
+> removes what an older roster left behind and mails players back the value.
 
 ---
 

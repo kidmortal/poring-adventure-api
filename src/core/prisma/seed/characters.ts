@@ -6,6 +6,7 @@
 import { Prisma } from '@prisma/client';
 
 import { prisma, upsertByName } from './client';
+import { ConsumableAsset, consumableImage } from './assets';
 
 const HEADS_FOLDER = 'https://kidmortal.sirv.com/heads';
 const SKILLS_FOLDER = 'https://kidmortal.sirv.com/skills';
@@ -99,6 +100,32 @@ type BuffSeed = {
   healthBonus?: number;
 };
 
+/**
+ * One meal buff. Spread rather than returned bare so the list above reads as a
+ * flat table of tiers, which is how it is actually tuned.
+ */
+function mealBuff(args: {
+  name: string;
+  asset: ConsumableAsset;
+  attackBonus?: number;
+  healthBonus?: number;
+  duration: number;
+}): BuffSeed[] {
+  return [
+    {
+      name: args.name,
+      effect: 'well_fed',
+      duration: args.duration,
+      image: consumableImage(args.asset),
+      pose: 'default',
+      persist: true,
+      maxStack: 2,
+      attackBonus: args.attackBonus ?? 0,
+      healthBonus: args.healthBonus ?? 0,
+    },
+  ];
+}
+
 const BUFFS: BuffSeed[] = [
   {
     name: 'Power up',
@@ -130,61 +157,43 @@ const BUFFS: BuffSeed[] = [
   },
 
   /**
-   * The cook's line. These persist, because a meal is eaten before a fight and
-   * would be pointless if it evaporated on the way to one — they tick down per
-   * battle instead, which is what makes the demand for food come back every day.
+   * The cook's line, one entry per meal tier.
    *
-   * maxStack is the ceiling on banked duration, not on how many buffs show at
-   * once: eating four meals in a row cannot store twenty battles of +10% attack.
+   * These persist, because a meal is eaten before a fight and would be
+   * pointless if it evaporated on the way to one — they tick down per battle
+   * instead, which is what makes the demand for food come back every day.
+   *
+   * `maxStack` is the ceiling on banked duration, not on how many buffs show at
+   * once: eating four meals in a row cannot store twenty battles of +20% attack.
+   *
+   * Each buff wears its own dish as its icon. There is no separate buff art for
+   * the food line, and pointing at a file that was never uploaded is exactly the
+   * mistake `assets.ts` exists to prevent.
    */
-  {
-    name: 'Well Fed',
-    effect: 'well_fed',
-    duration: 3,
-    image: `${BUFFS_FOLDER}/well_fed.webp`,
-    pose: 'default',
-    persist: true,
-    maxStack: 2,
-    attackBonus: 10,
-  },
-  {
-    name: 'Hearty',
-    effect: 'well_fed',
-    duration: 3,
-    image: `${BUFFS_FOLDER}/hearty.webp`,
-    pose: 'default',
-    persist: true,
-    maxStack: 2,
-    healthBonus: 15,
-  },
-  {
-    name: 'Spiced',
-    effect: 'well_fed',
-    duration: 4,
-    image: `${BUFFS_FOLDER}/spiced.webp`,
-    pose: 'default',
-    persist: true,
-    maxStack: 2,
-    attackBonus: 10,
-    healthBonus: 10,
-  },
-  {
-    name: 'Feasted',
-    effect: 'well_fed',
-    duration: 3,
-    image: `${BUFFS_FOLDER}/feasted.webp`,
-    pose: 'default',
-    persist: true,
-    maxStack: 2,
-    attackBonus: 10,
-  },
+  ...mealBuff({ name: 'Well Fed', asset: 'grilled_fish', attackBonus: 8, duration: 3 }),
+  ...mealBuff({ name: 'Well Fed II', asset: 'grilled_skewer', attackBonus: 12, duration: 3 }),
+  ...mealBuff({ name: 'Well Fed III', asset: 'roast_meat', attackBonus: 16, duration: 4 }),
+  ...mealBuff({ name: 'Well Fed IV', asset: 'glazed_ham', attackBonus: 20, duration: 4 }),
+
+  ...mealBuff({ name: 'Hearty', asset: 'soup_bowl', healthBonus: 8, duration: 3 }),
+  ...mealBuff({ name: 'Hearty II', asset: 'stew_bowl', healthBonus: 12, duration: 3 }),
+  ...mealBuff({ name: 'Hearty III', asset: 'curry_bowl', healthBonus: 16, duration: 4 }),
+  ...mealBuff({ name: 'Hearty IV', asset: 'monster_stew', healthBonus: 20, duration: 4 }),
+
+  ...mealBuff({ name: 'Balanced', asset: 'sushi_roll', attackBonus: 8, healthBonus: 8, duration: 4 }),
+  ...mealBuff({ name: 'Balanced II', asset: 'pasta_dish', attackBonus: 12, healthBonus: 12, duration: 4 }),
+  ...mealBuff({ name: 'Balanced III', asset: 'seafood_pasta', attackBonus: 15, healthBonus: 15, duration: 5 }),
+
+  ...mealBuff({ name: 'Feasted', asset: 'fruit_platter', attackBonus: 10, duration: 3 }),
+  ...mealBuff({ name: 'Feasted II', asset: 'grilled_platter', attackBonus: 14, duration: 3 }),
+  ...mealBuff({ name: 'Feasted III', asset: 'sushi_platter', attackBonus: 12, healthBonus: 12, duration: 4 }),
 
   /** The alchemist's insurance: catches one killing blow, then is spent. */
   {
     name: 'Second Wind',
     effect: 'second_wind',
     duration: 3,
-    image: `${BUFFS_FOLDER}/second_wind.webp`,
+    image: consumableImage('golden_potion'),
     pose: 'default',
     persist: true,
     maxStack: 1,
