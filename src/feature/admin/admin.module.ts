@@ -6,6 +6,8 @@ import { WebsocketModule } from 'src/core/websocket/websocket.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { NotificationModule } from 'src/integrations/notification/notification.module';
 import { MailModule } from 'src/feature/mail/mail.module';
+import { GuildModule } from 'src/feature/guild/guild.module';
+import { BattleModule } from 'src/feature/battle/battle.module';
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { MailModule } from 'src/feature/mail/mail.module';
     WebsocketModule,
     NotificationModule,
     MailModule,
+    GuildModule,
+    BattleModule,
     CacheModule.register({ ttl: 1000 * 60 * 10 }),
   ],
   providers: [AdminGateway, AdminService],

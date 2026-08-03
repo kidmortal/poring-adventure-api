@@ -93,6 +93,53 @@ export class AdminGateway {
     });
   }
 
+  /** Both daily resets take an email, or nothing at all to reset everyone. */
+  @SubscribeMessage('reset_daily_stamina')
+  async resetDailyStamina(@MessageBody() targetEmail: string, @ConnectedSocket() client: Socket) {
+    this.logger.debug(`reset_daily_stamina ${targetEmail || 'all'}`);
+    const email = client.handshake.auth.email;
+    return this.adminService.resetDailyStamina({ userEmail: email, targetEmail: targetEmail || undefined });
+  }
+
+  @SubscribeMessage('reset_boss_entry')
+  async resetBossEntry(@MessageBody() targetEmail: string, @ConnectedSocket() client: Socket) {
+    this.logger.debug(`reset_boss_entry ${targetEmail || 'all'}`);
+    const email = client.handshake.auth.email;
+    return this.adminService.resetBossEntry({ userEmail: email, targetEmail: targetEmail || undefined });
+  }
+
+  @SubscribeMessage('clear_guild_bosses')
+  async clearGuildBosses(@ConnectedSocket() client: Socket) {
+    this.logger.debug('clear_guild_bosses');
+    const email = client.handshake.auth.email;
+    return this.adminService.clearGuildBosses({ userEmail: email });
+  }
+
+  @SubscribeMessage('give_silver')
+  async giveSilver(@MessageBody() params: { email: string; amount: number }, @ConnectedSocket() client: Socket) {
+    this.logger.debug(`give_silver ${params.email}`);
+    const email = client.handshake.auth.email;
+    return this.adminService.giveSilver({
+      userEmail: email,
+      receiverEmail: params.email,
+      amount: params.amount,
+    });
+  }
+
+  @SubscribeMessage('force_end_battle')
+  async forceEndBattle(@MessageBody() targetEmail: string, @ConnectedSocket() client: Socket) {
+    this.logger.debug(`force_end_battle ${targetEmail}`);
+    const email = client.handshake.auth.email;
+    return this.adminService.forceEndBattle({ userEmail: email, targetEmail });
+  }
+
+  @SubscribeMessage('clear_user_cache')
+  async clearUserCache(@MessageBody() targetEmail: string, @ConnectedSocket() client: Socket) {
+    this.logger.debug(`clear_user_cache ${targetEmail}`);
+    const email = client.handshake.auth.email;
+    return this.adminService.clearUserCache({ userEmail: email, targetEmail });
+  }
+
   @SubscribeMessage('send_push_notification_user')
   async sendPushNotificationToUser(
     @MessageBody() params: { email: string; message: string },

@@ -7,6 +7,10 @@ import { MailService } from 'src/feature/mail/mail.service';
 import { NotificationService } from 'src/integrations/notification/notification.service';
 import { UsersService } from 'src/feature/users/users.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
+import { PrismaService } from 'src/core/prisma/prisma.service';
+import { UserWalletService } from 'src/feature/users/userWallet.service';
+import { GuildRepository } from 'src/feature/guild/guild.repository';
+import { BattleService } from 'src/feature/battle/battle.service';
 import * as os from 'os';
 import { execSync } from 'child_process';
 import { memoryUsage } from 'process';
@@ -20,6 +24,10 @@ export class AdminService {
     private readonly websocket: WebsocketService,
     private readonly userService: UsersService,
     private readonly mailService: MailService,
+    private readonly userWallet: UserWalletService,
+    private readonly guildRepository: GuildRepository,
+    private readonly battleService: BattleService,
+    private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
 
@@ -62,6 +70,88 @@ export class AdminService {
 
   async clearCache() {
     await this.cache.reset();
+    return true;
+  }
+
+  /**
+   * Daily resources are handed out lazily, keyed on the date they were last
+   * given — so putting them back is a matter of filling the bar and stamping it
+   * with today, not waiting for midnight.
+   */
+  async resetDailyStamina(args: { userEmail: string; targetEmail?: string }) {
+    const where = args.targetEmail ? { userEmail: args.targetEmail } : {};
+    const stats = await this.prisma.stats.findMany({ where });
+
+    for await (const stat of stats) {
+      await this.prisma.stats.update({
+        where: { userEmail: stat.userEmail },
+        data: { stamina: stat.maxStamina, staminaRefilledAt: new Date() },
+      });
+      await this.usersRepository.clearUserCache({ email: stat.userEmail });
+      await this.userService.notifyUserUpdateWithProfile({ email: stat.userEmail });
+    }
+
+    return this._report(args.userEmail, `Stamina refilled for ${stats.length} character(s)`);
+  }
+
+  /** Hands back today's guild boss entry, for one member or for everyone. */
+  async resetBossEntry(args: { userEmail: string; targetEmail?: string }) {
+    const where = args.targetEmail ? { userEmail: args.targetEmail } : {};
+    const result = await this.prisma.guildMember.updateMany({ where, data: { bossEntryUsedAt: null } });
+
+    // The entry rides on the cached guild payload, so every guild touched has
+    // to be re-read before anyone sees it come back.
+    const guilds = await this.prisma.guild.findMany({ select: { id: true } });
+    for await (const guild of guilds) {
+      await this.guildRepository.clearGuildCache({ guildId: guild.id });
+      await this.guildRepository.notifyGuildWithUpdate({ guildId: guild.id });
+    }
+
+    return this._report(args.userEmail, `Boss entry restored for ${result.count} member(s)`);
+  }
+
+  /** Sends the guild's standing boss away, pool and banked damage with it. */
+  async clearGuildBosses(args: { userEmail: string }) {
+    const removed = await this.prisma.currentGuildBoss.deleteMany({});
+
+    const guilds = await this.prisma.guild.findMany({ select: { id: true } });
+    for await (const guild of guilds) {
+      await this.guildRepository.clearGuildCache({ guildId: guild.id });
+      await this.guildRepository.notifyGuildWithUpdate({ guildId: guild.id });
+    }
+
+    return this._report(args.userEmail, `Dismissed ${removed.count} guild boss(es)`);
+  }
+
+  async giveSilver(args: { userEmail: string; receiverEmail: string; amount: number }) {
+    await this.userWallet.addSilverToUser({ userEmail: args.receiverEmail, amount: args.amount });
+    await this.userService.notifyUserUpdateWithProfile({ email: args.receiverEmail });
+    this.websocket.sendTextNotification({ email: args.receiverEmail, text: `An admin gave you ${args.amount} silver` });
+    return this._report(args.userEmail, `Gave ${args.amount} silver`);
+  }
+
+  /**
+   * Drops whatever fight the user is stuck in. A battle only lives in memory,
+   * so a crash mid-fight can leave one nobody is able to end.
+   */
+  async forceEndBattle(args: { userEmail: string; targetEmail: string }) {
+    const battle = this.battleService.getUserBattle(args.targetEmail);
+    if (!battle) return this._report(args.userEmail, 'That user is not in a battle');
+
+    await battle.removeBattle();
+    battle.notifyBattleRemoved();
+    return this._report(args.userEmail, 'Battle ended');
+  }
+
+  /** Forces the next read of a user to come from the database. */
+  async clearUserCache(args: { userEmail: string; targetEmail: string }) {
+    await this.usersRepository.clearUserCache({ email: args.targetEmail });
+    await this.userService.notifyUserUpdateWithProfile({ email: args.targetEmail });
+    return this._report(args.userEmail, 'Cache cleared and profile pushed');
+  }
+
+  private _report(email: string, text: string) {
+    this.websocket.sendTextNotification({ email, text });
     return true;
   }
 
