@@ -27,6 +27,13 @@ export class EquipmentService {
       ItemsValidator.isEquippable({ category: inventoryItem.item.category });
       ItemsValidator.hasRemainingStock({ stack: 1, inventoryItem });
 
+      const stats = await tx.stats.findUnique({ where: { userEmail: args.userEmail } });
+      ItemsValidator.meetsRequiredLevel({
+        requiredLevel: inventoryItem.item.requiredLevel,
+        level: stats?.level ?? 1,
+        itemName: inventoryItem.item.name,
+      });
+
       const equippedItems = await this.inventory.getAllEquippedItems({ userEmail: args.userEmail, tx });
       const sameCategory = equippedItems.find((equip) =>
         ItemsValidator.isSameCategory({

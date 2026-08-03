@@ -123,10 +123,15 @@ model MarketListing {
 }
 
 model Item {
-  id        Int             @id @default(autoincrement())
-  name      String
-  category  String
-  image     String
+  id       Int    @id @default(autoincrement())
+  name     String
+  category String
+  image    String
+
+  /// The character level needed to equip it. Ignored by anything that is not
+  /// equipment — a consumable or a material is usable at any level.
+  requiredLevel Int @default(1)
+
   attack    Int?
   str       Int?
   agi       Int?

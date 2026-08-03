@@ -9,6 +9,13 @@ export const ItemsValidator = {
     }
   },
 
+  /** Gear is tiered, so wearing it is gated on the character's own level. */
+  meetsRequiredLevel: (args: { requiredLevel: number; level: number; itemName: string }) => {
+    if (args.level < args.requiredLevel) {
+      throw new BadRequestException(`${args.itemName} requires level ${args.requiredLevel}`);
+    }
+  },
+
   isSameCategory: (args: { categoryItem: string; categoryEquipped: string }) => {
     if (args.categoryItem === args.categoryEquipped) {
       return true;
