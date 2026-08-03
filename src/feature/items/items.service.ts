@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/core/prisma/prisma.service';
+import { TRANSACTION_OPTIONS } from 'src/core/prisma/types/prisma';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
-import { UsersRepository } from 'src/feature/users/users.repository';
 import { UsersService } from 'src/feature/users/users.service';
 import { UserStatsService } from 'src/feature/users/userStats.service';
 import { UserWalletService } from 'src/feature/users/userWallet.service';
@@ -17,7 +17,6 @@ export class ItemsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
-    private readonly usersRepository: UsersRepository,
     private readonly userService: UsersService,
     private readonly userStats: UserStatsService,
     private readonly userWallet: UserWalletService,
@@ -28,32 +27,42 @@ export class ItemsService {
    * Pays the enhancement price and rolls for success. The silver is spent
    * either way — a failed roll simply leaves the item untouched. Returns the
    * outcome so the caller can show it, or false when the attempt was refused.
+   *
+   * Checking and notifying stay outside the transaction. Both of those read the
+   * full profile, which is the heaviest query in the app, and holding a
+   * transaction open across two of them against a remote database is what used
+   * to blow the interactive budget.
    */
   async enhanceItem(args: { userEmail: string; inventoryId: number }) {
-    return this.prisma.$transaction(async (tx) => {
-      const inventoryItem = await this.inventory.getOneInventoryItem({ ...args, tx });
-      if (!inventoryItem) return false;
+    const inventoryItem = await this.inventory.getOneInventoryItem(args);
+    if (!inventoryItem) return false;
 
-      if (inventoryItem.equipped) {
-        return this._deny(args.userEmail, 'Cannot enhance equipped item');
-      }
+    if (inventoryItem.equipped) {
+      return this._deny(args.userEmail, 'Cannot enhance equipped item');
+    }
 
-      const user = await this.usersRepository.getFullUser({ userEmail: args.userEmail });
-      if (!user) {
-        return this._deny(args.userEmail, 'User does not exist');
-      }
+    // Only the silver is in question, so this reads the one column instead of
+    // the profile with its inventory, skills, buffs and guild attached.
+    const wallet = await this.prisma.user.findUnique({
+      where: { email: args.userEmail },
+      select: { silver: true },
+    });
+    if (!wallet) {
+      return this._deny(args.userEmail, 'User does not exist');
+    }
 
-      const nextEnhancement = inventoryItem.enhancement + 1;
-      const price = Utils.enhancePrice(nextEnhancement);
-      if (user.silver < price) {
-        return this._deny(args.userEmail, 'Not enough silver');
-      }
+    const nextEnhancement = inventoryItem.enhancement + 1;
+    const price = Utils.enhancePrice(nextEnhancement);
+    if (wallet.silver < price) {
+      return this._deny(args.userEmail, 'Not enough silver');
+    }
 
-      const chance = Utils.enhanceChance(nextEnhancement);
-      const success = Utils.isSuccess(chance);
+    const chance = Utils.enhanceChance(nextEnhancement);
+    const success = Utils.isSuccess(chance);
 
-      // No notification either way: the outcome is returned, and the screen
-      // that asked for the roll is the one that shows it.
+    // What has to be atomic, and nothing else: paying for the attempt and
+    // applying what it rolled.
+    await this.prisma.$transaction(async (tx) => {
       if (success) {
         await this.inventory.removeItemFromInventory({ ...args, stack: 1, tx });
         await this.inventory.addItemToInventory({
@@ -67,15 +76,19 @@ export class ItemsService {
       }
 
       await this.userWallet.removeSilverFromUser({ userEmail: args.userEmail, amount: price, tx });
-      await this.userService.notifyUserUpdateWithProfile({ email: args.userEmail });
-      return {
-        item: inventoryItem.item.name,
-        enhancement: success ? nextEnhancement : inventoryItem.enhancement,
-        success,
-        chance,
-        forgePrice: price,
-      };
-    });
+    }, TRANSACTION_OPTIONS);
+
+    // After the commit, so what goes out is the profile that was actually
+    // written — pushing from inside sent the client the pre-spend silver.
+    await this.userService.notifyUserUpdateWithProfile({ email: args.userEmail });
+
+    return {
+      item: inventoryItem.item.name,
+      enhancement: success ? nextEnhancement : inventoryItem.enhancement,
+      success,
+      chance,
+      forgePrice: price,
+    };
   }
 
   /** Not implemented yet — item upgrading is still to be designed. */
@@ -97,7 +110,7 @@ export class ItemsService {
       }
       await this.inventory.removeItemFromInventory({ ...args, tx });
       return true;
-    });
+    }, TRANSACTION_OPTIONS);
   }
 
   private _deny(email: string, text: string) {
