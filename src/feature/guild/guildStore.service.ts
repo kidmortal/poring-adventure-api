@@ -8,6 +8,7 @@ import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { InventoryService } from 'src/feature/items/inventory.service';
 import { UsersService } from 'src/feature/users/users.service';
 import { GuildRepository } from './guild.repository';
+import { ITEM_WITH_BUFF } from 'src/feature/items/entities/itemInclude';
 
 /**
  * The guild store. It is paid for in guild tokens, which are earned by
@@ -33,7 +34,7 @@ export class GuildStoreService {
 
     const products = await this.prisma.guildStoreProduct.findMany({
       where: { enabled: true },
-      include: { item: true },
+      include: { item: ITEM_WITH_BUFF },
       orderBy: { price: 'asc' },
     });
     await this.cache.set(cacheKey, products);
@@ -51,7 +52,7 @@ export class GuildStoreService {
 
     const product = await this.prisma.guildStoreProduct.findUnique({
       where: { id: args.productId },
-      include: { item: true },
+      include: { item: ITEM_WITH_BUFF },
     });
     if (!product || !product.enabled) return this._deny(args.userEmail, 'That is not for sale');
 

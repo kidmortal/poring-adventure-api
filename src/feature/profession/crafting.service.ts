@@ -6,6 +6,7 @@ import { UserStaminaService } from 'src/feature/users/userStamina.service';
 import { UsersService } from 'src/feature/users/users.service';
 import { ProfessionService } from './profession.service';
 import { planIngredientConsumption, rollCraftQuality } from './profession.rules';
+import { ITEM_WITH_BUFF } from 'src/feature/items/entities/itemInclude';
 
 /**
  * Crafting: ingredients plus stamina in, one item out. Nothing is random —
@@ -25,7 +26,7 @@ export class CraftingService {
 
   getAllRecipes() {
     return this.prisma.recipe.findMany({
-      include: { profession: true, item: true, ingredients: { include: { item: true } } },
+      include: { profession: true, item: ITEM_WITH_BUFF, ingredients: { include: { item: ITEM_WITH_BUFF } } },
       orderBy: [{ professionId: 'asc' }, { requiredLevel: 'asc' }],
     });
   }

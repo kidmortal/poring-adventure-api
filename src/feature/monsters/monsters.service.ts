@@ -4,9 +4,10 @@ import { Prisma } from '@prisma/client';
 import { Cache } from 'cache-manager';
 
 import { PrismaService } from 'src/core/prisma/prisma.service';
+import { ITEM_WITH_BUFF } from 'src/feature/items/entities/itemInclude';
 
 type MapWithMonster = Prisma.MonsterGetPayload<{
-  include: { drops: { include: { item: true } } };
+  include: { drops: { include: { item: { include: { buff: true } } } } };
 }>;
 
 @Injectable()
@@ -31,7 +32,7 @@ export class MonstersService {
     console.log('not cached yet');
     const mapMonsters = await this.prisma.monster.findMany({
       where: { mapId: mapId },
-      include: { drops: { include: { item: true } } },
+      include: { drops: { include: { item: ITEM_WITH_BUFF } } },
     });
     await this.cache.set(cacheKey, mapMonsters);
     return mapMonsters;
@@ -53,7 +54,7 @@ export class MonstersService {
     if (cachedMap) return cachedMap as any;
 
     const maps = await this.prisma.map.findMany({
-      include: { monster: { include: { drops: { include: { item: true } } } } },
+      include: { monster: { include: { drops: { include: { item: ITEM_WITH_BUFF } } } } },
     });
     await this.cache.set(cacheKey, maps);
     return maps;

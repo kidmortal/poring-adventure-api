@@ -7,6 +7,7 @@ import { UsersService } from 'src/feature/users/users.service';
 import { planIngredientConsumption } from './profession.rules';
 import { ProfessionService } from './profession.service';
 import { pickDailyCommissions, utcDayKey } from './commission.rules';
+import { ITEM_WITH_BUFF } from 'src/feature/items/entities/itemInclude';
 
 /**
  * The commission board: standing NPC contracts a crafter can fill for silver.
@@ -45,7 +46,7 @@ export class CommissionService {
     const day = utcDayKey(new Date());
     const available = await this.prisma.commission.findMany({
       where: { professionId: learned.professionId },
-      include: { item: true },
+      include: { item: ITEM_WITH_BUFF },
     });
 
     const offered = pickDailyCommissions({
@@ -98,7 +99,7 @@ export class CommissionService {
     const day = utcDayKey(new Date());
     const commission = await this.prisma.commission.findUnique({
       where: { id: args.commissionId },
-      include: { item: true },
+      include: { item: ITEM_WITH_BUFF },
     });
     if (!commission) {
       throw new BadRequestException('That commission does not exist');

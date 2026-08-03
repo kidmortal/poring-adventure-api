@@ -5,6 +5,7 @@ import { UserStaminaService } from 'src/feature/users/userStamina.service';
 import { UsersService } from 'src/feature/users/users.service';
 import { ProfessionService } from './profession.service';
 import { rollNodeDrops } from './profession.rules';
+import { ITEM_WITH_BUFF } from 'src/feature/items/entities/itemInclude';
 
 /**
  * Gathering: pay the node's stamina, roll its drop table, keep whatever came
@@ -24,7 +25,7 @@ export class GatheringService {
 
   getAllNodes() {
     return this.prisma.gatheringNode.findMany({
-      include: { profession: true, drops: { include: { item: true } } },
+      include: { profession: true, drops: { include: { item: ITEM_WITH_BUFF } } },
       orderBy: [{ professionId: 'asc' }, { requiredLevel: 'asc' }],
     });
   }

@@ -3,11 +3,12 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/core/prisma/prisma.service';
+import { ITEM_WITH_BUFF } from 'src/feature/items/entities/itemInclude';
 
 export type FullUser = Prisma.UserGetPayload<{
   include: {
     appearance: true;
-    inventory: { include: { item: true; marketListing: true } };
+    inventory: { include: { item: { include: { buff: true } }; marketListing: true } };
     class: { include: { skills: true } };
     professions: { include: { profession: true } };
     learnedSkills: { include: { skill: { include: { buff: true } } } };
@@ -41,7 +42,7 @@ export class UsersRepository {
         where: { email: args.userEmail },
         include: {
           appearance: true,
-          inventory: { include: { item: true, marketListing: true } },
+          inventory: { include: { item: ITEM_WITH_BUFF, marketListing: true } },
           class: { include: { skills: true } },
           professions: { include: { profession: true } },
           learnedSkills: { include: { skill: { include: { buff: true } } } },

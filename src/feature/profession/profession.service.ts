@@ -4,6 +4,7 @@ import { TransactionContext } from 'src/core/prisma/types/prisma';
 import { UsersRepository } from 'src/feature/users/users.repository';
 import { Utils } from 'src/utilities/utils';
 import { maxStaminaForProfession } from './profession.rules';
+import { ITEM_WITH_BUFF } from 'src/feature/items/entities/itemInclude';
 
 /**
  * The crafting and gathering trades. A player commits to exactly one profession
@@ -20,7 +21,7 @@ export class ProfessionService {
 
   getAllProfessions() {
     return this.prisma.profession.findMany({
-      include: { nodes: { include: { drops: { include: { item: true } } } }, recipes: this._recipeInclude() },
+      include: { nodes: { include: { drops: { include: { item: ITEM_WITH_BUFF } } } }, recipes: this._recipeInclude() },
       orderBy: { id: 'asc' },
     });
   }
@@ -145,6 +146,6 @@ export class ProfessionService {
   }
 
   private _recipeInclude() {
-    return { include: { item: true, ingredients: { include: { item: true } } } } as const;
+    return { include: { item: ITEM_WITH_BUFF, ingredients: { include: { item: ITEM_WITH_BUFF } } } } as const;
   }
 }

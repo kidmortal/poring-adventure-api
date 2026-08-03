@@ -6,6 +6,7 @@ import { PrismaService } from 'src/core/prisma/prisma.service';
 import { TRANSACTION_OPTIONS, TransactionContext } from 'src/core/prisma/types/prisma';
 import { UsersService } from 'src/feature/users/users.service';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
+import { ITEM_WITH_BUFF } from 'src/feature/items/entities/itemInclude';
 
 @Injectable()
 export class MailService {
@@ -193,7 +194,7 @@ export class MailService {
   async _notifyUserMailBox(args: { userEmail: string }) {
     const mailBox = await this.prisma.mail.findMany({
       where: { userEmail: args.userEmail },
-      include: { item: true },
+      include: { item: ITEM_WITH_BUFF },
     });
 
     if (mailBox) {

@@ -5,6 +5,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { BattleService } from 'src/feature/battle/battle.service';
 import { Discord as DiscordUser } from '@prisma/client';
+import { ITEM_WITH_BUFF } from 'src/feature/items/entities/itemInclude';
 
 /** Registration tokens are short lived: the player has 10 minutes to paste it on discord. */
 const REGISTER_TOKEN_TTL_MS = 1000 * 60 * 10;
@@ -78,7 +79,7 @@ export class DiscordService {
   inventory(args: { discordId: string }) {
     return this.prisma.inventoryItem.findMany({
       where: { user: { discord: { discordId: args.discordId } } },
-      include: { item: true },
+      include: { item: ITEM_WITH_BUFF },
     });
   }
 

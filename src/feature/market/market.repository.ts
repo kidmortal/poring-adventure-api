@@ -6,6 +6,7 @@ import { PrismaService } from 'src/core/prisma/prisma.service';
 import { TransactionContext } from 'src/core/prisma/types/prisma';
 import { ItemCategory } from 'src/feature/items/constants';
 import { EQUIPABLE_CATEGORIES } from 'src/feature/items/entities/categories';
+import { ITEM_WITH_BUFF } from 'src/feature/items/entities/itemInclude';
 
 const LISTINGS_PER_PAGE = 10;
 const COUNT_CACHE_KEY = 'market_listing_count';
@@ -31,7 +32,7 @@ export class MarketRepository {
       skip: (args.page - 1) * LISTINGS_PER_PAGE,
       take: LISTINGS_PER_PAGE,
       where: this._categoryFilter(args.category),
-      include: { inventory: { include: { item: true } }, seller: true },
+      include: { inventory: { include: { item: ITEM_WITH_BUFF } }, seller: true },
     });
     await this.cache.set(cacheKey, listings);
     return listings;
@@ -52,7 +53,7 @@ export class MarketRepository {
     const tx = args.tx || this.prisma;
     return tx.marketListing.findUnique({
       where: { id: args.marketListingId },
-      include: { inventory: { include: { item: true } } },
+      include: { inventory: { include: { item: ITEM_WITH_BUFF } } },
     });
   }
 
@@ -101,7 +102,7 @@ export class MarketRepository {
   deleteListing(args: { marketListingId: number }) {
     return this.prisma.marketListing.delete({
       where: { id: args.marketListingId },
-      include: { inventory: { include: { item: true } } },
+      include: { inventory: { include: { item: ITEM_WITH_BUFF } } },
     });
   }
 
