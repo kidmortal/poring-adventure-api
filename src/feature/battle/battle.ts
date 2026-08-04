@@ -3,6 +3,7 @@ import { BattleUtils } from './battleUtils';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { Utils } from 'src/utilities/utils';
 import { runEffect } from './effects';
+import { absorbDamage, isSpentBarrier } from './barrier';
 import {
   applyDebuff,
   BattleDebuff,
@@ -24,6 +25,12 @@ enum SkillCategory {
    * mana at somebody other than themselves.
    */
   SelfRestore = 'self_restore',
+  /**
+   * Puts the skill's buff on the whole party. The Priest's other half: healing
+   * answers damage that has already landed, this answers the damage that has
+   * not, and it is the only reason to bring one to a fight the party is winning.
+   */
+  BuffParty = 'buff_party',
 }
 
 enum SkillEffect {
@@ -34,6 +41,12 @@ enum SkillEffect {
 /** Buff effects the engine acts on directly rather than through `runEffect`. */
 enum BuffEffect {
   SecondWind = 'second_wind',
+  /**
+   * A pool of borrowed health that is spent before the real one. Handled here
+   * rather than in `runEffect` because it has to survive between damage steps:
+   * what is left of it is state, not a multiplier applied to one hit.
+   */
+  Barrier = 'barrier',
 }
 
 /** How much health a Revive Draught leaves you standing on. */
@@ -98,6 +111,12 @@ export type UserWithStats = User & {
 };
 type UserBuffWithBuff = UserBuff & {
   buff: Buff;
+  /**
+   * What is left of a barrier's pool. Set only on a barrier buff, and only at
+   * the table: the amount comes from the caster's stats when it was raised, so
+   * there is nothing to store on the Buff row and nothing to persist afterwards.
+   */
+  barrier?: number;
 };
 
 type LearnedSkillWithSkill = LearnedSkill & {
@@ -422,6 +441,8 @@ export class BattleInstance {
           return this.processCastBuffSelf({ user, skill });
         case SkillCategory.SelfRestore:
           return this.processCastSelfRestore({ user, skill });
+        case SkillCategory.BuffParty:
+          return this.processCastBuffParty({ user, skill });
 
         default:
           return this.processCastTargetEnemy({ user, skill });
@@ -632,22 +653,63 @@ export class BattleInstance {
   private async processCastBuffSelf(args: { user: UserWithStats; skill: LearnedSkillWithSkill }) {
     args.user.stats.mana -= args.skill.skill.manaCost;
     if (args.skill.skill.buff) {
-      const buff = args.skill.skill.buff;
-      args.user.buffs.push({
-        duration: buff.duration,
-        id: 0,
-        userEmail: args.user.email,
-        buffId: buff.id,
-        // A copy, so nothing at the table can write back into the shared row
-        // hanging off the skill definition.
-        buff: { ...buff },
-      });
+      this.grantBuff({ target: args.user, caster: args.user, skill: args.skill });
       this.pushLog({
-        log: `${args.user.name} Casted ${buff.name} on himself`,
+        log: `${args.user.name} Casted ${args.skill.skill.buff.name} on himself`,
         icon: args.skill.skill.image,
       });
     }
     return this.afterDamageStep();
+  }
+
+  /**
+   * The party-wide blessing. The dead are skipped — a buff on a corpse is a turn
+   * the party needed — and everyone who is up gets their own copy, sized off the
+   * caster, so it ticks down on each of their own turns rather than in lockstep.
+   */
+  private async processCastBuffParty(args: { user: UserWithStats; skill: LearnedSkillWithSkill }) {
+    args.user.stats.mana -= args.skill.skill.manaCost;
+    const buff = args.skill.skill.buff;
+    if (!buff) return this.afterDamageStep();
+
+    const targets = this.users.filter((user) => !user.isDead);
+    targets.forEach((target) => this.grantBuff({ target, caster: args.user, skill: args.skill }));
+
+    this.pushLog({
+      log: `${args.user.name} Casted ${buff.name} on the party`,
+      icon: args.skill.skill.image,
+    });
+    return this.afterDamageStep();
+  }
+
+  /**
+   * Hands one player a copy of a skill's buff.
+   *
+   * The copy matters: `decreaseOrRemoveBuffs` ticks the object it is given, and
+   * a party sharing one row would drain everyone's blessing on the first
+   * player's turn.
+   */
+  private grantBuff(args: { target: UserWithStats; caster: UserWithStats; skill: LearnedSkillWithSkill }) {
+    const buff = args.skill.skill.buff;
+    args.target.buffs.push({
+      duration: buff.duration,
+      id: 0,
+      userEmail: args.target.email,
+      buffId: buff.id,
+      // A copy, so nothing at the table can write back into the shared row
+      // hanging off the skill definition.
+      buff: { ...buff },
+      // A barrier is worth whatever the caster's stats made it worth when it went
+      // up. Locking the size in here is what lets a Priest's shield outlive the
+      // turn they cast it on without re-reading stats that may since have moved.
+      barrier: buff.effect === BuffEffect.Barrier ? this.barrierAmount(args.caster, args.skill) : undefined,
+    });
+  }
+
+  /** A barrier's pool: the same `attribute × multiplier × mastery` every skill uses. */
+  private barrierAmount(caster: UserWithStats, skill: LearnedSkillWithSkill) {
+    const casterAttribute: number = caster.stats[skill.skill.attribute];
+    return Math.max(1, Math.floor(casterAttribute * skill.skill.multiplier * skill.masteryLevel));
   }
 
   private getLowestManaMember() {
@@ -718,12 +780,37 @@ export class BattleInstance {
     }
   }
   private async damageUser(args: { user: UserWithStats; amount: number }) {
-    args.user.stats.health -= args.amount;
+    const amount = this.absorbWithBarrier(args);
+    if (amount <= 0) return;
+
+    args.user.stats.health -= amount;
     if (args.user.stats.health <= 0) {
       if (this.spendSecondWind(args.user)) return;
       args.user.stats.health = 0;
       args.user.isDead = true;
     }
+  }
+
+  /**
+   * Spends a hit against whatever barriers the player is carrying and returns
+   * what is left over for their real health.
+   *
+   * Borrowed health rather than mitigation: it is a flat pool, so it is worth
+   * most against the many small hits a pack throws out and least against one
+   * enormous one — the opposite of the defense curve, which is what makes it
+   * worth casting on a party that is already armoured.
+   *
+   * Oldest barrier first, so a fresh one is not wasted covering a hit the
+   * expiring one could have taken.
+   */
+  private absorbWithBarrier(args: { user: UserWithStats; amount: number }) {
+    const { remaining, absorptions } = absorbDamage({ buffs: args.user.buffs, amount: args.amount });
+
+    absorptions.forEach(({ name, image, absorbed }) =>
+      this.pushLog({ icon: image, log: `${name} absorbed ${absorbed} damage for ${args.user.name}` }),
+    );
+    args.user.buffs = args.user.buffs.filter((userBuff) => !isSpentBarrier(userBuff));
+    return remaining;
   }
 
   /**

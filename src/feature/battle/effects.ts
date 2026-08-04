@@ -61,6 +61,29 @@ const effects: EffectMap = {
       },
     };
   },
+  /**
+   * A Priest's blessing on the whole party. Mechanically the same trade as a
+   * meal — a share of damage dealt and a share of damage taken, both read off
+   * the buff row — because the numbers a cook tunes and the numbers a Priest
+   * casts are the same kind of number, and neither should need new code.
+   *
+   * What separates them is where they come from: food is bought and eaten
+   * before the fight, this costs a Priest their turn inside it.
+   */
+  blessed: (params) => {
+    return {
+      onAttack: () => {
+        if (params.buff.attackBonus) {
+          params.dmgStep.damage.value *= 1 + params.buff.attackBonus / 100;
+        }
+      },
+      onDefense: () => {
+        if (params.buff.healthBonus) {
+          params.dmgStep.damage.value *= 1 - Math.min(params.buff.healthBonus, 50) / 100;
+        }
+      },
+    };
+  },
   invincible: (params) => {
     return {
       onAttack: () => {},

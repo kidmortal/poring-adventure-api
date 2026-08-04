@@ -68,7 +68,7 @@ export class UsersService {
   }
 
   getAllClasses() {
-    return this.prisma.class.findMany({ include: { skills: true } });
+    return this.prisma.class.findMany({ include: { skills: { include: { buff: true, debuff: true } } } });
   }
 
   getAllHeads() {

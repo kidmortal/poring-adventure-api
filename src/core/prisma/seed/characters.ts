@@ -208,6 +208,53 @@ const BUFFS: BuffSeed[] = [
     persist: true,
     maxStack: 1,
   },
+
+  /**
+   * The Priest's party-wide blessing. Modest percentages on purpose: it lands on
+   * everybody at once, so what would be a fair number on one player is four
+   * times that across a full party.
+   */
+  {
+    name: 'Blessed',
+    effect: 'blessed',
+    duration: 4,
+    image: skillImage('cleric', 'divine spirit'),
+    pose: 'enhanced',
+    persist: false,
+    maxStack: 1,
+    attackBonus: 10,
+    healthBonus: 10,
+  },
+
+  /**
+   * The two barriers, which are the same mechanic bought by different classes.
+   *
+   * A barrier is a flat pool spent before real health, so it is worth most
+   * against a pack throwing out many small hits and least against a single
+   * enormous one — the opposite of how defense behaves, which is what makes it
+   * worth having on top of armour rather than instead of it.
+   *
+   * Their size is not written here: it comes off the caster's stats when the
+   * skill goes up, so a level 50 Priest's shield is a level 50 shield.
+   */
+  {
+    name: 'Aegis',
+    effect: 'barrier',
+    duration: 4,
+    image: skillImage('cleric', 'blessing of protection'),
+    pose: 'enhanced',
+    persist: false,
+    maxStack: 1,
+  },
+  {
+    name: 'Mana Shield',
+    effect: 'barrier',
+    duration: 4,
+    image: skillImage('mage', 'mana shield'),
+    pose: 'enhanced',
+    persist: false,
+    maxStack: 1,
+  },
 ];
 
 /**
@@ -262,6 +309,23 @@ const DEBUFFS = [
     effect: 'stun',
     duration: 1,
     image: skillImage('mage', 'frost nova'),
+    potency: 0,
+    maxStack: 1,
+  },
+  /** The same turn taken away, bought by the two classes that talk it out of fighting. */
+  {
+    name: 'Polymorphed',
+    effect: 'stun',
+    duration: 1,
+    image: skillImage('mage', 'polymorph'),
+    potency: 0,
+    maxStack: 1,
+  },
+  {
+    name: 'Feared',
+    effect: 'stun',
+    duration: 1,
+    image: skillImage('cleric', 'psychic scream'),
     potency: 0,
     maxStack: 1,
   },
@@ -361,6 +425,33 @@ const PRIEST: Ladder = { className: 'Priest', folder: 'cleric', attribute: 'int'
 const KNIGHT: Ladder = { className: 'Knight', folder: 'warrior', attribute: 'str' };
 const ASSASSIN: Ladder = { className: 'Assassin', folder: 'rogue', attribute: 'agi' };
 
+/**
+ * A blessing on the whole party. The Priest's other half: a heal answers damage
+ * that has already landed, a blessing answers the damage that has not, and it is
+ * the reason to bring one to a fight that is going well rather than badly.
+ */
+function partyBuff(ladder: Ladder, rung: Rung, buffName: string, description: string): SkillSeed {
+  return ladderSkill(ladder, rung, {
+    category: 'buff_party',
+    buffName,
+    description: rung.description ?? description,
+  });
+}
+
+/**
+ * A barrier the caster raises on themselves — the same pool a Priest hands the
+ * party, bought by a class that has to survive its own turn.
+ */
+function selfBarrier(ladder: Ladder, rung: Rung, buffName: string): SkillSeed {
+  return ladderSkill(ladder, rung, {
+    category: 'buff_self',
+    buffName,
+    description:
+      rung.description ??
+      `Raises a barrier absorbing ${Math.round(rung.power * 100)}% of your ${ladder.attribute} in damage.`,
+  });
+}
+
 /** Heals the lowest-health party member. */
 function heal(ladder: Ladder, rung: Rung): SkillSeed {
   return ladderSkill(ladder, rung, {
@@ -382,15 +473,6 @@ function groupHeal(ladder: Ladder, rung: Rung): SkillSeed {
     areaOfEffect: true,
     description:
       rung.description ?? `Heals the whole party for ${Math.round(rung.power * 100)}% of your intelligence each.`,
-  });
-}
-
-/** Refills the lowest-mana party member, which is usually the caster themselves. */
-function infuse(ladder: Ladder, rung: Rung): SkillSeed {
-  return ladderSkill(ladder, rung, {
-    category: 'target_ally',
-    effect: 'infusion',
-    description: rung.description ?? `Restores ${Math.round(rung.power * 100)}% of your intelligence as mana.`,
   });
 }
 
@@ -449,15 +531,19 @@ const MAGE_LADDER: SkillSeed[] = [
   ladderSkill(MAGE, { asset: 'cone of cold', level: 17, power: 4, mana: 7, cd: 2 }, { areaOfEffect: true }),
   ladderSkill(MAGE, { asset: 'ignite', level: 20, power: 4.5, mana: 8, cd: 2 }, { debuffName: 'Burning' }),
   guard(MAGE, { asset: 'ice block', level: 23, power: 1, mana: 10, cd: 6 }),
-  ladderSkill(MAGE, { asset: 'polymorph', level: 26, power: 4.8, mana: 9, cd: 3, threat: 0.3 }),
-  ladderSkill(MAGE, { asset: 'blink', level: 29, power: 5, mana: 8, cd: 2, threat: 0.2 }),
+  ladderSkill(
+    MAGE,
+    { asset: 'polymorph', level: 26, power: 3, mana: 9, cd: 4, threat: 0.3 },
+    { debuffName: 'Polymorphed' },
+  ),
+  guard(MAGE, { asset: 'blink', level: 29, power: 1, mana: 6, cd: 4 }),
   ladderSkill(
     MAGE,
     { asset: 'flamestrike', level: 32, power: 5.5, mana: 11, cd: 3 },
     { areaOfEffect: true, debuffName: 'Burning' },
   ),
   ladderSkill(MAGE, { asset: 'arcane explosion', level: 36, power: 6, mana: 12, cd: 3 }, { areaOfEffect: true }),
-  selfInfuse(MAGE, { asset: 'mana shield', level: 40, power: 4, mana: 0, cd: 5 }),
+  selfBarrier(MAGE, { asset: 'mana shield', level: 40, power: 4, mana: 8, cd: 5 }, 'Mana Shield'),
   selfInfuse(MAGE, { asset: 'arcane intellect', level: 45, power: 5, mana: 0, cd: 5 }),
   ladderSkill(MAGE, { asset: 'pyroblast', level: 50, power: 8, mana: 18, cd: 4, threat: 0.5 }),
 ];
@@ -473,7 +559,12 @@ const PRIEST_LADDER: SkillSeed[] = [
   heal(PRIEST, { asset: 'renew', level: 6, power: 2.5, mana: 2, cd: 1 }),
   ladderSkill(PRIEST, { asset: 'holy strike', level: 9, power: 2.5, mana: 4, cd: 1 }),
   heal(PRIEST, { asset: 'flash heal', level: 12, power: 4, mana: 7, cd: 1 }),
-  groupInfuse(PRIEST, { asset: 'divine spirit', level: 15, power: 3, mana: 0, cd: 4 }),
+  partyBuff(
+    PRIEST,
+    { asset: 'divine spirit', level: 15, power: 1, mana: 6, cd: 4 },
+    'Blessed',
+    'Blesses the whole party: 10% more damage dealt and 10% less taken for four turns.',
+  ),
   ladderSkill(PRIEST, { asset: 'mind blast', level: 18, power: 3.5, mana: 6, cd: 2 }),
   heal(PRIEST, { asset: 'regeneration', level: 21, power: 3.5, mana: 5, cd: 1 }),
   ladderSkill(
@@ -481,11 +572,20 @@ const PRIEST_LADDER: SkillSeed[] = [
     { asset: 'holy nova', level: 24, power: 3.5, mana: 8, cd: 2, threat: 0.5 },
     { areaOfEffect: true },
   ),
-  infuse(PRIEST, { asset: 'dispel magic', level: 27, power: 3.5, mana: 0, cd: 4 }),
+  groupInfuse(PRIEST, { asset: 'dispel magic', level: 27, power: 3.5, mana: 0, cd: 4 }),
   heal(PRIEST, { asset: 'greater heal', level: 30, power: 5.5, mana: 10, cd: 2 }),
-  ladderSkill(PRIEST, { asset: 'psychic scream', level: 33, power: 4, mana: 9, cd: 3, threat: 0.2 }),
+  ladderSkill(
+    PRIEST,
+    { asset: 'psychic scream', level: 33, power: 4, mana: 9, cd: 3, threat: 0.2 },
+    { areaOfEffect: true, debuffName: 'Feared' },
+  ),
   ladderSkill(PRIEST, { asset: 'holy fire', level: 36, power: 5, mana: 11, cd: 3 }),
-  guard(PRIEST, { asset: 'blessing of protection', level: 40, power: 1, mana: 12, cd: 6 }),
+  partyBuff(
+    PRIEST,
+    { asset: 'blessing of protection', level: 40, power: 4, mana: 14, cd: 5 },
+    'Aegis',
+    'Raises a barrier on every party member, each absorbing 400% of your intelligence in damage.',
+  ),
   groupHeal(PRIEST, { asset: 'prayer of healing', level: 45, power: 7, mana: 14, cd: 3 }),
   heal(PRIEST, { asset: 'resurrection', level: 50, power: 10, mana: 20, cd: 6 }),
 ];
