@@ -11,7 +11,7 @@ export type FullUser = Prisma.UserGetPayload<{
     inventory: { include: { item: { include: { buff: true } }; marketListing: true } };
     class: { include: { skills: true } };
     professions: { include: { profession: true } };
-    learnedSkills: { include: { skill: { include: { buff: true } } } };
+    learnedSkills: { include: { skill: { include: { buff: true; debuff: true } } } };
     buffs: { include: { buff: true } };
     guildMember: true;
     guildApplications: true;
@@ -45,7 +45,7 @@ export class UsersRepository {
           inventory: { include: { item: ITEM_WITH_BUFF, marketListing: true } },
           class: { include: { skills: true } },
           professions: { include: { profession: true } },
-          learnedSkills: { include: { skill: { include: { buff: true } } } },
+          learnedSkills: { include: { skill: { include: { buff: true, debuff: true } } } },
           buffs: { include: { buff: true } },
           guildMember: true,
           // Their own pending applications, so a guild they have asked to join

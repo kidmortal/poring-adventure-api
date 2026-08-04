@@ -6,7 +6,7 @@
 import { Prisma } from '@prisma/client';
 
 import { prisma, upsertByName } from './client';
-import { ConsumableAsset, consumableImage } from './assets';
+import { ConsumableAsset, consumableImage, SkillFolder, skillImage } from './assets';
 
 const HEADS_FOLDER = 'https://kidmortal.sirv.com/heads';
 const SKILLS_FOLDER = 'https://kidmortal.sirv.com/skills';
@@ -210,6 +210,63 @@ const BUFFS: BuffSeed[] = [
   },
 ];
 
+/**
+ * What a skill can leave on the monster it lands on. These are the enemy-side
+ * mirror of the buffs above, and they are what the client draws beside the
+ * health bar — so each one wears the art of the skill it is best known by.
+ *
+ * `potency` is a percentage, and what it is a percentage of belongs to the
+ * effect: armour shredded, damage lost, or a share of the monster's starting
+ * health burned each of its turns.
+ */
+const DEBUFFS = [
+  {
+    name: 'Sundered',
+    effect: 'defense_down',
+    duration: 3,
+    image: skillImage('warrior', 'sunder armor'),
+    potency: 25,
+    maxStack: 2,
+  },
+  {
+    name: 'Weakened',
+    effect: 'attack_down',
+    duration: 3,
+    image: skillImage('rogue', 'crippling poison'),
+    potency: 20,
+    maxStack: 1,
+  },
+  {
+    name: 'Poisoned',
+    effect: 'poison',
+    duration: 3,
+    image: skillImage('rogue', 'deadly poison'),
+    potency: 5,
+    maxStack: 3,
+  },
+  {
+    name: 'Burning',
+    effect: 'poison',
+    duration: 3,
+    image: skillImage('mage', 'ignite'),
+    potency: 6,
+    maxStack: 2,
+  },
+  /**
+   * The one debuff that takes a turn away outright, so it is deliberately short
+   * and sits on long-cooldown skills only — a party that can chain it would
+   * otherwise never be hit back.
+   */
+  {
+    name: 'Frozen',
+    effect: 'stun',
+    duration: 1,
+    image: skillImage('mage', 'frost nova'),
+    potency: 0,
+    maxStack: 1,
+  },
+];
+
 type SkillSeed = {
   name: string;
   /** Which class may learn it. */
@@ -228,7 +285,301 @@ type SkillSeed = {
   effect?: string | null;
   /** Set when casting it applies a buff. */
   buffName?: string;
+  /** Set when landing it leaves a debuff on the enemy. */
+  debuffName?: string;
+  /** Hits every enemy, or heals the whole party, for 70% of its written power. */
+  areaOfEffect?: boolean;
 };
+
+/**
+ * A class's ladder from level 1 to 50.
+ *
+ * The four ladders below are written as tables because that is how they are
+ * tuned — the interesting number in a row is `power`, and everything else is
+ * either the art it wears or the level it arrives at. `power` is the multiplier
+ * on the class's attribute, so a Mage's 8.0 Pyroblast and a Knight's 7.5
+ * Bladestorm are not comparable: the Mage has four intelligence a level and the
+ * Knight three strength, and the Knight is buying threat with the difference.
+ *
+ * Only the mechanics the battle engine actually has are used — damage, healing,
+ * mana infusion, and a self-buff pointing at an existing buff row. A skill named
+ * after a poison or a stun is a damage skill wearing that name until the engine
+ * grows a status system; nothing here promises behaviour that does not exist.
+ */
+type Ladder = {
+  className: string;
+  folder: SkillFolder;
+  /** The stat every skill on the ladder scales off. */
+  attribute: string;
+};
+
+type Rung = {
+  /** Art file name, which is also the skill's name once title-cased. */
+  asset: string;
+  level: number;
+  /** Multiplier on the class attribute. */
+  power: number;
+  mana: number;
+  cd: number;
+  /** Threat per point of damage. A tank buys aggro here; a rogue sheds it. */
+  threat?: number;
+  description?: string;
+};
+
+/**
+ * `arcane explosion` → `Arcane Explosion`, so the art and the name cannot drift.
+ * `of` stays lowercase unless it leads — "Fan of Knives", not "Fan Of Knives".
+ */
+function skillName(asset: string) {
+  return asset
+    .split(' ')
+    .map((word, index) => (index > 0 && word === 'of' ? word : word[0].toUpperCase() + word.slice(1)))
+    .join(' ');
+}
+
+function ladderSkill(ladder: Ladder, rung: Rung, extra: Partial<SkillSeed> = {}): SkillSeed {
+  const target = extra.areaOfEffect ? 'all enemies' : 'the target';
+  return {
+    name: skillName(rung.asset),
+    className: ladder.className,
+    image: skillImage(ladder.folder, rung.asset),
+    description: rung.description ?? `Deals ${Math.round(rung.power * 100)}% ${ladder.attribute} damage to ${target}.`,
+    attribute: ladder.attribute,
+    multiplier: rung.power,
+    category: 'target_enemy',
+    requiredLevel: rung.level,
+    manaCost: rung.mana,
+    cooldown: rung.cd,
+    threatModifier: rung.threat,
+    effect: '',
+    ...extra,
+  };
+}
+
+const MAGE: Ladder = { className: 'Mage', folder: 'mage', attribute: 'int' };
+const PRIEST: Ladder = { className: 'Priest', folder: 'cleric', attribute: 'int' };
+const KNIGHT: Ladder = { className: 'Knight', folder: 'warrior', attribute: 'str' };
+const ASSASSIN: Ladder = { className: 'Assassin', folder: 'rogue', attribute: 'agi' };
+
+/** Heals the lowest-health party member. */
+function heal(ladder: Ladder, rung: Rung): SkillSeed {
+  return ladderSkill(ladder, rung, {
+    category: 'target_ally',
+    effect: 'healing',
+    description: rung.description ?? `Heals an ally for ${Math.round(rung.power * 100)}% of your intelligence.`,
+  });
+}
+
+/**
+ * The party heal. It reaches everyone still standing at a reduced rate, which is
+ * what makes a Priest worth a slot against a boss that hits the whole party
+ * rather than only whoever is holding it.
+ */
+function groupHeal(ladder: Ladder, rung: Rung): SkillSeed {
+  return ladderSkill(ladder, rung, {
+    category: 'target_ally',
+    effect: 'healing',
+    areaOfEffect: true,
+    description:
+      rung.description ?? `Heals the whole party for ${Math.round(rung.power * 100)}% of your intelligence each.`,
+  });
+}
+
+/** Refills the lowest-mana party member, which is usually the caster themselves. */
+function infuse(ladder: Ladder, rung: Rung): SkillSeed {
+  return ladderSkill(ladder, rung, {
+    category: 'target_ally',
+    effect: 'infusion',
+    description: rung.description ?? `Restores ${Math.round(rung.power * 100)}% of your intelligence as mana.`,
+  });
+}
+
+/**
+ * Refills the caster and nobody else.
+ *
+ * Putting health or mana on somebody else is the Priest's job and the whole
+ * reason the party keeps a slot for one. A Mage sustains itself — that is what
+ * the rungs below are for — but the moment it can top up an ally it is a worse
+ * Priest rather than a Mage, and the party stops needing the real one.
+ */
+function selfInfuse(ladder: Ladder, rung: Rung): SkillSeed {
+  return ladderSkill(ladder, rung, {
+    category: 'self_restore',
+    effect: 'infusion',
+    description: rung.description ?? `Restores ${Math.round(rung.power * 100)}% of your intelligence as your own mana.`,
+  });
+}
+
+/** The same, spread across everyone still standing. */
+function groupInfuse(ladder: Ladder, rung: Rung): SkillSeed {
+  return ladderSkill(ladder, rung, {
+    category: 'target_ally',
+    effect: 'infusion',
+    areaOfEffect: true,
+    description:
+      rung.description ?? `Restores ${Math.round(rung.power * 100)}% of your intelligence as mana to the whole party.`,
+  });
+}
+
+/** The one turn of immunity every class gets, wearing a different name each time. */
+function guard(ladder: Ladder, rung: Rung): SkillSeed {
+  return ladderSkill(ladder, rung, {
+    category: 'buff_self',
+    buffName: 'Invincible',
+    description: rung.description ?? 'Ignores all damage for one turn.',
+  });
+}
+
+/**
+ * The glass cannon's ladder: the steepest damage curve in the game, paid for out
+ * of the shallowest mana pool. Threat is shaved off the big nukes so a Mage who
+ * opens with Pyroblast does not immediately become the tank.
+ */
+const MAGE_LADDER: SkillSeed[] = [
+  ladderSkill(MAGE, { asset: 'fireball', level: 1, power: 2, mana: 2, cd: 1 }),
+  ladderSkill(MAGE, { asset: 'frostbolt', level: 3, power: 2.5, mana: 3, cd: 1 }),
+  ladderSkill(MAGE, { asset: 'arcane missiles', level: 5, power: 3, mana: 4, cd: 2 }),
+  ladderSkill(MAGE, { asset: 'fire blast', level: 8, power: 3.2, mana: 4, cd: 1 }),
+  ladderSkill(
+    MAGE,
+    { asset: 'frost nova', level: 11, power: 3.5, mana: 6, cd: 2, threat: 0.5 },
+    { areaOfEffect: true, debuffName: 'Frozen' },
+  ),
+  selfInfuse(MAGE, { asset: 'evocation', level: 14, power: 2, mana: 0, cd: 4 }),
+  ladderSkill(MAGE, { asset: 'cone of cold', level: 17, power: 4, mana: 7, cd: 2 }, { areaOfEffect: true }),
+  ladderSkill(MAGE, { asset: 'ignite', level: 20, power: 4.5, mana: 8, cd: 2 }, { debuffName: 'Burning' }),
+  guard(MAGE, { asset: 'ice block', level: 23, power: 1, mana: 10, cd: 6 }),
+  ladderSkill(MAGE, { asset: 'polymorph', level: 26, power: 4.8, mana: 9, cd: 3, threat: 0.3 }),
+  ladderSkill(MAGE, { asset: 'blink', level: 29, power: 5, mana: 8, cd: 2, threat: 0.2 }),
+  ladderSkill(
+    MAGE,
+    { asset: 'flamestrike', level: 32, power: 5.5, mana: 11, cd: 3 },
+    { areaOfEffect: true, debuffName: 'Burning' },
+  ),
+  ladderSkill(MAGE, { asset: 'arcane explosion', level: 36, power: 6, mana: 12, cd: 3 }, { areaOfEffect: true }),
+  selfInfuse(MAGE, { asset: 'mana shield', level: 40, power: 4, mana: 0, cd: 5 }),
+  selfInfuse(MAGE, { asset: 'arcane intellect', level: 45, power: 5, mana: 0, cd: 5 }),
+  ladderSkill(MAGE, { asset: 'pyroblast', level: 50, power: 8, mana: 18, cd: 4, threat: 0.5 }),
+];
+
+/**
+ * The healer's ladder. Every band carries a heal, because a Priest who has run
+ * out of answers is a party slot spent on nothing, and the damage line is kept
+ * deliberately behind the Mage's — a Priest out-lasts, they do not out-burn.
+ */
+const PRIEST_LADDER: SkillSeed[] = [
+  heal(PRIEST, { asset: 'heal', level: 1, power: 3, mana: 3, cd: 2 }),
+  ladderSkill(PRIEST, { asset: 'smite', level: 3, power: 2, mana: 2, cd: 1 }),
+  heal(PRIEST, { asset: 'renew', level: 6, power: 2.5, mana: 2, cd: 1 }),
+  ladderSkill(PRIEST, { asset: 'holy strike', level: 9, power: 2.5, mana: 4, cd: 1 }),
+  heal(PRIEST, { asset: 'flash heal', level: 12, power: 4, mana: 7, cd: 1 }),
+  groupInfuse(PRIEST, { asset: 'divine spirit', level: 15, power: 3, mana: 0, cd: 4 }),
+  ladderSkill(PRIEST, { asset: 'mind blast', level: 18, power: 3.5, mana: 6, cd: 2 }),
+  heal(PRIEST, { asset: 'regeneration', level: 21, power: 3.5, mana: 5, cd: 1 }),
+  ladderSkill(
+    PRIEST,
+    { asset: 'holy nova', level: 24, power: 3.5, mana: 8, cd: 2, threat: 0.5 },
+    { areaOfEffect: true },
+  ),
+  infuse(PRIEST, { asset: 'dispel magic', level: 27, power: 3.5, mana: 0, cd: 4 }),
+  heal(PRIEST, { asset: 'greater heal', level: 30, power: 5.5, mana: 10, cd: 2 }),
+  ladderSkill(PRIEST, { asset: 'psychic scream', level: 33, power: 4, mana: 9, cd: 3, threat: 0.2 }),
+  ladderSkill(PRIEST, { asset: 'holy fire', level: 36, power: 5, mana: 11, cd: 3 }),
+  guard(PRIEST, { asset: 'blessing of protection', level: 40, power: 1, mana: 12, cd: 6 }),
+  groupHeal(PRIEST, { asset: 'prayer of healing', level: 45, power: 7, mana: 14, cd: 3 }),
+  heal(PRIEST, { asset: 'resurrection', level: 50, power: 10, mana: 20, cd: 6 }),
+];
+
+/**
+ * The tank's ladder, and the only one that buys threat on purpose. Damage sits
+ * below every other class at the same level; the threat modifiers are what the
+ * strength is really spent on, so the Knight holds a boss the Assassin is
+ * out-damaging three to one.
+ */
+const KNIGHT_LADDER: SkillSeed[] = [
+  ladderSkill(KNIGHT, { asset: 'heroic strike', level: 1, power: 2, mana: 1, cd: 1, threat: 2 }),
+  ladderSkill(KNIGHT, { asset: 'charge', level: 3, power: 2.2, mana: 2, cd: 2, threat: 2.5 }),
+  ladderSkill(KNIGHT, { asset: 'cleave', level: 6, power: 2.5, mana: 2, cd: 1, threat: 2 }, { areaOfEffect: true }),
+  // The Knight's version of the Rune Knight's Power up: the same buff row, since
+  // "hit harder, take less, be looked at more" is exactly what a tank shouts for.
+  ladderSkill(
+    KNIGHT,
+    {
+      asset: 'battle shout',
+      level: 9,
+      power: 1,
+      mana: 5,
+      cd: 4,
+      description: 'Increases damage by 20%, defense by 20% and aggro by 300%',
+    },
+    { category: 'buff_self', buffName: 'Power up' },
+  ),
+  ladderSkill(
+    KNIGHT,
+    { asset: 'sunder armor', level: 12, power: 2.8, mana: 3, cd: 2, threat: 3 },
+    { debuffName: 'Sundered' },
+  ),
+  ladderSkill(KNIGHT, { asset: 'rend', level: 15, power: 3, mana: 3, cd: 1, threat: 2 }),
+  guard(KNIGHT, { asset: 'shield block', level: 18, power: 1, mana: 6, cd: 6 }),
+  ladderSkill(
+    KNIGHT,
+    { asset: 'thunder clap', level: 21, power: 3.2, mana: 4, cd: 2, threat: 3 },
+    { areaOfEffect: true, debuffName: 'Weakened' },
+  ),
+  ladderSkill(KNIGHT, { asset: 'pummel', level: 24, power: 3.5, mana: 4, cd: 2, threat: 2.5 }),
+  ladderSkill(KNIGHT, { asset: 'mortal strike', level: 27, power: 4, mana: 5, cd: 2, threat: 1.5 }),
+  ladderSkill(KNIGHT, { asset: 'intimidating roar', level: 30, power: 3, mana: 5, cd: 3, threat: 4 }),
+  ladderSkill(KNIGHT, { asset: 'shockwave', level: 34, power: 4.5, mana: 6, cd: 3, threat: 3 }, { areaOfEffect: true }),
+  ladderSkill(KNIGHT, { asset: 'battle rage', level: 38, power: 5, mana: 6, cd: 2, threat: 2 }),
+  ladderSkill(KNIGHT, { asset: 'whirlwind', level: 42, power: 5.5, mana: 7, cd: 3, threat: 2 }, { areaOfEffect: true }),
+  ladderSkill(KNIGHT, { asset: 'execute', level: 46, power: 6.5, mana: 8, cd: 3, threat: 1 }),
+  ladderSkill(
+    KNIGHT,
+    { asset: 'bladestorm', level: 50, power: 7.5, mana: 10, cd: 4, threat: 2.5 },
+    { areaOfEffect: true },
+  ),
+];
+
+/**
+ * The striker's ladder. Damage close to the Mage's off a class with no armour
+ * at all, and threat below one on every rung — an Assassin who pulls the boss
+ * off the Knight dies to the next swing, so shedding aggro is the class's real
+ * defensive stat.
+ */
+const ASSASSIN_LADDER: SkillSeed[] = [
+  ladderSkill(ASSASSIN, { asset: 'backstab', level: 1, power: 2.5, mana: 2, cd: 1, threat: 0.5 }),
+  ladderSkill(ASSASSIN, { asset: 'ambush', level: 3, power: 3, mana: 3, cd: 2, threat: 0.5 }),
+  ladderSkill(ASSASSIN, { asset: 'sap', level: 6, power: 3, mana: 3, cd: 2, threat: 0.3 }),
+  ladderSkill(ASSASSIN, { asset: 'blind', level: 9, power: 3.2, mana: 4, cd: 2, threat: 0.3 }),
+  ladderSkill(
+    ASSASSIN,
+    { asset: 'crippling poison', level: 12, power: 3.5, mana: 4, cd: 2, threat: 0.5 },
+    { debuffName: 'Weakened' },
+  ),
+  ladderSkill(ASSASSIN, { asset: 'sprint', level: 15, power: 3.5, mana: 3, cd: 2, threat: 0.2 }),
+  ladderSkill(ASSASSIN, { asset: 'kidney shot', level: 18, power: 4, mana: 5, cd: 2, threat: 0.5 }),
+  ladderSkill(
+    ASSASSIN,
+    { asset: 'fan of knives', level: 21, power: 4.2, mana: 6, cd: 2, threat: 0.8 },
+    { areaOfEffect: true },
+  ),
+  ladderSkill(ASSASSIN, { asset: 'weakening toxin', level: 24, power: 4.5, mana: 6, cd: 3, threat: 0.4 }),
+  ladderSkill(ASSASSIN, { asset: 'stealth', level: 27, power: 5, mana: 6, cd: 3, threat: 0.1 }),
+  ladderSkill(ASSASSIN, { asset: 'shadowstep', level: 30, power: 5.2, mana: 7, cd: 2, threat: 0.3 }),
+  ladderSkill(ASSASSIN, { asset: 'rupture', level: 34, power: 5.5, mana: 7, cd: 3, threat: 0.5 }),
+  ladderSkill(
+    ASSASSIN,
+    { asset: 'deadly poison', level: 38, power: 6, mana: 8, cd: 3, threat: 0.4 },
+    { debuffName: 'Poisoned' },
+  ),
+  ladderSkill(ASSASSIN, { asset: 'envenom', level: 42, power: 6.5, mana: 9, cd: 3, threat: 0.5 }),
+  guard(ASSASSIN, { asset: 'vanish', level: 46, power: 1, mana: 10, cd: 6 }),
+  ladderSkill(
+    ASSASSIN,
+    { asset: 'blade flurry', level: 50, power: 8, mana: 12, cd: 4, threat: 0.6 },
+    { areaOfEffect: true },
+  ),
+];
 
 const SKILLS: SkillSeed[] = [
   {
@@ -332,18 +683,10 @@ const SKILLS: SkillSeed[] = [
     manaCost: 5,
     cooldown: 1,
   },
-  {
-    name: 'Backstab',
-    className: 'Assassin',
-    image: `${SKILLS_FOLDER}/backstab.webp`,
-    description: 'Deals 400% agi damage to the target.',
-    attribute: 'agi',
-    multiplier: 4,
-    category: 'target_enemy',
-    requiredLevel: 1,
-    manaCost: 2,
-    cooldown: 1,
-  },
+  ...MAGE_LADDER,
+  ...PRIEST_LADDER,
+  ...KNIGHT_LADDER,
+  ...ASSASSIN_LADDER,
 ];
 
 export async function seedHeads() {
@@ -403,20 +746,52 @@ export async function seedBuffs() {
   console.log(`buffs: ${BUFFS.length}`);
 }
 
+export async function seedDebuffs() {
+  for (const debuff of DEBUFFS) {
+    await prisma.debuff.upsert({ where: { name: debuff.name }, create: debuff, update: debuff });
+  }
+  console.log(`debuffs: ${DEBUFFS.length}`);
+}
+
+/**
+ * The support monopoly, checked rather than trusted.
+ *
+ * Only a Priest may put health or mana on somebody else — every other class
+ * sustains itself or not at all. Written as a seed guard because the rule lives
+ * in a `category` string that is easy to copy onto the wrong ladder, and a Mage
+ * that can heal costs the Priest its reason to be in the party.
+ */
+function assertSupportIsPriestOnly() {
+  const offenders = SKILLS.filter((skill) => skill.category === 'target_ally' && skill.className !== 'Priest').map(
+    (skill) => `${skill.className}'s ${skill.name}`,
+  );
+
+  if (offenders.length > 0) {
+    throw new Error(`only a Priest may heal or infuse an ally — found ${offenders.join(', ')}`);
+  }
+}
+
 export async function seedSkills() {
-  for (const { className, buffName, ...skill } of SKILLS) {
+  assertSupportIsPriestOnly();
+
+  for (const { className, buffName, debuffName, ...skill } of SKILLS) {
     const characterClass = await prisma.class.findUnique({ where: { name: className } });
     if (!characterClass) throw new Error(`no class named "${className}" — seed classes first`);
 
     const buff = buffName ? await prisma.buff.findUnique({ where: { name: buffName } }) : null;
     if (buffName && !buff) throw new Error(`no buff named "${buffName}" — seed buffs first`);
 
+    const debuff = debuffName ? await prisma.debuff.findUnique({ where: { name: debuffName } }) : null;
+    if (debuffName && !debuff) throw new Error(`no debuff named "${debuffName}" — seed debuffs first`);
+
     await upsertByName<Prisma.SkillUncheckedCreateInput>(prisma.skill, {
       ...skill,
       threatModifier: skill.threatModifier ?? 1,
+      areaOfEffect: skill.areaOfEffect ?? false,
       effect: skill.effect ?? null,
       classId: characterClass.id,
       buffId: buff?.id ?? null,
+      debuffId: debuff?.id ?? null,
     });
   }
   console.log(`skills: ${SKILLS.length}`);

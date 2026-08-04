@@ -31,8 +31,22 @@ export function consumableImage(name: ConsumableAsset) {
   return assetUrl('consumables', name);
 }
 
+/**
+ * Skill art is filed per class rather than in one flat folder, and the folders
+ * are named after the archetype the art was drawn for, not after the class that
+ * ended up using it — `cleric` is the Priest's, `warrior` the Knight's and
+ * `rogue` the Assassin's.
+ */
+export function skillImage(folder: SkillFolder, name: string) {
+  if (!(SKILL_ASSETS[folder] as readonly string[]).includes(name)) {
+    throw new Error(`no ${folder} skill art named "${name}" — check the Sirv folder listing`);
+  }
+  return assetUrl(`skills/${folder}`, name);
+}
+
 export type MaterialAsset = (typeof MATERIAL_ASSETS)[number];
 export type ConsumableAsset = (typeof CONSUMABLE_ASSETS)[number];
+export type SkillFolder = keyof typeof SKILL_ASSETS;
 
 // prettier-ignore
 const MATERIAL_ASSETS = [
@@ -96,3 +110,27 @@ const CONSUMABLE_ASSETS = [
   'verdant_potion', 'vial_empty', 'vial_health', 'vial_mana', 'vial_stamina', 'vial_stoppered_clarity',
   'vial_stoppered_health', 'waffle', 'white_rice_bowl', 'white_tea_cup', 'wine_bottle', 'wrap_sandwich',
 ] as const;
+
+// prettier-ignore
+const SKILL_ASSETS = {
+  mage: [
+    'arcane explosion', 'arcane intellect', 'arcane missiles', 'blink', 'cone of cold', 'evocation',
+    'fire blast', 'fireball', 'flamestrike', 'frost nova', 'frostbolt', 'ice block', 'ignite', 'mana shield',
+    'polymorph', 'pyroblast',
+  ],
+  cleric: [
+    'blessing of protection', 'dispel magic', 'divine spirit', 'flash heal', 'greater heal', 'heal',
+    'holy fire', 'holy nova', 'holy strike', 'mind blast', 'prayer of healing', 'psychic scream',
+    'regeneration', 'renew', 'resurrection', 'smite',
+  ],
+  warrior: [
+    'battle rage', 'battle shout', 'bladestorm', 'charge', 'cleave', 'execute', 'heroic strike',
+    'intimidating roar', 'mortal strike', 'pummel', 'rend', 'shield block', 'shockwave', 'sunder armor',
+    'thunder clap', 'whirlwind',
+  ],
+  rogue: [
+    'ambush', 'backstab', 'blade flurry', 'blind', 'crippling poison', 'deadly poison', 'envenom',
+    'fan of knives', 'kidney shot', 'rupture', 'sap', 'shadowstep', 'sprint', 'stealth', 'vanish',
+    'weakening toxin',
+  ],
+} as const;

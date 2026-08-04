@@ -366,11 +366,41 @@ model Skill {
   /// a tank hold aggro without out-damaging the party.
   threatModifier Float @default(1)
 
+  /// Whether the skill hits every enemy standing, or heals the whole party,
+  /// instead of the single target it was pointed at. Damage and healing are
+  /// scaled down when it does, so a pull of one is never the better target.
+  areaOfEffect Boolean @default(false)
+
   class         Class          @relation(fields: [classId], references: [id])
   classId       Int
   learnedSkill  LearnedSkill[]
   buff          Buff?          @relation(fields: [buffId], references: [id])
   buffId        Int?
+  /// Set when landing the skill leaves something on the enemy.
+  debuff        Debuff?        @relation(fields: [debuffId], references: [id])
+  debuffId      Int?
+}
+
+/// Something a skill leaves on a monster: the mirror of Buff, which only ever
+/// sits on a player. It lives on the monster for the length of one fight and is
+/// never persisted, so there is no MonsterDebuff row to clean up — the battle
+/// instance carries it and the battle payload ships it, icon included, for the
+/// client to draw beside the health bar.
+model Debuff {
+  id       Int    @id @default(autoincrement())
+  name     String @unique
+  /// Which branch of `debuffs.ts` runs. `none` is inert but still displayed.
+  effect   String @default("none")
+  /// Turns of the afflicted monster's own turns it survives.
+  duration Int    @default(2)
+  image    String
+  /// The magnitude the effect reads, as a percentage. What it is a percentage
+  /// of is the effect's business — armour shredded, damage lost, health burned.
+  potency  Int    @default(0)
+  /// How many copies may sit on one monster at once.
+  maxStack Int    @default(1)
+
+  skill Skill[]
 }
 
 model LearnedSkill {

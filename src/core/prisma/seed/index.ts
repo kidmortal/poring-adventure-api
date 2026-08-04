@@ -14,7 +14,7 @@
 import { prisma } from './client';
 import { seedItems } from './items';
 import { seedEquipment, seedEquipmentDrops } from './equipment';
-import { backfillDefense, seedBuffs, seedClasses, seedHeads, seedSkills } from './characters';
+import { backfillDefense, seedBuffs, seedClasses, seedDebuffs, seedHeads, seedSkills } from './characters';
 import { pruneProfessionDrops, seedMonsters } from './monsters';
 import { seedGatheringNodes, seedProfessions, seedRecipes } from './professions';
 import { seedCommissions } from './commissions';
@@ -34,6 +34,8 @@ const STEPS = [
   // The one step that touches player rows: defense is newer than the characters
   // holding it, and is derived entirely from the class blocks seeded above.
   backfillDefense,
+  // Both come before the skills that point at them.
+  seedDebuffs,
   seedSkills,
   seedMonsters,
   // Needs both the gear and the monsters that drop it.

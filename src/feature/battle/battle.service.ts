@@ -26,6 +26,13 @@ import { TRANSACTION_OPTIONS } from 'src/core/prisma/types/prisma';
  */
 const GUILD_BOSS_ENRAGE_ROUND = 5;
 
+/**
+ * The largest pack a map battle can hand out. A boss ignores it entirely — it is
+ * always fought alone — and every extra monster is a full share of drops and
+ * experience, so this is the ceiling on how much a single pull can be worth.
+ */
+const MAX_PULL_SIZE = 3;
+
 @Injectable()
 export class BattleService {
   constructor(
@@ -76,18 +83,21 @@ export class BattleService {
       } else {
         users = [userData];
       }
-      const monsterData = await this.monsterService.findOneFromMap(args.mapId);
+      // A pull rather than a single monster — unless the map handed out its
+      // boss, which is always fought alone.
+      const monsters = await this.monsterService.findPullFromMap({
+        mapId: args.mapId,
+        maxSize: MAX_PULL_SIZE,
+      });
       // An unknown or empty map has nothing to fight, and a battle built around
       // a missing monster throws deeper in on its first health check.
-      if (!monsterData) {
+      if (monsters.length === 0) {
         this.socket.sendErrorNotification({
           email: args.userEmail,
           text: 'There is nothing to fight on that map',
         });
         return false;
       }
-
-      const monsters = [monsterData];
       const newBattleInstance: BattleInstance = new BattleInstance({
         socket: this.socket,
         users: users,

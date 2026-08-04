@@ -1,13 +1,29 @@
-import { Buff, Drop, Item, LearnedSkill, Monster, Skill, Stats, User, UserBuff } from '@prisma/client';
+import { Buff, Debuff, Drop, Item, LearnedSkill, Monster, Skill, Stats, User, UserBuff } from '@prisma/client';
 import { BattleUtils } from './battleUtils';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { Utils } from 'src/utilities/utils';
 import { runEffect } from './effects';
+import {
+  applyDebuff,
+  BattleDebuff,
+  DebuffEffect,
+  debuffedAttack,
+  debuffedDefense,
+  isStunned,
+  poisonDamage,
+  tickDebuffs,
+} from './debuffs';
 
 enum SkillCategory {
   TargetEnemy = 'target_enemy',
   TargetAlly = 'target_ally',
   BuffSelf = 'buff_self',
+  /**
+   * Restores the caster and nobody else. This is what keeps a Mage's own pool
+   * topped up without making them a healer: only a Priest may point health or
+   * mana at somebody other than themselves.
+   */
+  SelfRestore = 'self_restore',
 }
 
 enum SkillEffect {
@@ -26,6 +42,13 @@ const SECOND_WIND_HEALTH = 0.3;
 /** Each enraged swing is this much harder than the one before it. */
 const ENRAGE_DAMAGE_MULTIPLIER = 1.3;
 
+/**
+ * What each target of an area skill is worth against a single-target cast of the
+ * same power. Below one, so clearing a pack is what an area skill is for and
+ * a lone monster is still the single-target skill's job.
+ */
+const AREA_POWER_MULTIPLIER = 0.7;
+
 type DamageInfo = {
   image: string;
   name: string;
@@ -37,13 +60,29 @@ type DamageInfo = {
 export type DamageStepParams = {
   attacker: 'user' | 'monster';
   user: UserWithStats;
-  monster: MonsterWithDrops;
+  monster: MonsterInBattle;
   damage: DamageInfo;
   skipDamageStep?: boolean;
+  /**
+   * Set while an area skill is still working through its targets: the hit lands,
+   * but the turn does not end until the last one has.
+   */
+  deferTurnEnd?: boolean;
 };
 
 export type MonsterWithDrops = Monster & {
   drops: DropWithItem[];
+};
+
+/**
+ * A monster at the table. `maxHealth` is what it stood up with — the client
+ * draws the bar against it, and poison burns a share of it — and `debuffs` is
+ * everything the party has stuck on it, shipped in the battle payload so the
+ * icons can be drawn beside that bar. Neither is ever written back to the row.
+ */
+export type MonsterInBattle = MonsterWithDrops & {
+  maxHealth: number;
+  debuffs: BattleDebuff[];
 };
 
 export type DropWithItem = Drop & {
@@ -67,11 +106,12 @@ type LearnedSkillWithSkill = LearnedSkill & {
 };
 type SkillWithBuff = Skill & {
   buff?: Buff;
+  debuff?: Debuff;
 };
 
 export type Battle = {
   users: UserWithStats[];
-  monsters: MonsterWithDrops[];
+  monsters: MonsterInBattle[];
   attackerTurn: number;
   attackerList: string[];
   battleFinished: boolean;
@@ -114,7 +154,7 @@ export type BattleUserDropedItem = {
 export class BattleInstance {
   private socket: WebsocketService;
   private users: UserWithStats[];
-  private monsters: MonsterWithDrops[];
+  private monsters: MonsterInBattle[];
   private attackerTurn: number = 0;
   private attackerList: string[] = [];
   battleFinished: boolean = false;
@@ -152,8 +192,14 @@ export class BattleInstance {
     return this.users.map((user) => user.email);
   }
 
+  /** A pull is over when the last monster in it falls, not the first. */
   get isMonsterAlive() {
-    return this.monsters[0].health > 0;
+    return this.monsters.some((monster) => monster.health > 0);
+  }
+
+  /** Everything still standing, in turn order — what an area skill hits. */
+  get aliveMonsters() {
+    return this.monsters.filter((monster) => monster.health > 0);
   }
   get isPlayersAlive() {
     const aliveUsers = this.users.filter((u) => !u.isDead);
@@ -194,8 +240,8 @@ export class BattleInstance {
   }: CreateBattleParams) {
     this.socket = socket;
     this.users = this.generateUserBattleValues(users);
-    this.monsters = monsters;
-    this.attackerList = BattleUtils.generateBattleAttackOrder(users, monsters);
+    this.monsters = this.generateMonsterBattleValues(monsters);
+    this.attackerList = BattleUtils.generateBattleAttackOrder(users, this.monsters);
     this.updateUsers = updateUsers;
     this.removeBattle = removeBattle;
     this.guildBossGuildId = guildBossGuildId;
@@ -323,7 +369,8 @@ export class BattleInstance {
     if (isUserTurn) {
       const user = this.getUserFromBattle(args.email);
       const userDamage = user.stats.attack;
-      const targetMonster = this.monsters[0];
+      const targetMonster = this.defaultMonsterTarget();
+      if (!targetMonster) return false;
 
       return this.beforeDamageStep({
         attacker: 'user',
@@ -373,6 +420,8 @@ export class BattleInstance {
           });
         case SkillCategory.BuffSelf:
           return this.processCastBuffSelf({ user, skill });
+        case SkillCategory.SelfRestore:
+          return this.processCastSelfRestore({ user, skill });
 
         default:
           return this.processCastTargetEnemy({ user, skill });
@@ -443,24 +492,64 @@ export class BattleInstance {
   }) {
     const userAttribute: number = args.user.stats[args.skill.skill.attribute];
     const multiplier = args.skill.skill.multiplier * args.skill.masteryLevel;
-    const targetMonster = args.targetName ? this.getMonsterTarget(args.targetName) : this.monsters[0];
-    const userDamage = args.user.stats.attack + userAttribute * multiplier;
+    const targets = args.skill.skill.areaOfEffect
+      ? this.aliveMonsters
+      : [args.targetName ? this.getMonsterTarget(args.targetName) : this.defaultMonsterTarget()].filter(Boolean);
 
-    return this.beforeDamageStep({
-      attacker: 'user',
-      monster: targetMonster,
-      user: args.user,
-      damage: {
-        image: args.skill.skill.image,
-        name: '',
-        value: userDamage,
-        skill: args.skill,
-        // Threat is no longer the same thing as damage: a skill decides how
-        // loudly it lands, which is the only reason a tank can hold a boss it
-        // is not out-damaging anyone with.
-        aggro: Math.floor(userDamage * (args.skill.skill.threatModifier ?? 1)),
-      },
+    // Nothing left to point it at. The cast is refunded rather than eaten,
+    // since the fight is already over by the time this can happen.
+    if (targets.length === 0) return false;
+
+    const areaCast = args.skill.skill.areaOfEffect && targets.length > 1;
+    const userDamage = Math.floor(
+      (args.user.stats.attack + userAttribute * multiplier) * (areaCast ? AREA_POWER_MULTIPLIER : 1),
+    );
+
+    if (areaCast) {
+      this.pushLog({
+        icon: args.skill.skill.image,
+        log: `${args.user.name} cast ${args.skill.skill.name} on ${targets.length} enemies`,
+      });
+    }
+
+    // An area skill is one cast: the mana is spent once, and the turn ends once,
+    // after the last target has been resolved. `damage.skill` is what charges
+    // mana inside the damage step, so it is left off the per-target hits.
+    if (areaCast) args.user.stats.mana -= args.skill.skill.manaCost;
+
+    targets.forEach((monster, index) => {
+      this.applySkillDebuff({ user: args.user, skill: args.skill, monster });
+      this.beforeDamageStep({
+        attacker: 'user',
+        monster,
+        user: args.user,
+        damage: {
+          image: args.skill.skill.image,
+          name: '',
+          value: userDamage,
+          skill: areaCast ? undefined : args.skill,
+          // Threat is no longer the same thing as damage: a skill decides how
+          // loudly it lands, which is the only reason a tank can hold a boss it
+          // is not out-damaging anyone with.
+          aggro: Math.floor(userDamage * (args.skill.skill.threatModifier ?? 1)),
+        },
+        deferTurnEnd: index < targets.length - 1,
+      });
     });
+    return true;
+  }
+
+  /** Sticks whatever the skill carries onto the monster it just landed on. */
+  private applySkillDebuff(args: { user: UserWithStats; skill: LearnedSkillWithSkill; monster: MonsterInBattle }) {
+    const debuff = args.skill.skill.debuff;
+    if (!debuff) return;
+
+    if (applyDebuff({ monster: args.monster, debuff })) {
+      this.pushLog({
+        icon: debuff.image,
+        log: `${args.monster.name} is afflicted with ${debuff.name} by ${args.user.name}`,
+      });
+    }
   }
 
   private async processCastTargetAlly(args: {
@@ -470,23 +559,70 @@ export class BattleInstance {
   }) {
     const userAttribute: number = args.user.stats[args.skill.skill.attribute];
     const multiplier = args.skill.skill.multiplier * args.skill.masteryLevel;
+    const areaCast = args.skill.skill.areaOfEffect;
+    // The party heal is the mirror of the party nuke: it reaches everyone, and
+    // pays the same rate per head for doing it.
+    const rawPotency = userAttribute * multiplier * (areaCast ? AREA_POWER_MULTIPLIER : 1);
+    args.user.stats.mana -= args.skill.skill.manaCost;
+
+    if (args.skill.skill.effect === SkillEffect.Healing) {
+      // The dead are past healing — a Priest's turn spent topping up a corpse is
+      // the turn the party needed to stay alive.
+      const targets = areaCast
+        ? this.users.filter((user) => !user.isDead)
+        : [args.targetName ? this.getUserTarget(args.targetName) : this.getLowestHealthMember()];
+
+      targets.forEach((targetAlly) => {
+        const potency = Utils.randomDamage(rawPotency, 20);
+        this.healUser({ user: targetAlly, amount: potency });
+        this.pushLog({
+          log: `${args.user.name} Healed ${targetAlly.name} by ${potency} Health Points`,
+          icon: args.skill.skill.image,
+        });
+      });
+    }
+
+    if (args.skill.skill.effect === SkillEffect.Infusion) {
+      const targets = areaCast
+        ? this.users.filter((user) => !user.isDead)
+        : [args.targetName ? this.getUserTarget(args.targetName) : this.getLowestManaMember()];
+
+      targets.forEach((targetAlly) => {
+        const potency = Utils.randomDamage(rawPotency, 20);
+        this.infuseUser({ user: targetAlly, amount: potency });
+        this.pushLog({
+          log: `${args.user.name} Infused ${targetAlly.name} by ${potency} Mana Points`,
+          icon: args.skill.skill.image,
+        });
+      });
+    }
+    return this.afterDamageStep();
+  }
+
+  /**
+   * The caster's own second wind: the same healing and infusion effects, with
+   * the target fixed to whoever cast it. A class that can put health or mana on
+   * an ally is a support class, and that slot belongs to the Priest — so this is
+   * the only restoring a Mage is allowed to do, and the target is not a choice.
+   */
+  private async processCastSelfRestore(args: { user: UserWithStats; skill: LearnedSkillWithSkill }) {
+    const userAttribute: number = args.user.stats[args.skill.skill.attribute];
+    const multiplier = args.skill.skill.multiplier * args.skill.masteryLevel;
     const potency = Utils.randomDamage(userAttribute * multiplier, 20);
     args.user.stats.mana -= args.skill.skill.manaCost;
-    if (args.skill.skill.effect === SkillEffect.Healing) {
-      const targetAlly = args.targetName ? this.getUserTarget(args.targetName) : this.getLowestHealthMember();
 
-      this.healUser({ user: targetAlly, amount: potency });
+    if (args.skill.skill.effect === SkillEffect.Healing) {
+      this.healUser({ user: args.user, amount: potency });
       this.pushLog({
-        log: `${args.user.name} Healed ${targetAlly.name} by ${potency} Health Points`,
+        log: `${args.user.name} Recovered ${potency} Health Points`,
         icon: args.skill.skill.image,
       });
     }
 
     if (args.skill.skill.effect === SkillEffect.Infusion) {
-      const targetAlly = args.targetName ? this.getUserTarget(args.targetName) : this.getLowestManaMember();
-      this.infuseUser({ user: targetAlly, amount: potency });
+      this.infuseUser({ user: args.user, amount: potency });
       this.pushLog({
-        log: `${args.user.name} Infused ${targetAlly.name} by ${potency} Mana Points`,
+        log: `${args.user.name} Recovered ${potency} Mana Points`,
         icon: args.skill.skill.image,
       });
     }
@@ -617,7 +753,23 @@ export class BattleInstance {
     const isMonsterAlive = monster?.health > 0;
 
     if (monster && isMonsterAlive) {
-      const monsterDamage = this.enrageMonsterDamage(monster);
+      // Everything the party stuck on it is paid out at the top of its own turn,
+      // so a two-turn debuff is two of its swings whatever the party size.
+      this.burnPoison(monster);
+      const stunned = isStunned(monster);
+      tickDebuffs(monster);
+
+      // Losing the turn still ends it — otherwise a stunned monster holds the
+      // order and the fight stops moving until the stun is ticked off by
+      // something that never runs.
+      if (stunned || monster.health <= 0) {
+        if (stunned && monster.health > 0) {
+          this.pushLog({ log: `${monster.name} is unable to act`, icon: monster.image });
+        }
+        return this.afterDamageStep();
+      }
+
+      const monsterDamage = debuffedAttack(monster, this.enrageMonsterDamage(monster));
       const targetUser = this.getHighestAggroPlayer();
       return this.beforeDamageStep({
         attacker: 'monster',
@@ -632,6 +784,22 @@ export class BattleInstance {
       });
     }
     return false;
+  }
+
+  /**
+   * Poison ticking. It is not credited to anyone's damage total: the guild boss
+   * pays out on hits landed, and a burn that kept paying after its caster left
+   * the fight would be a second, unbudgeted damage source in that ledger.
+   */
+  private burnPoison(monster: MonsterInBattle) {
+    const damage = poisonDamage(monster);
+    if (damage <= 0) return;
+
+    monster.health -= damage;
+    this.pushLog({
+      log: `${monster.name} takes ${damage} damage from poison`,
+      icon: monster.debuffs.find((debuff) => debuff.effect === DebuffEffect.Poison)?.image ?? monster.image,
+    });
   }
 
   /**
@@ -737,23 +905,35 @@ export class BattleInstance {
     if (!args.skipDamageStep) {
       return this.startDamageStep(args);
     } else {
-      return this.afterDamageStep();
+      return this.endDamageStep(args);
     }
   }
 
-  private startDamageStep({ attacker, damage, user, monster }: DamageStepParams) {
+  /**
+   * Ends the turn, unless this hit is one of several an area skill is still
+   * working through — those all land inside a single turn.
+   */
+  private endDamageStep(args: DamageStepParams) {
+    if (args.deferTurnEnd) return true;
+    return this.afterDamageStep();
+  }
+
+  private startDamageStep(params: DamageStepParams) {
+    const { attacker, damage, user, monster } = params;
     const randomDmg = Utils.randomDamage(damage.value, 20);
     if (attacker === 'user') {
       user.aggro += damage.aggro;
 
       if (this.isEvaded(monster.agi)) {
         this.pushLog({ log: `${monster.name} evaded ${user.name}'s attack`, icon: damage.image });
-        return this.afterDamageStep();
+        return this.endDamageStep(params);
       }
 
       const dealt = BattleUtils.mitigate({
         raw: randomDmg,
-        defense: monster.defense,
+        // Shredded armour is read here rather than written onto the monster, so
+        // the debuff wearing off restores it without anything to unwind.
+        defense: debuffedDefense(monster),
         attackerLevel: user.stats.level,
       });
       // Aggro decays every round; this is the running total the guild boss pays out on.
@@ -767,7 +947,7 @@ export class BattleInstance {
     if (attacker === 'monster') {
       if (this.isEvaded(user.stats.agi)) {
         this.pushLog({ log: `${user.name} evaded ${monster.name}'s attack`, icon: damage.image });
-        return this.afterDamageStep();
+        return this.endDamageStep(params);
       }
 
       const taken = BattleUtils.mitigate({
@@ -781,7 +961,7 @@ export class BattleInstance {
         icon: damage.image,
       });
     }
-    this.afterDamageStep();
+    this.endDamageStep(params);
   }
 
   /** A dodge, rolled off agility and capped hard so speed can never mean immunity. */
@@ -809,10 +989,9 @@ export class BattleInstance {
       user.buffs = user.buffs.filter((userBuff) => userBuff.duration >= 1);
       return;
     }
-    const monster = this.monsters.find((m) => m.name === currentTurn);
-    if (monster) {
-      return;
-    }
+    // A monster's debuffs are not ticked here: they are paid out at the top of
+    // its turn in processMonsterAttack, which is the only place that still runs
+    // when the monster is stunned out of acting.
   }
 
   private async settleBattleAndProcessRewards() {
@@ -840,6 +1019,19 @@ export class BattleInstance {
     this.battleFinished = true;
     this.notifyUsers();
   }
+  /**
+   * A copy per monster, because a pull can contain two of the same row and the
+   * map cache hands out the object it is holding — sharing it would mean one
+   * Poring's health bar dropping when the other one is hit.
+   */
+  private generateMonsterBattleValues(monsters: MonsterWithDrops[]): MonsterInBattle[] {
+    return monsters.map((monster) => ({
+      ...monster,
+      maxHealth: monster.health,
+      debuffs: [],
+    }));
+  }
+
   private generateUserBattleValues(users: UserWithStats[]) {
     users.forEach((user) => {
       user.aggro = 0;
@@ -850,8 +1042,19 @@ export class BattleInstance {
     return users;
   }
 
+  /**
+   * The named monster, as long as it is still standing. A client pointing at a
+   * corpse — the pack it was aiming into died a turn ago — falls through to
+   * whatever is left rather than spending the turn hitting nothing.
+   */
   private getMonsterTarget(name: string) {
-    return this.monsters.find((m) => m.name === name);
+    const named = this.monsters.find((m) => m.name === name && m.health > 0);
+    return named ?? this.defaultMonsterTarget();
+  }
+
+  /** Who an untargeted attack lands on: the first monster still standing. */
+  private defaultMonsterTarget() {
+    return this.aliveMonsters[0];
   }
   private getUserTarget(name: string) {
     return this.users.find((u) => u.name === name);

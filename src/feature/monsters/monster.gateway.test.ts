@@ -53,6 +53,67 @@ describe('Party Gateway', () => {
       expect(monsters).toEqual([]);
     });
   });
+  describe('findPullFromMap', () => {
+    const poring = { id: 1, name: 'Poring', boss: false, health: 10, drops: [] } as any;
+    const drops = { id: 2, name: 'Drops', boss: false, health: 10, drops: [] } as any;
+    const kades = { id: 3, name: 'Kades', boss: true, health: 500, drops: [] } as any;
+
+    function stubMap(monsters: any[]) {
+      jest.spyOn(service, 'findAllFromMap').mockResolvedValue(monsters);
+    }
+
+    it('brings a pack of ordinary monsters, never more than the ceiling', async () => {
+      stubMap([poring, drops]);
+
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const pull = await service.findPullFromMap({ mapId: 1, maxSize: 3 });
+        expect(pull.length).toBeGreaterThanOrEqual(1);
+        expect(pull.length).toBeLessThanOrEqual(3);
+      }
+    });
+
+    it('leaves a boss to be fought alone', async () => {
+      stubMap([kades]);
+
+      const pull = await service.findPullFromMap({ mapId: 1, maxSize: 3 });
+      expect(pull).toHaveLength(1);
+      expect(pull[0].name).toBe('Kades');
+    });
+
+    it('never puts a boss in a pack it did not lead', async () => {
+      stubMap([poring, kades]);
+
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const pull = await service.findPullFromMap({ mapId: 1, maxSize: 3 });
+        if (pull.length > 1) expect(pull.some((monster) => monster.boss)).toBe(false);
+      }
+    });
+
+    it('names duplicates apart, since the turn order addresses a monster by name', async () => {
+      stubMap([poring]);
+
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const pull = await service.findPullFromMap({ mapId: 1, maxSize: 3 });
+        const names = pull.map((monster) => monster.name);
+        expect(new Set(names).size).toBe(names.length);
+        if (names.length > 1) expect(names[0]).toBe('Poring A');
+      }
+    });
+
+    it('hands out copies, so one monster taking damage is not both of them', async () => {
+      stubMap([poring]);
+      const pull = await service.findPullFromMap({ mapId: 1, maxSize: 1 });
+
+      pull[0].health -= 5;
+      expect(poring.health).toBe(10);
+    });
+
+    it('has nothing to fight on an empty map', async () => {
+      stubMap([]);
+      expect(await service.findPullFromMap({ mapId: 99, maxSize: 3 })).toEqual([]);
+    });
+  });
+
   describe('get_maps', () => {
     it('should call getAllMaps service ', async () => {
       const fakeReturn = {} as any;
