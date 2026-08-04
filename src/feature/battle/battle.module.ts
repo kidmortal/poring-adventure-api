@@ -7,9 +7,10 @@ import { WebsocketModule } from 'src/core/websocket/websocket.module';
 import { ItemsModule } from 'src/feature/items/items.module';
 import { PartyModule } from 'src/feature/party/party.module';
 import { GuildModule } from 'src/feature/guild/guild.module';
+import { DungeonModule } from 'src/feature/dungeon/dungeon.module';
 
 @Module({
-  imports: [UsersModule, MonstersModule, ItemsModule, WebsocketModule, PartyModule, GuildModule],
+  imports: [UsersModule, MonstersModule, ItemsModule, WebsocketModule, PartyModule, GuildModule, DungeonModule],
   providers: [BattleGateway, BattleService],
   exports: [BattleService],
 })

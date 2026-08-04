@@ -28,6 +28,25 @@ export class BattleGateway {
     return this.battleService.createGuildBossBattle({ userEmail: email });
   }
 
+  /**
+   * Both dungeon events live here rather than on the dungeon gateway: they open
+   * a battle, and the battle list belongs to the battle service — the same
+   * reason `battle_create_guild_boss` is above.
+   */
+  @SubscribeMessage('battle_create_dungeon')
+  async createDungeon(@MessageBody() dto: DungeonEnterDto, @ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`battle_create_dungeon ${email}`);
+    return this.battleService.createDungeonBattle({ userEmail: email, dungeonId: dto?.dungeonId });
+  }
+
+  @SubscribeMessage('battle_dungeon_continue')
+  async continueDungeon(@ConnectedSocket() client: Socket) {
+    const email = client.handshake.auth.email;
+    this.logger.debug(`battle_dungeon_continue ${email}`);
+    return this.battleService.continueDungeonRun({ userEmail: email });
+  }
+
   @SubscribeMessage('battle_update')
   async update(@ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;

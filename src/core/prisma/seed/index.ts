@@ -20,6 +20,7 @@ import { seedGatheringNodes, seedProfessions, seedRecipes } from './professions'
 import { seedCommissions } from './commissions';
 import { seedGuildBosses, seedGuildStore, seedGuildTasks } from './guild';
 import { seedStoreProducts } from './store';
+import { seedDungeons } from './dungeons';
 
 /**
  * Order matters: everything below items resolves an item by name, and buffs
@@ -50,6 +51,8 @@ const STEPS = [
   seedGuildTasks,
   seedGuildBosses,
   seedGuildStore,
+  // Needs the gear catalog and the materials its bosses hand out.
+  seedDungeons,
   seedStoreProducts,
 ];
 

@@ -40,6 +40,8 @@ model User {
   discord           Discord?
   guildBossDamage   GuildBossDamage[]
   commissions       UserCommission[]
+  dungeonEntries    DungeonEntry[]
+  dungeonRuns       DungeonRunMember[]
 }
 
 model Discord {
@@ -174,6 +176,7 @@ model Item {
   craftedBy         Recipe[]           @relation("RecipeResult")
   recipeIngredients RecipeIngredient[] @relation("RecipeIngredient")
   commissions       Commission[]
+  dungeonDrops      DungeonDrop[]
 }
 
 model Drop {
@@ -663,6 +666,131 @@ model GuildApplication {
   userEmail String
   guild     Guild  @relation(fields: [guildId], references: [id])
   guildId   Int
+}
+
+/// A gauntlet of three bosses fought back to back on one entry a day.
+///
+/// A map is a place you can go back to all afternoon; a dungeon is a single
+/// attempt. That is what lets its monsters be tuned well above anything on a
+/// map — the party only gets one run at them, and what they walk out with is
+/// budgeted against a day rather than against an hour of farming.
+model Dungeon {
+  id          Int    @id @default(autoincrement())
+  name        String @unique
+  image       String
+  description String @default("")
+
+  /// Advisory only, and shown on the card. Nothing stops an under-levelled
+  /// party from walking in — the bosses will do that on their own.
+  recommendedLevel Int @default(1)
+
+  /// Where it sits in the list, so the client never has to sort by level and
+  /// guess at ties.
+  sortOrder Int @default(0)
+
+  monsters DungeonMonster[]
+  entries  DungeonEntry[]
+  runs     DungeonRun[]
+}
+
+/// A dungeon boss. Deliberately its own table rather than a Monster: these are
+/// stronger than anything with a mapId, they are never rolled into a random
+/// pull, and they carry a stage that fixes the order they are fought in.
+model DungeonMonster {
+  id        Int     @id @default(autoincrement())
+  dungeon   Dungeon @relation(fields: [dungeonId], references: [id], onDelete: Cascade)
+  dungeonId Int
+
+  /// 1, 2, 3 — the order the party meets them in. The last one is the dungeon's
+  /// real fight; the two before it are the toll paid to reach it with health
+  /// left, since nothing is topped up between them beyond the camp restore.
+  stage Int
+
+  name   String
+  image  String
+  level  Int    @default(1)
+  attack Int    @default(1)
+  health Int    @default(1)
+  agi    Int    @default(0)
+
+  defense Int @default(0)
+
+  /// Paid out on the kill like any other monster, so the reward per stage is
+  /// simply the numbers here: small, small, large.
+  silver Int @default(1)
+  exp    Int @default(1)
+
+  drops DungeonDrop[]
+
+  @@unique([dungeonId, stage])
+}
+
+/// A dungeon boss's loot table. The mirror of Drop, which belongs to Monster.
+model DungeonDrop {
+  id        Int            @id @default(autoincrement())
+  monster   DungeonMonster @relation(fields: [monsterId], references: [id], onDelete: Cascade)
+  monsterId Int
+  item      Item           @relation(fields: [itemId], references: [id])
+  itemId    Int
+  chance    Int
+  minAmount Int            @default(1)
+  maxAmount Int            @default(1)
+
+  @@unique([monsterId, itemId])
+}
+
+/// One row per player per dungeon, holding when they last walked in. Entries
+/// come back on the UTC day boundary, the same rule stamina and the guild boss
+/// entry use, so one row is enough — there is no history to keep.
+model DungeonEntry {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  userEmail String
+  dungeon   Dungeon  @relation(fields: [dungeonId], references: [id], onDelete: Cascade)
+  dungeonId Int
+  usedAt    DateTime @default(now())
+
+  @@unique([userEmail, dungeonId])
+}
+
+/// One party's attempt at a dungeon. It outlives the individual boss fights,
+/// which is the whole reason it is a row: the party can be knocked offline
+/// between the second and third boss and pick the run back up where it stopped.
+model DungeonRun {
+  id        Int     @id @default(autoincrement())
+  dungeon   Dungeon @relation(fields: [dungeonId], references: [id])
+  dungeonId Int
+
+  /// Whoever spent the entries. A solo run is its own leader.
+  leaderEmail String
+
+  /// Bosses already down. The next fight is `stage + 1`, and the run is cleared
+  /// when this reaches the dungeon's boss count.
+  stage Int @default(0)
+
+  /// active, cleared or failed. A wipe or a retreat fails it, and the entry is
+  /// spent either way — that is the cost of the attempt.
+  status String @default("active")
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  members DungeonRunMember[]
+
+  @@index([status])
+}
+
+/// Who walked in. Kept apart from the party, which can be rearranged mid-run:
+/// the run is fought by the people who paid for it.
+model DungeonRunMember {
+  id           Int        @id @default(autoincrement())
+  run          DungeonRun @relation(fields: [dungeonRunId], references: [id], onDelete: Cascade)
+  dungeonRunId Int
+  user         User       @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  userEmail    String
+
+  @@unique([dungeonRunId, userEmail])
+  @@index([userEmail])
 }
 
 model UserPurchase {

@@ -16,6 +16,8 @@ import { BattleValidations } from './validators';
 import { GuildService } from 'src/feature/guild/guild.service';
 import { GuildTaskService } from 'src/feature/guild/guildTask.service';
 import { GuildBossService } from 'src/feature/guild/guildBoss.service';
+import { DungeonService } from 'src/feature/dungeon/dungeon.service';
+import { DungeonMonsterWithDrops, toBattleMonster } from 'src/feature/dungeon/dungeon.rules';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { TRANSACTION_OPTIONS } from 'src/core/prisma/types/prisma';
 
@@ -33,6 +35,13 @@ const GUILD_BOSS_ENRAGE_ROUND = 5;
  */
 const MAX_PULL_SIZE = 3;
 
+/**
+ * A dungeon boss turns on the party far later than a guild boss does — it has a
+ * health pool one party is actually meant to finish, so the enrage is only
+ * there to end a stalemate rather than to cap the fight.
+ */
+const DUNGEON_ENRAGE_ROUND = 12;
+
 @Injectable()
 export class BattleService {
   constructor(
@@ -47,6 +56,7 @@ export class BattleService {
     private readonly guildService: GuildService,
     private readonly guildTaskService: GuildTaskService,
     private readonly guildBossService: GuildBossService,
+    private readonly dungeonService: DungeonService,
     private readonly prisma: PrismaService,
     private readonly socket: WebsocketService,
   ) {}
@@ -128,14 +138,7 @@ export class BattleService {
       return true;
     }
 
-    const userData = await this.usersRepository.getFullUser({ userEmail: args.userEmail });
-    let users: UserWithStats[] = [userData];
-    let partyLeaderEmail: string | undefined;
-    if (userData.partyId) {
-      const fullPartyInfo = await this.partyRepository.getPartyFromId({ partyId: userData.partyId });
-      users = fullPartyInfo.members;
-      partyLeaderEmail = fullPartyInfo.leaderEmail;
-    }
+    const { users, partyLeaderEmail } = await this._gatherParty(args.userEmail);
 
     const prepared = await this.guildBossService.prepareFight({
       userEmail: args.userEmail,
@@ -182,6 +185,147 @@ export class BattleService {
   }
 
   /**
+   * Walking into a dungeon. The entry is spent here, before the first blow: an
+   * attempt is what the day buys, and it is the whole party's day — one member
+   * out of entries keeps everyone out.
+   */
+  async createDungeonBattle(args: { userEmail: string; dungeonId: number }) {
+    const battle = this.getUserBattle(args.userEmail);
+    if (battle) {
+      battle.notifyUsers();
+      return true;
+    }
+
+    const { users, partyLeaderEmail } = await this._gatherParty(args.userEmail);
+
+    // Checked before the entry is spent rather than by the battle validator
+    // after it: someone left on the floor by an earlier fight would otherwise
+    // cost the party the day and give them a raw exception for it.
+    const fallen = users.find((user) => (user.stats?.health ?? 0) <= 0);
+    if (fallen) {
+      const who = fallen.email === args.userEmail ? 'You have' : `${fallen.name} has`;
+      this.socket.sendErrorNotification({
+        email: args.userEmail,
+        text: `${who} to recover before the party can go in`,
+      });
+      return false;
+    }
+
+    const prepared = await this.dungeonService.prepareEntry({
+      userEmail: args.userEmail,
+      participants: users.map((user) => ({ email: user.email, name: user.name })),
+      dungeonId: args.dungeonId,
+    });
+    if (!prepared) return false;
+
+    const run = await this.dungeonService.startRun({
+      dungeonId: prepared.dungeon.id,
+      leaderEmail: partyLeaderEmail ?? args.userEmail,
+      emails: prepared.emails,
+    });
+
+    return this._openDungeonFight({
+      users,
+      boss: prepared.boss,
+      runId: run.id,
+      dungeonName: prepared.dungeon.name,
+      totalStages: prepared.dungeon.monsters.length,
+      creatorEmail: args.userEmail,
+      partyLeaderEmail,
+    });
+  }
+
+  /**
+   * The next boss in a run already under way. No entry is spent — that was paid
+   * on the way in — but the party arrives on whatever health the last fight
+   * left them, topped up only to the camp share.
+   */
+  async continueDungeonRun(args: { userEmail: string }) {
+    const battle = this.getUserBattle(args.userEmail);
+    if (battle && !battle.battleFinished) {
+      this.socket.sendErrorNotification({
+        email: args.userEmail,
+        text: 'Finish the fight you are in first',
+      });
+      return false;
+    }
+
+    const prepared = await this.dungeonService.prepareNextFight({ userEmail: args.userEmail });
+    if (!prepared) return false;
+
+    // The finished fight goes before the new one is built, so the party is
+    // never in two battles at once.
+    if (battle) {
+      await battle.removeBattle();
+      battle.notifyBattleRemoved();
+    }
+
+    await this.dungeonService.campRestoreForRun({ emails: prepared.emails });
+    // Read after the camp, so the party stands up on the health it restored.
+    const users = await this._loadUsers(prepared.emails);
+
+    return this._openDungeonFight({
+      users,
+      boss: prepared.boss,
+      runId: prepared.run.id,
+      dungeonName: prepared.run.dungeon.name,
+      totalStages: prepared.run.dungeon.monsters.length,
+      creatorEmail: args.userEmail,
+      partyLeaderEmail: prepared.run.leaderEmail,
+    });
+  }
+
+  private async _openDungeonFight(args: {
+    users: UserWithStats[];
+    boss: DungeonMonsterWithDrops;
+    runId: number;
+    dungeonName: string;
+    totalStages: number;
+    creatorEmail: string;
+    partyLeaderEmail?: string;
+  }) {
+    const newBattleInstance = new BattleInstance({
+      socket: this.socket,
+      users: args.users,
+      monsters: [toBattleMonster(args.boss)],
+      updateUsers: (b) => this.updateStatsAndRewards(b),
+      removeBattle: () => this._remove(args.creatorEmail),
+      dungeon: {
+        runId: args.runId,
+        name: args.dungeonName,
+        stage: args.boss.stage,
+        totalStages: args.totalStages,
+      },
+      enrageAfterRound: DUNGEON_ENRAGE_ROUND,
+      partyLeaderEmail: args.partyLeaderEmail,
+    });
+    BattleValidations.validateBattleInstanceStart(newBattleInstance);
+
+    newBattleInstance.notifyUsers();
+    this.battleList.push(newBattleInstance);
+    return true;
+  }
+
+  /** The caller and whoever they are partied with, plus who leads them. */
+  private async _gatherParty(userEmail: string) {
+    const userData = await this.usersRepository.getFullUser({ userEmail });
+    if (!userData.partyId) return { users: [userData] as UserWithStats[], partyLeaderEmail: undefined };
+
+    const fullPartyInfo = await this.partyRepository.getPartyFromId({ partyId: userData.partyId });
+    return { users: fullPartyInfo.members as UserWithStats[], partyLeaderEmail: fullPartyInfo.leaderEmail };
+  }
+
+  /** The run's own members, which is not the same list as the current party. */
+  private async _loadUsers(emails: string[]) {
+    const users: UserWithStats[] = [];
+    for await (const userEmail of emails) {
+      const user = await this.usersRepository.getFullUser({ userEmail });
+      if (user) users.push(user);
+    }
+    return users;
+  }
+
+  /**
    * Running from a fight ends it for the whole party, so it is not everyone's
    * call: the leader may do it at any point, anyone else only on their own
    * turn. A solo fight or a finished one is nobody else's business.
@@ -201,9 +345,23 @@ export class BattleService {
     // Running from the boss, or being wiped by it, still counts: the damage was
     // dealt and the entry was spent either way.
     await this._bankGuildBossDamage(battle);
+    await this._closeDungeonRun(battle);
     battle.removeBattle();
     battle.notifyBattleRemoved();
     return true;
+  }
+
+  /**
+   * Leaving a dungeon fight ends the run, whichever way it is left — wiped,
+   * run from, or simply walked out of after a boss went down. The entry paid
+   * for an attempt, and this is where the attempt stops.
+   *
+   * A run the party has already cleared is untouched: failRun only acts on one
+   * that is still standing.
+   */
+  private async _closeDungeonRun(battle: BattleInstance) {
+    if (!battle.dungeon) return;
+    await this.dungeonService.failRun({ runId: battle.dungeon.runId });
   }
 
   /** No-op for a normal fight; consumeDamage empties itself so it cannot double up. */
@@ -295,6 +453,7 @@ export class BattleService {
     // can call the retreat, which is the point of carrying it.
     if (item.battleEffect === 'escape') {
       await this._bankGuildBossDamage(battle);
+      await this._closeDungeonRun(battle);
       battle.pushLog({ icon: item.image, log: `${item.name} filled the air — the party slipped away` });
       battle.removeBattle();
       battle.notifyBattleRemoved();
@@ -378,6 +537,12 @@ export class BattleService {
 
     // Last, so the kill payout lands after everyone's own rewards are committed.
     await this._bankGuildBossDamage(battle);
+
+    // The boss is down, so the run moves on — and closes itself if that was the
+    // last of them. Everything the fight was worth is already banked above.
+    if (battle.dungeon) {
+      await this.dungeonService.completeStage({ runId: battle.dungeon.runId });
+    }
   }
 
   getUserBattle(userEmail: string): BattleInstance | undefined {

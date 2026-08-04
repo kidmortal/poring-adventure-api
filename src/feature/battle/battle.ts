@@ -139,6 +139,19 @@ export type Battle = {
   drops: BattleDrop[];
 };
 
+/**
+ * Which boss of which run this fight is, shipped with the battle so the client
+ * can draw the party's place in the gauntlet without a second request.
+ */
+export type DungeonBattleInfo = {
+  runId: number;
+  name: string;
+  /** The boss being fought, counted from 1. */
+  stage: number;
+  /** How many there are in all — the last one is the dungeon's real fight. */
+  totalStages: number;
+};
+
 type CreateBattleParams = {
   users: UserWithStats[];
   monsters: MonsterWithDrops[];
@@ -147,6 +160,8 @@ type CreateBattleParams = {
   removeBattle: () => Promise<boolean>;
   /** Set when the monster is a guild's standing boss, whose health pool is persisted. */
   guildBossGuildId?: number;
+  /** Set when the fight is one leg of a dungeon run. */
+  dungeon?: DungeonBattleInfo;
   /** Round after which the monster starts enraging. Left unset, it never does. */
   enrageAfterRound?: number;
   /** Who led the party in, when it was not a solo fight. */
@@ -185,6 +200,7 @@ export class BattleInstance {
   /** Damage each player has landed on the monsters, by email. Never decays. */
   private damageDealt: { [email: string]: number } = {};
   readonly guildBossGuildId?: number;
+  readonly dungeon?: DungeonBattleInfo;
   readonly partyLeaderEmail?: string;
   private readonly enrageAfterRound?: number;
   /** Passes through the attack order, counted from 1. */
@@ -254,6 +270,7 @@ export class BattleInstance {
     updateUsers,
     removeBattle,
     guildBossGuildId,
+    dungeon,
     enrageAfterRound,
     partyLeaderEmail,
   }: CreateBattleParams) {
@@ -264,6 +281,7 @@ export class BattleInstance {
     this.updateUsers = updateUsers;
     this.removeBattle = removeBattle;
     this.guildBossGuildId = guildBossGuildId;
+    this.dungeon = dungeon;
     this.enrageAfterRound = enrageAfterRound;
     this.partyLeaderEmail = partyLeaderEmail;
   }
@@ -300,6 +318,9 @@ export class BattleInstance {
       // The client sends the player back to the guild rather than the map
       // selection when this fight ends.
       guildBoss: !!this.guildBossGuildId,
+      // Which leg of a dungeon run this is, so the results screen can offer the
+      // next boss instead of a rematch.
+      dungeon: this.dungeon,
     };
   }
 

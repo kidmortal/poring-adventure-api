@@ -26,6 +26,7 @@ import { MonstersModule } from 'src/feature/monsters/monsters.module';
 import { PartyModule } from 'src/feature/party/party.module';
 import { SkillsModule } from 'src/feature/skills/skills.module';
 import { ProfessionModule } from 'src/feature/profession/profession.module';
+import { DungeonModule } from 'src/feature/dungeon/dungeon.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { ProfessionModule } from 'src/feature/profession/profession.module';
     ItemsModule,
     MarketModule,
     MonstersModule,
+    DungeonModule,
     BattleModule,
     WebsocketModule,
     PartyModule,
