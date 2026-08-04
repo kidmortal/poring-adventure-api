@@ -14,8 +14,8 @@
 import { prisma } from './client';
 import { seedItems } from './items';
 import { seedEquipment, seedEquipmentDrops } from './equipment';
-import { seedBuffs, seedClasses, seedHeads, seedSkills } from './characters';
-import { seedMonsters } from './monsters';
+import { backfillDefense, seedBuffs, seedClasses, seedHeads, seedSkills } from './characters';
+import { pruneProfessionDrops, seedMonsters } from './monsters';
 import { seedGatheringNodes, seedProfessions, seedRecipes } from './professions';
 import { seedCommissions } from './commissions';
 import { seedGuildBosses, seedGuildStore, seedGuildTasks } from './guild';
@@ -31,6 +31,9 @@ const STEPS = [
   seedEquipment,
   seedHeads,
   seedClasses,
+  // The one step that touches player rows: defense is newer than the characters
+  // holding it, and is derived entirely from the class blocks seeded above.
+  backfillDefense,
   seedSkills,
   seedMonsters,
   // Needs both the gear and the monsters that drop it.
@@ -38,6 +41,8 @@ const STEPS = [
   seedProfessions,
   seedGatheringNodes,
   seedRecipes,
+  // Needs both: it reads the nodes and recipes to know what a monster must not drop.
+  pruneProfessionDrops,
   // Needs both the professions and everything they can be asked to hand over.
   seedCommissions,
   seedGuildTasks,

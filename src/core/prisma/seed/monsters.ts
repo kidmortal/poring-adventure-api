@@ -53,8 +53,6 @@ type MonsterSeed = {
   asset: string;
   level: number;
   boss?: boolean;
-  /** Consumables only. Equipment drops are placed by `seedEquipmentDrops`. */
-  drops?: DropSeed[];
 };
 
 type MapSeed = {
@@ -84,26 +82,12 @@ const MAPS: MapSeed[] = [
       { itemName: 'Egg', chance: 20, maxAmount: 2 },
     ],
     monsters: [
-      {
-        name: 'Poring',
-        asset: 'PORING',
-        level: 1,
-        drops: [{ itemName: 'Round Cookie', chance: 80, maxAmount: 2 }],
-      },
+      { name: 'Poring', asset: 'PORING', level: 1 },
       { name: 'Fabre', asset: 'FABRE', level: 2 },
       { name: 'Poporing', asset: 'POPORING', level: 4 },
-      { name: 'Lunatic', asset: 'LUNATIC', level: 6, drops: [{ itemName: 'Bread Bun', chance: 80, maxAmount: 3 }] },
+      { name: 'Lunatic', asset: 'LUNATIC', level: 6 },
       { name: 'Fire Poring', asset: 'FIRE_PORING', level: 8 },
-      {
-        name: 'King Poring',
-        asset: 'KING_PORING',
-        level: 10,
-        boss: true,
-        drops: [
-          { itemName: 'Health Potion', chance: 40, maxAmount: 3 },
-          { itemName: 'Mana Potion', chance: 40, maxAmount: 3 },
-        ],
-      },
+      { name: 'King Poring', asset: 'KING_PORING', level: 10, boss: true },
     ],
   },
   {
@@ -191,6 +175,27 @@ async function seedDrops(monsterId: number, drops: DropSeed[]) {
   }
 }
 
+/**
+ * Takes everything a profession produces back off the monster loot tables.
+ *
+ * Ore, herbs, fish, potions and cooked food are the trades' whole reason to
+ * exist; if a fighter can farm them by killing things, nobody buys them and
+ * nobody levels a gatherer or a crafter. Monsters keep what no node and no
+ * recipe makes — slime jelly, bones, wings, and the gear `seedEquipmentDrops`
+ * places — which is the half of the economy only combat can supply.
+ *
+ * Run after the nodes and recipes are seeded, since it asks them what counts as
+ * profession output rather than keeping a second list that can drift.
+ */
+export async function pruneProfessionDrops() {
+  const gathered = await prisma.gatheringDrop.findMany({ select: { itemId: true }, distinct: ['itemId'] });
+  const crafted = await prisma.recipe.findMany({ select: { itemId: true }, distinct: ['itemId'] });
+  const { count } = await prisma.drop.deleteMany({
+    where: { itemId: { in: [...gathered, ...crafted].map((row) => row.itemId) } },
+  });
+  console.log(`profession-made drops removed from monsters: ${count}`);
+}
+
 export async function seedMonsters() {
   let monsterCount = 0;
 
@@ -210,9 +215,8 @@ export async function seedMonsters() {
         ...(monster.boss ? bossStats(monster.level) : normalStats(monster.level)),
       });
       // Only the declared drops are touched — a loot table added by hand on a
-      // live database is left where it is. The map's materials come last so a
-      // monster that lists one itself keeps its own rate.
-      await seedDrops(monsterId, [...map.materials, ...(monster.drops ?? [])]);
+      // live database is left where it is.
+      await seedDrops(monsterId, map.materials);
       monsterCount++;
     }
   }
