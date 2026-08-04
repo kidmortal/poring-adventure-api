@@ -168,6 +168,7 @@ export class UserStatsService {
       str: userClass.str * args.amount,
       agi: userClass.agi * args.amount,
       int: userClass.int * args.amount,
+      defense: userClass.defense * args.amount,
       tx,
     };
     return this._applyStats(gain, args.direction);

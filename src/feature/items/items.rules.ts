@@ -10,6 +10,7 @@ export type ItemStatBlock = {
   str: number;
   agi: number;
   int: number;
+  defense: number;
 };
 
 /**
@@ -27,6 +28,7 @@ export function itemStatBlock(args: { item: Item; quality?: number; enhancement?
     str: scale(args.item.str),
     agi: scale(args.item.agi),
     int: scale(args.item.int),
+    defense: scale(args.item.defense),
   };
 }
 

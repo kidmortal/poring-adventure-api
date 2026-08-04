@@ -144,6 +144,8 @@ export class BattleService {
       boss: true,
       attack: boss.attack,
       health: boss.health,
+      agi: boss.boss.agi,
+      defense: boss.boss.defense,
       silver: boss.boss.silver,
       exp: boss.boss.exp,
       mapId: 0,

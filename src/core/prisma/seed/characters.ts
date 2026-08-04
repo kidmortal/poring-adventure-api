@@ -28,62 +28,72 @@ const CLASSES = [
   {
     name: 'Rune Knight',
     icon: '⚔️',
-    description: 'Sword and rune magic in one hand. Solid attack with the health to stay in melee.',
+    description: 'Sword and rune magic in one hand. Solid attack with the armour to stay in melee.',
     costume: 'rune_knight',
     attack: 3,
     health: 5,
     mana: 2,
     str: 2,
-    agi: 1,
+    agi: 2,
     int: 1,
+    defense: 2,
   },
   {
+    /**
+     * Deliberately out-lasted rather than out-damaged by the Mage: the deepest
+     * mana pool in the game against the shallowest scaling. Same intelligence
+     * budget, spent on staying up instead of on burst.
+     */
     name: 'Priest',
     icon: '✨',
-    description: 'Support caster. Heals and blessings backed by a deep mana pool.',
+    description: 'Support caster. Heals and blessings backed by the deepest mana pool in the game.',
     costume: 'priest',
     attack: 1,
-    health: 2,
-    mana: 5,
+    health: 3,
+    mana: 6,
     str: 1,
     agi: 1,
     int: 3,
+    defense: 1,
   },
   {
     name: 'Mage',
     icon: '🔮',
-    description: 'Glass cannon caster. Highest intelligence, lowest survivability.',
+    description: 'Glass cannon caster. Highest intelligence, a shallow pool, and no armour at all.',
     costume: 'mage',
     attack: 1,
     health: 2,
-    mana: 5,
+    mana: 4,
     str: 1,
     agi: 1,
-    int: 3,
+    int: 4,
+    defense: 0,
   },
   {
     name: 'Knight',
     icon: '🛡️',
-    description: 'Frontline tank. Trades damage for the strength and health to hold aggro.',
+    description: 'Frontline tank. Trades damage for the armour and strength to hold a boss in place.',
     costume: 'knight',
     attack: 2,
-    health: 6,
+    health: 7,
     mana: 1,
     str: 3,
     agi: 1,
     int: 1,
+    defense: 3,
   },
   {
     name: 'Assassin',
     icon: '🗡️',
-    description: 'Fast striker. Highest attack and agility, thin health bar.',
+    description: 'Fast striker. Acts first, dodges most, and dies to anything that connects.',
     costume: 'assassin',
     attack: 5,
     health: 2,
     mana: 2,
     str: 1,
-    agi: 3,
+    agi: 4,
     int: 1,
+    defense: 0,
   },
 ];
 
@@ -209,6 +219,8 @@ type SkillSeed = {
   /** The stat the damage or healing scales off, times `multiplier`. */
   attribute: string;
   multiplier: number;
+  /** Threat per point of damage. Left unset it is 1 — threat equal to damage. */
+  threatModifier?: number;
   category: string;
   requiredLevel: number;
   manaCost: number;
@@ -357,6 +369,33 @@ export async function seedClasses() {
   console.log(`classes: ${CLASSES.length}`);
 }
 
+/**
+ * Brings every existing character's defense in line with the class blocks above.
+ *
+ * Defense arrived after the characters did, so a level-40 Knight would otherwise
+ * stand in the new mitigation formula with the zero their row was created with.
+ * It is recomputed rather than incremented — `class.defense × level` is exactly
+ * what levelling would have granted — so re-running the seed after a tuning pass
+ * corrects everyone instead of stacking on top of the last one.
+ *
+ * This is safe only while no equipment grants defense. Once it does, gear has to
+ * be added back on top and this becomes a one-off script rather than a seed step.
+ */
+export async function backfillDefense() {
+  const classes = await prisma.class.findMany();
+  let updated = 0;
+
+  for (const characterClass of classes) {
+    const result = await prisma.$executeRaw`
+      UPDATE "Stats"
+      SET "defense" = ${characterClass.defense} * "level"
+      WHERE "userEmail" IN (SELECT "email" FROM "User" WHERE "classId" = ${characterClass.id})
+    `;
+    updated += result;
+  }
+  console.log(`defense backfilled: ${updated} characters`);
+}
+
 export async function seedBuffs() {
   for (const buff of BUFFS) {
     await prisma.buff.upsert({ where: { name: buff.name }, create: buff, update: buff });
@@ -374,6 +413,7 @@ export async function seedSkills() {
 
     await upsertByName<Prisma.SkillUncheckedCreateInput>(prisma.skill, {
       ...skill,
+      threatModifier: skill.threatModifier ?? 1,
       effect: skill.effect ?? null,
       classId: characterClass.id,
       buffId: buff?.id ?? null,

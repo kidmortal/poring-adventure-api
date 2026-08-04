@@ -28,6 +28,7 @@ describe('users rules', () => {
     it('defaults every untouched stat to zero', () => {
       expect(statDelta({ str: 5 }, 'increment')).toEqual({
         level: { increment: 0 },
+        defense: { increment: 0 },
         maxHealth: { increment: 0 },
         maxMana: { increment: 0 },
         attack: { increment: 0 },

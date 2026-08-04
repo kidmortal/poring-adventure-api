@@ -63,6 +63,11 @@ model Stats {
   str        Int    @default(1)
   agi        Int    @default(1)
   int        Int    @default(1)
+
+  /// Flat mitigation, from class levels and gear. Fed through mitigate() in the
+  /// battle engine, which caps the reduction so no gear tier can reach immunity.
+  defense    Int    @default(0)
+
   user       User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   userEmail  String @unique
 
@@ -139,6 +144,7 @@ model Item {
   int       Int?
   health    Int?
   mana      Int?
+  defense   Int?
 
   /// A consumable that grants this buff when eaten. Cooking's whole niche: a
   /// meal is worth eating before a fight rather than during one.
@@ -191,6 +197,13 @@ model Monster {
   boss   Boolean @default(false)
   attack Int     @default(1)
   health Int     @default(1)
+
+  /// Speed, which decides where the monster sits in the turn order. Left at 0 it
+  /// falls back to its level, so every monster seeded before this existed still
+  /// acts roughly where its difficulty says it should.
+  agi     Int    @default(0)
+  defense Int    @default(0)
+
   silver Int     @default(1)
   exp    Int     @default(1)
   drops  Drop[]
@@ -227,6 +240,7 @@ model Class {
   str         Int     @default(1)
   agi         Int     @default(1)
   int         Int     @default(1)
+  defense     Int     @default(0)
   skills      Skill[]
   users       User[]
 }
@@ -347,6 +361,11 @@ model Skill {
   description   String         @default("Skill Description")
   attribute     String
   multiplier    Int            @default(1)
+
+  /// How much threat the skill generates per point of damage. This is what lets
+  /// a tank hold aggro without out-damaging the party.
+  threatModifier Float @default(1)
+
   class         Class          @relation(fields: [classId], references: [id])
   classId       Int
   learnedSkill  LearnedSkill[]
@@ -507,10 +526,15 @@ model CurrentGuildTask {
 }
 
 model GuildTask {
-  id               Int                @id @default(autoincrement())
-  name             String             @unique
-  target           Map                @relation(fields: [mapId], references: [id])
-  mapId            Int
+  id     Int    @id @default(autoincrement())
+  name   String @unique
+  /// The sprite the offer is illustrated with. A map's own image is its boss,
+  /// so a task to clear out porings was advertising a King Poring; this lets a
+  /// task show what it actually asks you to kill. Falls back to the map image.
+  image  String @default("")
+  target Map    @relation(fields: [mapId], references: [id])
+  mapId  Int
+
   killCount        Int                @default(10)
   taskPoints       Int                @default(10)
   currentGuildTask CurrentGuildTask[]

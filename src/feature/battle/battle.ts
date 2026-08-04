@@ -210,6 +210,9 @@ export class BattleInstance {
 
   // Functions that round be called periodically
   tickBattle() {
+    // A settled fight — won or wiped — waits to be dismissed rather than
+    // carrying on swinging at a party that cannot answer.
+    if (this.battleFinished) return;
     this.processMonsterAttack();
   }
 
@@ -342,7 +345,18 @@ export class BattleInstance {
     if (isUserTurn) {
       const user = this.getUserFromBattle(args.email);
       const skill = this.getSkillFromUser(args);
+      if (!skill) return false;
       if (skill.cooldown > 0) return false;
+      // A healer who cannot budget their mana is not playing a resource role.
+      // The cast is refused outright rather than driving the pool negative.
+      if (user.stats.mana < skill.skill.manaCost) {
+        this.pushLog({
+          icon: skill.skill.image,
+          log: `${user.name} does not have the mana for ${skill.skill.name}`,
+        });
+        this.notifyUsers();
+        return false;
+      }
       skill.cooldown += skill.skill.cooldown;
       switch (skill.skill.category) {
         case SkillCategory.TargetEnemy:
@@ -441,7 +455,10 @@ export class BattleInstance {
         name: '',
         value: userDamage,
         skill: args.skill,
-        aggro: userDamage,
+        // Threat is no longer the same thing as damage: a skill decides how
+        // loudly it lands, which is the only reason a tank can hold a boss it
+        // is not out-damaging anyone with.
+        aggro: Math.floor(userDamage * (args.skill.skill.threatModifier ?? 1)),
       },
     });
   }
@@ -481,11 +498,13 @@ export class BattleInstance {
     if (args.skill.skill.buff) {
       const buff = args.skill.skill.buff;
       args.user.buffs.push({
-        duration: 1,
+        duration: buff.duration,
         id: 0,
         userEmail: args.user.email,
         buffId: buff.id,
-        buff,
+        // A copy, so nothing at the table can write back into the shared row
+        // hanging off the skill definition.
+        buff: { ...buff },
       });
       this.pushLog({
         log: `${args.user.name} Casted ${buff.name} on himself`,
@@ -519,9 +538,12 @@ export class BattleInstance {
     return lowestUser;
   }
 
+  /** The monster only looks at people who can still be killed. */
   private getHighestAggroPlayer() {
-    let highestUser = this.users[0];
-    this.users.forEach((user) => {
+    const living = this.users.filter((user) => !user.isDead);
+    const candidates = living.length > 0 ? living : this.users;
+    let highestUser = candidates[0];
+    candidates.forEach((user) => {
       if (user.aggro > highestUser.aggro) {
         highestUser = user;
       }
@@ -629,19 +651,34 @@ export class BattleInstance {
   }
 
   private async processNextTurn() {
-    const pastAttacker = this.attackerTurn;
-    const attackerList = this.attackerList;
-    const maxIndex = attackerList.length - 1;
+    const maxIndex = this.attackerList.length - 1;
+    if (maxIndex < 0) return this.attackerTurn;
 
-    if (pastAttacker < maxIndex) {
-      return (this.attackerTurn = pastAttacker + 1);
-    } else if (pastAttacker === maxIndex) {
-      // Back to the top of the order: everyone has had their turn.
-      this.round += 1;
-      return (this.attackerTurn = 0);
-    } else {
-      return this.attackerTurn - 1;
+    // Bounded by the length of the order, so a fight in which nobody can act
+    // advances one slot rather than spinning.
+    for (let step = 0; step <= maxIndex; step++) {
+      if (this.attackerTurn < maxIndex) {
+        this.attackerTurn += 1;
+      } else {
+        // Back to the top of the order: everyone has had their turn.
+        this.attackerTurn = 0;
+        this.round += 1;
+        // Threat decays once a round rather than once a hit — decaying per hit
+        // meant a five-player party shredded the tank's lead five times over.
+        this.decreasePlayersAggro();
+      }
+      if (this.canAct(this.attackerList[this.attackerTurn])) break;
     }
+    return this.attackerTurn;
+  }
+
+  /** Whether whoever holds this slot in the order is still in a state to use it. */
+  private canAct(name: string) {
+    const user = this.users.find((u) => u.name === name);
+    if (user) return !user.isDead;
+    const monster = this.monsters.find((m) => m.name === name);
+    if (monster) return monster.health > 0;
+    return false;
   }
 
   private isUserTurn(args: { email: string }) {
@@ -650,7 +687,9 @@ export class BattleInstance {
     const attackerIndex = this.attackerTurn;
     const attacker = attackerList[attackerIndex];
 
-    return user && attacker === user.name;
+    // The dead hold their slot in the order but cannot spend it. Until a Priest
+    // brings them back, that is the whole cost of dying.
+    return user && !user.isDead && attacker === user.name;
   }
 
   private getSkillFromUser(args: { email: string; skillId: number }) {
@@ -706,28 +745,53 @@ export class BattleInstance {
     const randomDmg = Utils.randomDamage(damage.value, 20);
     if (attacker === 'user') {
       user.aggro += damage.aggro;
-      // Aggro decays every turn; this is the running total the guild boss pays out on.
-      this.damageDealt[user.email] = (this.damageDealt[user.email] ?? 0) + Math.max(randomDmg, 0);
-      monster.health -= randomDmg;
+
+      if (this.isEvaded(monster.agi)) {
+        this.pushLog({ log: `${monster.name} evaded ${user.name}'s attack`, icon: damage.image });
+        return this.afterDamageStep();
+      }
+
+      const dealt = BattleUtils.mitigate({
+        raw: randomDmg,
+        defense: monster.defense,
+        attackerLevel: user.stats.level,
+      });
+      // Aggro decays every round; this is the running total the guild boss pays out on.
+      this.damageDealt[user.email] = (this.damageDealt[user.email] ?? 0) + Math.max(dealt, 0);
+      monster.health -= dealt;
       this.pushLog({
-        log: `${user.name} Dealt ${randomDmg} damage to ${monster.name}`,
+        log: `${user.name} Dealt ${dealt} damage to ${monster.name}`,
         icon: damage.image,
       });
     }
     if (attacker === 'monster') {
-      this.damageUser({ user: user, amount: randomDmg });
+      if (this.isEvaded(user.stats.agi)) {
+        this.pushLog({ log: `${user.name} evaded ${monster.name}'s attack`, icon: damage.image });
+        return this.afterDamageStep();
+      }
+
+      const taken = BattleUtils.mitigate({
+        raw: randomDmg,
+        defense: BattleUtils.effectiveDefense(user.stats),
+        attackerLevel: monster.level,
+      });
+      this.damageUser({ user: user, amount: taken });
       this.pushLog({
-        log: `${monster.name} Dealt ${randomDmg} damage to ${user.name}`,
+        log: `${monster.name} Dealt ${taken} damage to ${user.name}`,
         icon: damage.image,
       });
     }
     this.afterDamageStep();
   }
 
+  /** A dodge, rolled off agility and capped hard so speed can never mean immunity. */
+  private isEvaded(agi?: number) {
+    return Math.random() < BattleUtils.evasionChance(agi ?? 0);
+  }
+
   private afterDamageStep() {
     this.settleBattleAndProcessRewards();
     this.decreaseOrRemoveBuffs();
-    this.decreasePlayersAggro();
     this.decreasePlayerCooldown();
     this.processNextTurn();
     this.notifyUsers();
@@ -738,8 +802,11 @@ export class BattleInstance {
     const currentTurn = this.attackerList[this.attackerTurn];
     const user = this.users.find((u) => u.name === currentTurn);
     if (user) {
-      user.buffs.forEach(({ buff }) => (buff.duration -= 1));
-      user.buffs = user.buffs.filter(({ buff }) => buff.duration >= 1);
+      // Ticked on the player's own UserBuff row, never on the Buff template the
+      // skill points at — mutating that drained the second cast of a buff by as
+      // much as the first had already used up.
+      user.buffs.forEach((userBuff) => (userBuff.duration -= 1));
+      user.buffs = user.buffs.filter((userBuff) => userBuff.duration >= 1);
       return;
     }
     const monster = this.monsters.find((m) => m.name === currentTurn);
@@ -760,17 +827,17 @@ export class BattleInstance {
       this.notifyUsers();
       return;
     }
-    this.battleFinished = false;
     if (monsterAlive && !userAlive) {
+      // A wipe ends the fight as surely as a kill does. Leaving it unfinished is
+      // what left lost battles stuck in the list for an admin to clear by hand.
       this.userLost = true;
+      this.battleFinished = true;
       this.notifyUsers();
       return;
     }
     this.generateBattleDrops();
-    if (!this.battleFinished) {
-      await this.updateUsers(this);
-      this.battleFinished = true;
-    }
+    await this.updateUsers(this);
+    this.battleFinished = true;
     this.notifyUsers();
   }
   private generateUserBattleValues(users: UserWithStats[]) {
