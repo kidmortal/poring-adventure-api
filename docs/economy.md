@@ -27,24 +27,64 @@ required level.
 
 Two independent axes, both on `InventoryItem`:
 
-- **Quality 1–5** — set when crafted, from the crafter's level.
-  `Utils.qualityMultiplier` = `1 + (quality − 1) × 0.15`, so Legendary is +60%.
+- **Quality 1–5** — set when crafted, from the crafter's level, and raised after
+  the fact by `upgradeItem` (below). `Utils.qualityMultiplier` =
+  `1 + (quality − 1) × 0.15`, so Legendary is +60%.
 - **Enhancement +0..+N** — bought at the forge, and the only real silver sink.
-  `Utils.enhanceChance` starts at 100% and drops 10% of the remainder per level;
-  `Utils.enhancePrice` starts at 100 and rises 50% per level.
+  `enhanceChance` starts at 100% and drops 10% of the remainder per level.
 
 Combined: `itemStatsMultiplier(q, e) = qualityMultiplier(q) + e × 0.2 × (q × 0.5)`.
 **Quality has to stand on its own in that first term** — it used to be folded
 into the enhancement term, which meant a Legendary sword at +0 was numerically
 identical to a Common one and a crafter's level bought the buyer nothing.
 
+The item's **level does not appear in that formula and must not**: gear is
+seeded one tier per map band with base stats already multiplied by the tier
+(`8 × tier` attack and so on), so `requiredLevel` is in the numbers before the
+multiplier ever reads them. A level term here would charge for it twice.
+
 `itemStatBlock` is used on **both** equip and unequip so the two can never
 disagree and leak stats.
+
+**Price, though, does read all three** (`enhancePrice`, in `items.rules.ts`):
+the old 100-silver-and-half-again-per-level curve, times `1 + (level − 1) × 0.1`
+and `1 + (quality − 1) × 0.5`. It used to be the enhancement level alone, which
+priced a +10 on a level-1 Common shirt exactly like a +10 on a Legendary level-50
+blade — while the formula above makes an enhancement level worth **five times**
+as much on a Legendary as on a Common. The cheapest power in the game was on the
+same shelf as the most expensive.
 
 Failure setback (`profession.rules`): below **+6** a failure costs only silver;
 from +6 up it costs a level, never below the **+5 floor**. That is what keeps a
 blacksmith in business — high enhancement becomes a standing relationship rather
 than an errand.
+
+### Raising rarity — the gear sink
+
+`upgradeItem` (`items.service.ts`) feeds a **duplicate into the item** for a
+chance at the next quality tier. The material must be the same item at the same
+quality; its own enhancement is **not read at all**, which is the point — this is
+where the fourth copy of a tier-2 helmet goes, so the drop table stops being
+noise and becomes the supply line for rarity.
+
+| Gate | Why |
+|---|---|
+| Target at **+5 or better** (`UPGRADE_MIN_ENHANCEMENT`) | Makes it a decision taken after a run of enhancement, not the first thing done with a fresh drop |
+| Target below Legendary | Nowhere left to go |
+| Material unlocked, unequipped, not promised to a market listing | The obvious ways to lose something you meant to keep |
+| Material auto-picked **least enhanced first** | Feeding a +7 into a +5 is never what anyone meant |
+
+Odds by the quality being **left**: 70% → Uncommon, 50% → Rare, 30% → Epic,
+10% → Legendary (`upgradeChance`).
+
+**Both outcomes cost the same**: the duplicate is gone and the enhancement is
+reset to **+0**. Losing the +5 is the real price of the roll — the silver already
+spent reaching it is what is being gambled, and it is why the odds are generous
+at the bottom and cruel at the top. Note this is the one path that resets past
+the `SETBACK_FLOOR`; the floor guards a failed *forge* attempt, not a chosen one.
+
+One consequence worth knowing: since price scales on quality, a successful
+upgrade makes every subsequent enhancement on that item more expensive.
 
 ### Consumables
 
@@ -129,7 +169,7 @@ and its `offeredOn` day is what caps a contract to once a day.
 
 | In | Out |
 |---|---|
-| Monster kills | Enhancement forge (`enhancePrice`) |
+| Monster kills | Enhancement forge (`enhancePrice`, scaled by item level and rarity) |
 | Commissions | Market listing fee (2%) |
 | Selling on the market | Market sale tax (5%) |
 | | Hiring a crafter (moves between players) |

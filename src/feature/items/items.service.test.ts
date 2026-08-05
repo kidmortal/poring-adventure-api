@@ -7,6 +7,7 @@ import { UserWalletService } from 'src/feature/users/userWallet.service';
 import { Utils } from 'src/utilities/utils';
 
 import { InventoryService } from './inventory.service';
+import { enhancePrice } from './items.rules';
 import { ItemsService } from './items.service';
 
 describe('Items Service', () => {
@@ -32,7 +33,7 @@ describe('Items Service', () => {
     equipped: false,
     quality: 1,
     enhancement: 2,
-    item: { name: 'Bronze Sword', category: 'weapon' },
+    item: { name: 'Bronze Sword', category: 'weapon', requiredLevel: 21 },
   };
 
   beforeEach(async () => {
@@ -88,7 +89,10 @@ describe('Items Service', () => {
 
       expect(inventory.addItemToInventory).toHaveBeenCalledWith(expect.objectContaining({ enhancement: 3, stack: 1 }));
       expect(wallet.removeSilverFromUser).toHaveBeenCalledWith(
-        expect.objectContaining({ userEmail: USER, amount: Utils.enhancePrice(3) }),
+        expect.objectContaining({
+          userEmail: USER,
+          amount: enhancePrice({ enhancement: 3, requiredLevel: 21, quality: 1 }),
+        }),
       );
       expect(result).toMatchObject({ item: 'Bronze Sword', enhancement: 3, success: true });
     });
@@ -141,6 +145,20 @@ describe('Items Service', () => {
       );
     });
 
+    it('refuses a copy that is already promised to a market listing', async () => {
+      // Enhancing moves the item to a new stack, which deletes the row it left —
+      // and the listing cascades with it. The sale would have vanished silently.
+      inventory.getOneInventoryItem.mockResolvedValue({ ...ownedItem, marketListing: { stack: 1 } });
+
+      const result = await service.enhanceItem({ userEmail: USER, inventoryId: 7 });
+
+      expect(result).toBe(false);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(websocket.sendErrorNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Cannot enhance an item that is listed on the market' }),
+      );
+    });
+
     it('takes a level back when a roll above the setback threshold fails', async () => {
       inventory.getOneInventoryItem.mockResolvedValue({ ...ownedItem, enhancement: 7 });
       jest.spyOn(Utils, 'isSuccess').mockReturnValue(false);
@@ -159,6 +177,104 @@ describe('Items Service', () => {
 
       expect(inventory.addItemToInventory).not.toHaveBeenCalled();
       expect(result).toMatchObject({ enhancement: 5, success: false, setback: false });
+    });
+  });
+
+  describe('upgradeItem', () => {
+    /** The item the roll is made on: a finished +5, still Common. */
+    const readyToUpgrade = { ...ownedItem, enhancement: 5 };
+    /** The spare copy off a monster, at whatever enhancement it happened to have. */
+    const spare = { id: 8, stack: 1, enhancement: 0, marketListing: null };
+
+    beforeEach(() => {
+      inventory.getOneInventoryItem.mockResolvedValue(readyToUpgrade);
+      prisma.inventoryItem.findMany = jest.fn().mockResolvedValue([spare]);
+    });
+
+    it('raises the rarity and puts the enhancement back to zero on a win', async () => {
+      jest.spyOn(Utils, 'isSuccess').mockReturnValue(true);
+
+      const result = await service.upgradeItem({ userEmail: USER, inventoryId: 7 });
+
+      expect(inventory.addItemToInventory).toHaveBeenCalledWith(
+        expect.objectContaining({ quality: 2, enhancement: 0 }),
+      );
+      expect(result).toMatchObject({ success: true, chance: 70, quality: 2, enhancement: 0 });
+    });
+
+    it('eats the duplicate and the +5 either way when the roll is lost', async () => {
+      jest.spyOn(Utils, 'isSuccess').mockReturnValue(false);
+
+      const result = await service.upgradeItem({ userEmail: USER, inventoryId: 7 });
+
+      // The rarity did not move, but the enhancement is gone — that loss is the
+      // price of the roll, and the spare is spent whichever way it lands.
+      expect(inventory.addItemToInventory).toHaveBeenCalledWith(
+        expect.objectContaining({ quality: 1, enhancement: 0 }),
+      );
+      expect(inventory.removeItemFromInventory).toHaveBeenCalledTimes(2);
+      expect(result).toMatchObject({ success: false, quality: 1, previousEnhancement: 5 });
+    });
+
+    it('refuses an item that has not been enhanced far enough yet', async () => {
+      inventory.getOneInventoryItem.mockResolvedValue({ ...ownedItem, enhancement: 4 });
+
+      expect(await service.upgradeItem({ userEmail: USER, inventoryId: 7 })).toBe(false);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(websocket.sendErrorNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Requires +5 before its rarity can be raised' }),
+      );
+    });
+
+    it('refuses a copy that is already promised to a market listing', async () => {
+      inventory.getOneInventoryItem.mockResolvedValue({ ...readyToUpgrade, marketListing: { stack: 1 } });
+
+      expect(await service.upgradeItem({ userEmail: USER, inventoryId: 7 })).toBe(false);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(websocket.sendErrorNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Cannot upgrade an item that is listed on the market' }),
+      );
+    });
+
+    it('refuses a Legendary, which has nowhere left to go', async () => {
+      inventory.getOneInventoryItem.mockResolvedValue({ ...readyToUpgrade, quality: 5 });
+
+      expect(await service.upgradeItem({ userEmail: USER, inventoryId: 7 })).toBe(false);
+      expect(websocket.sendErrorNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'This item is already Legendary' }),
+      );
+    });
+
+    it('refuses when the only spare is already promised to the market', async () => {
+      prisma.inventoryItem.findMany = jest.fn().mockResolvedValue([{ ...spare, marketListing: { stack: 1 } }]);
+
+      expect(await service.upgradeItem({ userEmail: USER, inventoryId: 7 })).toBe(false);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('will not eat the item it is upgrading when that is the only copy', async () => {
+      // Two identical +5s merge into one row, so the target's own stack is only
+      // fuel when it holds a second copy.
+      prisma.inventoryItem.findMany = jest.fn().mockResolvedValue([{ id: 7, stack: 1, enhancement: 5 }]);
+      expect(await service.upgradeItem({ userEmail: USER, inventoryId: 7 })).toBe(false);
+
+      prisma.inventoryItem.findMany = jest.fn().mockResolvedValue([{ id: 7, stack: 2, enhancement: 5 }]);
+      jest.spyOn(Utils, 'isSuccess').mockReturnValue(true);
+      expect(await service.upgradeItem({ userEmail: USER, inventoryId: 7 })).toMatchObject({ success: true });
+    });
+
+    it('reaches for the least enhanced spare rather than the first one found', async () => {
+      await service.upgradeItem({ userEmail: USER, inventoryId: 7 });
+
+      expect(prisma.inventoryItem.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { enhancement: 'asc' } }),
+      );
+      // And only ever a copy at the same rarity, unlocked and not being worn.
+      expect(prisma.inventoryItem.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ itemId: 42, quality: 1, equipped: false, locked: false }),
+        }),
+      );
     });
   });
 

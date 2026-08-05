@@ -3,6 +3,7 @@ import { PrismaService } from 'src/core/prisma/prisma.service';
 import { TRANSACTION_OPTIONS } from 'src/core/prisma/types/prisma';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { InventoryService } from 'src/feature/items/inventory.service';
+import { enhanceChance, enhancePrice } from 'src/feature/items/items.rules';
 import { ItemsValidator } from 'src/feature/items/items.validator';
 import { UserStaminaService } from 'src/feature/users/userStamina.service';
 import { UserWalletService } from 'src/feature/users/userWallet.service';
@@ -179,7 +180,11 @@ export class HiringService {
     ItemsValidator.isEnhanceable({ category: inventoryItem.item.category });
 
     const nextEnhancement = inventoryItem.enhancement + 1;
-    const forgePrice = Utils.enhancePrice(nextEnhancement);
+    const forgePrice = enhancePrice({
+      enhancement: nextEnhancement,
+      requiredLevel: inventoryItem.item.requiredLevel,
+      quality: inventoryItem.quality,
+    });
     const fee = serviceFee({
       staminaCost: ENHANCE_SERVICE_STAMINA_COST,
       pricePerStamina: offer.pricePerStamina,
@@ -187,7 +192,7 @@ export class HiringService {
     const hirer = await this._requireSilver({ userEmail: args.hirerEmail, amount: forgePrice + fee });
 
     const chance = hiredEnhanceChance({
-      baseChance: Utils.enhanceChance(nextEnhancement),
+      baseChance: enhanceChance(nextEnhancement),
       blacksmithLevel: blacksmith.level,
     });
     const success = Utils.isSuccess(chance);
@@ -263,7 +268,7 @@ export class HiringService {
       success,
       setback: enhancement < inventoryItem.enhancement,
       chance,
-      baseChance: Utils.enhanceChance(nextEnhancement),
+      baseChance: enhanceChance(nextEnhancement),
       blacksmith: offer.crafter.name,
       blacksmithLevel: blacksmith.level,
       forgePrice,
@@ -294,10 +299,14 @@ export class HiringService {
     ItemsValidator.isEnhanceable({ category: inventoryItem.item.category });
 
     const nextEnhancement = inventoryItem.enhancement + 1;
-    const forgePrice = Utils.enhancePrice(nextEnhancement);
+    const forgePrice = enhancePrice({
+      enhancement: nextEnhancement,
+      requiredLevel: inventoryItem.item.requiredLevel,
+      quality: inventoryItem.quality,
+    });
     await this._requireSilver({ userEmail: args.userEmail, amount: forgePrice });
 
-    const baseChance = Utils.enhanceChance(nextEnhancement);
+    const baseChance = enhanceChance(nextEnhancement);
     const chance = hiredEnhanceChance({ baseChance, blacksmithLevel: learned.level });
     const success = Utils.isSuccess(chance);
     const enhancement = success ? nextEnhancement : enhancementAfterFailure({ current: inventoryItem.enhancement });

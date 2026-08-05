@@ -42,7 +42,11 @@ export class ItemsGateway {
   async upgradeItem(@MessageBody() dto: UpgradeItemDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug('upgrade_item');
-    return this.itemService.upgradeItem({ userEmail: email, inventoryId: dto.inventoryId });
+    return this.itemService.upgradeItem({
+      userEmail: email,
+      inventoryId: dto.inventoryId,
+      materialInventoryId: dto.materialInventoryId,
+    });
   }
 
   @SubscribeMessage('unequip_item')

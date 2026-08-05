@@ -7,14 +7,6 @@ function isSuccess(chance: number): boolean {
   return randomNum < chance;
 }
 
-function enhanceChance(enhanceLevel: number): number {
-  let currentChance = 100;
-  for (let index = 0; index < enhanceLevel; index++) {
-    currentChance -= Math.round(currentChance * 0.1);
-  }
-  return currentChance;
-}
-
 /**
  * What quality alone is worth: 1 Common through 5 Legendary, 15% a tier.
  *
@@ -34,14 +26,6 @@ function qualityMultiplier(quality: number) {
  */
 function itemStatsMultiplier(quality: number, enhancement: number) {
   return qualityMultiplier(quality) + enhancement * 0.2 * (quality * 0.5);
-}
-
-function enhancePrice(enhanceLevel: number): number {
-  let currentPrice = 100;
-  for (let index = 0; index < enhanceLevel; index++) {
-    currentPrice += Math.round(currentPrice * 0.5);
-  }
-  return currentPrice;
 }
 
 function randomDamage(value: number, oscillationPercentage: number): number {
@@ -101,8 +85,6 @@ function formatMemory(memory?: number) {
 
 export const Utils = {
   isSuccess,
-  enhanceChance,
-  enhancePrice,
   getRandomNumberBetween,
   getLevelFromExp,
   randomDamage,

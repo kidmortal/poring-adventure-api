@@ -1,6 +1,14 @@
 import { Item } from '@prisma/client';
 import { Utils } from 'src/utilities/utils';
-import { buffDurationForQuality, consumablePotency, itemStatBlock } from './items.rules';
+import {
+  buffDurationForQuality,
+  canUpgradeQuality,
+  consumablePotency,
+  enhanceChance,
+  enhancePrice,
+  itemStatBlock,
+  upgradeChance,
+} from './items.rules';
 
 const sword = { health: 0, mana: 0, attack: 100, str: 10, agi: 0, int: 0 } as Item;
 
@@ -58,6 +66,57 @@ describe('Item rules', () => {
 
     it('never rounds a buff away to nothing', () => {
       expect(buffDurationForQuality({ duration: 1, quality: 1 })).toBe(1);
+    });
+  });
+
+  describe('enhanceChance', () => {
+    it('is certain at +1 and loses a tenth of what is left after', () => {
+      expect(enhanceChance(1)).toBe(90);
+      expect(enhanceChance(2)).toBe(81);
+      expect(enhanceChance(10)).toBe(35);
+    });
+  });
+
+  describe('enhancePrice', () => {
+    it('keeps the old curve for a Common piece of starting gear', () => {
+      expect(enhancePrice({ enhancement: 1 })).toBe(150);
+      expect(enhancePrice({ enhancement: 3 })).toBe(338);
+    });
+
+    it('charges more for the same +1 on higher-tier gear', () => {
+      const starter = enhancePrice({ enhancement: 5, requiredLevel: 1, quality: 1 });
+      const endgame = enhancePrice({ enhancement: 5, requiredLevel: 41, quality: 1 });
+
+      expect(endgame).toBeGreaterThan(starter);
+      expect(endgame).toBe(starter * 5);
+    });
+
+    it('charges more for the same +1 on a rarer copy of the same item', () => {
+      // Enhancement is worth five times as much on a Legendary, so a forge that
+      // charged the same for both was selling the good version at a discount.
+      const common = enhancePrice({ enhancement: 5, requiredLevel: 21, quality: 1 });
+      const legendary = enhancePrice({ enhancement: 5, requiredLevel: 21, quality: 5 });
+
+      expect(legendary).toBe(common * 3);
+    });
+  });
+
+  describe('upgradeChance', () => {
+    it('falls away as the rarity climbs, and stops at Legendary', () => {
+      expect(upgradeChance(1)).toBe(70);
+      expect(upgradeChance(2)).toBe(50);
+      expect(upgradeChance(3)).toBe(30);
+      expect(upgradeChance(4)).toBe(10);
+      expect(upgradeChance(5)).toBe(0);
+    });
+  });
+
+  describe('canUpgradeQuality', () => {
+    it('wants the enhancement finished first, and refuses a Legendary outright', () => {
+      expect(canUpgradeQuality({ quality: 1, enhancement: 4 })).toBe(false);
+      expect(canUpgradeQuality({ quality: 1, enhancement: 5 })).toBe(true);
+      expect(canUpgradeQuality({ quality: 4, enhancement: 9 })).toBe(true);
+      expect(canUpgradeQuality({ quality: 5, enhancement: 9 })).toBe(false);
     });
   });
 });

@@ -16,4 +16,6 @@ declare type EnhanceItemDto = {
 
 declare type UpgradeItemDto = {
   inventoryId: number;
+  /** The duplicate to feed in. Left out, the least enhanced copy is chosen. */
+  materialInventoryId?: number;
 };
