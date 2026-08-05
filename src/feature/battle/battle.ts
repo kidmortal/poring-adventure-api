@@ -1156,12 +1156,25 @@ export class BattleInstance {
    *
    * Buffs are not ticked and the turn does not advance, because no turn was
    * taken: the monsters simply stop being alive.
+   *
+   * The blow is *dealt*, not declared — the remaining health is run through the
+   * same per-player tally a real hit feeds. A guild boss banks what the party
+   * hit it for, so setting health to zero and nothing else left the pool full,
+   * paid nobody and never killed the boss. Credit goes to the admin when they
+   * are in the fight and to whoever is when they are not, because the tally is
+   * what `applyDamage` pays out on and a stranger's row does not belong in it.
    */
-  async forceKillMonsters(args: { by: string }) {
+  async forceKillMonsters(args: { by: string; credit?: string }) {
     if (this.battleFinished) return false;
     if (!this.isMonsterAlive) return false;
 
+    const creditEmail = args.credit && this.hasUser(args.credit) ? args.credit : this.users[0]?.email;
+
     this.aliveMonsters.forEach((monster) => {
+      const remaining = Math.max(monster.health, 0);
+      if (creditEmail) {
+        this.damageDealt[creditEmail] = (this.damageDealt[creditEmail] ?? 0) + remaining;
+      }
       monster.health = 0;
       this.pushLog({ icon: monster.image, log: `${monster.name} was struck down by ${args.by}` });
     });

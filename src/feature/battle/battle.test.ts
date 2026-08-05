@@ -245,4 +245,36 @@ describe('BattleInstance', () => {
       expect(after.log.some((entry: { message: string }) => entry.message.includes('absorbed'))).toBe(true);
     });
   });
+
+  describe('an admin killing the fight', () => {
+    it('deals the remaining health rather than declaring it', async () => {
+      // What consumeDamage holds is what a guild boss banks and pays out on, so
+      // a kill that skips the tally leaves the pool full and nobody rewarded.
+      const { battle } = build([player('Mage', [])], [monster('Poring A'), monster('Poring B', { health: 50 })]);
+
+      await battle.forceKillMonsters({ by: 'an admin', credit: 'Mage@test' });
+
+      expect(battle.consumeDamage()).toEqual([{ userEmail: 'Mage@test', damage: 350 }]);
+      expect(battle.isMonsterAlive).toBe(false);
+      expect(battle.battleFinished).toBe(true);
+    });
+
+    it('credits somebody in the fight when the admin is not in it', async () => {
+      const { battle } = build([player('Mage', [])], [monster('Poring')]);
+
+      await battle.forceKillMonsters({ by: 'an admin', credit: 'someoneelse@test' });
+
+      expect(battle.consumeDamage()).toEqual([{ userEmail: 'Mage@test', damage: 300 }]);
+    });
+
+    it('refuses a fight that is already settled, so nothing banks twice', async () => {
+      const { battle } = build([player('Mage', [])], [monster('Poring')]);
+
+      await battle.forceKillMonsters({ by: 'an admin', credit: 'Mage@test' });
+      battle.consumeDamage();
+
+      expect(await battle.forceKillMonsters({ by: 'an admin', credit: 'Mage@test' })).toBe(false);
+      expect(battle.consumeDamage()).toEqual([]);
+    });
+  });
 });

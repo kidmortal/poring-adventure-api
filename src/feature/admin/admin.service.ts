@@ -156,7 +156,7 @@ export class AdminService {
     const battle = this.battleService.getUserBattle(targetEmail);
     if (!battle) return this._report(args.userEmail, 'That user is not in a battle');
 
-    const killed = await battle.forceKillMonsters({ by: 'an admin' });
+    const killed = await battle.forceKillMonsters({ by: 'an admin', credit: targetEmail });
     if (!killed) return this._report(args.userEmail, 'That battle is already settled');
 
     return this._report(args.userEmail, 'Monsters killed');

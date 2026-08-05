@@ -101,3 +101,10 @@ which runs the battle's ordinary victory path. It is a testing tool for what a
 kill *leads to*: the drop roll, the experience, a dungeon's next stage, a guild
 boss's banked damage. Paying the rewards out directly instead would be
 exercising a path the game does not otherwise have.
+
+The kill is **dealt, not declared** — the monster's remaining health goes
+through the same per-player tally a real hit feeds, credited to the admin when
+they are in the fight and to a participant when they are not. A guild boss banks
+`consumeDamage()`, so zeroing health without touching the tally banked nothing:
+the pool stayed full, `applyDamage` returned early on `total <= 0`, and the boss
+neither died nor paid out.
