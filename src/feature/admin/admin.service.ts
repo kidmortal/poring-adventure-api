@@ -188,14 +188,14 @@ export class AdminService {
     let buff: Buff | undefined;
     let debuff: Debuff | undefined;
 
-    if (args.action === 'buff_allies') {
+    if (args.action === 'buff_allies' || args.action === 'buff_monsters') {
       buff = args.name
         ? await this.prisma.buff.findUnique({ where: { name: args.name } })
         : await this.prisma.buff.findFirst();
       if (!buff) return this._report(args.userEmail, `No buff named ${args.name}`);
     }
 
-    if (args.action === 'debuff_monsters') {
+    if (args.action === 'debuff_monsters' || args.action === 'debuff_allies') {
       debuff = args.name
         ? await this.prisma.debuff.findUnique({ where: { name: args.name } })
         : await this.prisma.debuff.findFirst();

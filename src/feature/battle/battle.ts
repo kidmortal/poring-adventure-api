@@ -4,6 +4,7 @@ import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { Utils } from 'src/utilities/utils';
 import { runEffect } from './effects';
 import { absorbDamage, isSpentBarrier } from './barrier';
+import { applyBuff, buffedAttack, buffedDamageTaken, tickBuffs } from './buffs';
 import { rollCritical } from './crit';
 import {
   applyDebuff,
@@ -48,6 +49,16 @@ enum BuffEffect {
    * what is left of it is state, not a multiplier applied to one hit.
    */
   Barrier = 'barrier',
+}
+
+/**
+ * A player's debuff list as the queries want it. Optional on the type because
+ * the object arrives from a cached profile that has never heard of a fight, and
+ * a missing list means the same as an empty one.
+ */
+function debuffsOf(user: UserWithStats) {
+  if (!user.debuffs) user.debuffs = [];
+  return user as { debuffs: BattleDebuff[] };
 }
 
 /** How much health a Revive Draught leaves you standing on. */
@@ -97,6 +108,8 @@ export type MonsterWithDrops = Monster & {
 export type MonsterInBattle = MonsterWithDrops & {
   maxHealth: number;
   debuffs: BattleDebuff[];
+  /** Whatever has been put *on* it. Lives for the fight and is never persisted. */
+  buffs: UserBuffWithBuff[];
 };
 
 export type DropWithItem = Drop & {
@@ -109,6 +122,12 @@ export type UserWithStats = User & {
   aggro?: number;
   learnedSkills: LearnedSkillWithSkill[];
   buffs: UserBuffWithBuff[];
+  /**
+   * What has been stuck on the player. Battle-only, like the monster's: a
+   * debuff is spent inside the fight it was applied in and there is no row for
+   * it, which is what separates it from a buff.
+   */
+  debuffs?: BattleDebuff[];
 };
 type UserBuffWithBuff = UserBuff & {
   buff: Buff;
@@ -140,8 +159,10 @@ export type BattleDebugAction =
   | 'heal_monsters'
   | 'hurt_monsters'
   | 'buff_allies'
+  | 'buff_monsters'
   | 'clear_buffs'
   | 'debuff_monsters'
+  | 'debuff_allies'
   | 'clear_debuffs'
   | 'restore_mana'
   | 'drain_mana'
@@ -443,7 +464,7 @@ export class BattleInstance {
 
       const { value: userDamage } = this.rollCrit({
         user,
-        value: user.stats.attack,
+        value: debuffedAttack(debuffsOf(user), user.stats.attack),
         icon: 'https://kidmortal.sirv.com/skills/attack.webp',
         log: `${user.name} lands a critical hit`,
       });
@@ -539,15 +560,10 @@ export class BattleInstance {
       restored.push(`${args.mana} mana`);
     }
     if (args.buff) {
-      // Pushed as its own copy, because decreaseOrRemoveBuffs ticks the buff
-      // object down and a shared row would drain every drinker at once.
-      user.buffs.push({
-        id: 0,
-        userEmail: user.email,
-        buffId: args.buff.id,
-        duration: args.buffDuration ?? args.buff.duration,
-        buff: { ...args.buff, duration: args.buffDuration ?? args.buff.duration },
-      });
+      // Its own copy, because decreaseOrRemoveBuffs ticks the buff object down
+      // and a shared row would drain every drinker at once — and one entry per
+      // name, so a second potion extends the first rather than doubling it.
+      applyBuff({ target: user, buff: args.buff, duration: args.buffDuration });
       restored.push(args.buff.name);
     }
 
@@ -644,7 +660,7 @@ export class BattleInstance {
     const debuff = args.skill.skill.debuff;
     if (!debuff) return;
 
-    if (applyDebuff({ monster: args.monster, debuff })) {
+    if (applyDebuff({ target: args.monster, debuff })) {
       this.pushLog({
         icon: debuff.image,
         log: `${args.monster.name} is afflicted with ${debuff.name} by ${args.user.name}`,
@@ -784,14 +800,9 @@ export class BattleInstance {
    */
   private grantBuff(args: { target: UserWithStats; caster: UserWithStats; skill: LearnedSkillWithSkill }) {
     const buff = args.skill.skill.buff;
-    args.target.buffs.push({
-      duration: buff.duration,
-      id: 0,
-      userEmail: args.target.email,
-      buffId: buff.id,
-      // A copy, so nothing at the table can write back into the shared row
-      // hanging off the skill definition.
-      buff: { ...buff },
+    applyBuff({
+      target: args.target,
+      buff,
       // A barrier is worth whatever the caster's stats made it worth when it went
       // up. Locking the size in here is what lets a Priest's shield outlive the
       // turn they cast it on without re-reading stats that may since have moved.
@@ -938,6 +949,7 @@ export class BattleInstance {
       this.burnPoison(monster);
       const stunned = isStunned(monster);
       tickDebuffs(monster);
+      tickBuffs(monster);
 
       // Losing the turn still ends it — otherwise a stunned monster holds the
       // order and the fight stops moving until the stun is ticked off by
@@ -949,7 +961,8 @@ export class BattleInstance {
         return this.afterDamageStep();
       }
 
-      const monsterDamage = debuffedAttack(monster, this.enrageMonsterDamage(monster));
+      // Its own buffs raise the swing, whatever the party has stuck on it lowers it.
+      const monsterDamage = debuffedAttack(monster, buffedAttack(monster, this.enrageMonsterDamage(monster)));
       const targetUser = this.getHighestAggroPlayer();
       return this.beforeDamageStep({
         attacker: 'monster',
@@ -972,7 +985,7 @@ export class BattleInstance {
    * the fight would be a second, unbudgeted damage source in that ledger.
    */
   private burnPoison(monster: MonsterInBattle) {
-    const damage = poisonDamage(monster);
+    const damage = poisonDamage({ carrier: monster, maxHealth: monster.maxHealth });
     if (damage <= 0) return;
 
     monster.health -= damage;
@@ -1015,9 +1028,53 @@ export class BattleInstance {
         // meant a five-player party shredded the tank's lead five times over.
         this.decreasePlayersAggro();
       }
-      if (this.canAct(this.attackerList[this.attackerTurn])) break;
+      const name = this.attackerList[this.attackerTurn];
+      if (!this.canAct(name)) continue;
+      // A player's own debuffs are paid at the top of their turn, exactly as a
+      // monster's are at the top of its own — and a stun costs the turn, which
+      // means looking for the next slot rather than stopping here.
+      if (await this.startPlayerTurn(name)) break;
     }
     return this.attackerTurn;
+  }
+
+  /**
+   * Whether whoever holds this slot may use it, once what is stuck on them has
+   * been paid. Monsters answer for themselves in `processMonsterAttack`, so a
+   * slot that is not a player's passes straight through.
+   */
+  private async startPlayerTurn(name: string) {
+    const user = this.users.find((u) => u.name === name);
+    if (!user) return true;
+
+    this.burnPlayerPoison(user);
+    if (!this.isPlayersAlive) {
+      // Burned down the last of the party: the fight is over, and settling it
+      // here is what stops the order advancing into an empty table.
+      await this.settleBattleAndProcessRewards();
+      return true;
+    }
+    if (user.isDead) return false;
+
+    const stunned = isStunned(debuffsOf(user));
+    tickDebuffs(debuffsOf(user));
+    if (stunned) {
+      this.pushLog({ log: `${user.name} is unable to act` });
+      return false;
+    }
+    return true;
+  }
+
+  /** Poison on a player, burned off the health they walked in with. */
+  private burnPlayerPoison(user: UserWithStats) {
+    const damage = poisonDamage({ carrier: debuffsOf(user), maxHealth: user.stats.maxHealth });
+    if (damage <= 0) return;
+
+    this.damageUser({ user, amount: damage });
+    this.pushLog({
+      log: `${user.name} takes ${damage} damage from poison`,
+      icon: user.debuffs?.find((debuff) => debuff.effect === DebuffEffect.Poison)?.image,
+    });
   }
 
   /** Whether whoever holds this slot in the order is still in a state to use it. */
@@ -1113,14 +1170,16 @@ export class BattleInstance {
         raw: randomDmg,
         // Shredded armour is read here rather than written onto the monster, so
         // the debuff wearing off restores it without anything to unwind.
-        defense: debuffedDefense(monster),
+        defense: debuffedDefense(monster, monster.defense),
         attackerLevel: user.stats.level,
       });
+      // Whatever the monster is wearing takes its share before the health does.
+      const landed = buffedDamageTaken(monster, dealt);
       // Aggro decays every round; this is the running total the guild boss pays out on.
-      this.damageDealt[user.email] = (this.damageDealt[user.email] ?? 0) + Math.max(dealt, 0);
-      monster.health -= dealt;
+      this.damageDealt[user.email] = (this.damageDealt[user.email] ?? 0) + Math.max(landed, 0);
+      monster.health -= landed;
       this.pushLog({
-        log: `${user.name} Dealt ${dealt} damage to ${monster.name}`,
+        log: `${user.name} Dealt ${landed} damage to ${monster.name}`,
         icon: damage.image,
       });
     }
@@ -1132,7 +1191,9 @@ export class BattleInstance {
 
       const taken = BattleUtils.mitigate({
         raw: randomDmg,
-        defense: BattleUtils.effectiveDefense(user.stats),
+        // A player's armour is shredded the same way a monster's is — read at
+        // the moment of the hit, so nothing has to be unwound when it expires.
+        defense: debuffedDefense(debuffsOf(user), BattleUtils.effectiveDefense(user.stats)),
         attackerLevel: monster.level,
       });
       this.damageUser({ user: user, amount: taken });
@@ -1287,20 +1348,34 @@ export class BattleInstance {
       this.pushLog({ icon: args.buff.image, log: `${args.by} granted ${args.buff.name} to the party` });
     }
 
+    if (action === 'buff_monsters') {
+      if (!args.buff) return false;
+      this.aliveMonsters.forEach((monster) => applyBuff({ target: monster, buff: args.buff }));
+      this.pushLog({ icon: args.buff.image, log: `${args.by} granted ${args.buff.name} to the enemy` });
+    }
+
     if (action === 'clear_buffs') {
       this.users.forEach((user) => (user.buffs = []));
-      this.pushLog({ log: `${args.by} stripped the party's buffs` });
+      this.monsters.forEach((monster) => (monster.buffs = []));
+      this.pushLog({ log: `${args.by} stripped every buff` });
     }
 
     if (action === 'debuff_monsters') {
       if (!args.debuff) return false;
-      this.aliveMonsters.forEach((monster) => applyDebuff({ monster, debuff: args.debuff }));
+      this.aliveMonsters.forEach((monster) => applyDebuff({ target: monster, debuff: args.debuff }));
       this.pushLog({ icon: args.debuff.image, log: `${args.by} afflicted the enemy with ${args.debuff.name}` });
+    }
+
+    if (action === 'debuff_allies') {
+      if (!args.debuff) return false;
+      this.users.forEach((user) => applyDebuff({ target: debuffsOf(user), debuff: args.debuff }));
+      this.pushLog({ icon: args.debuff.image, log: `${args.by} afflicted the party with ${args.debuff.name}` });
     }
 
     if (action === 'clear_debuffs') {
       this.monsters.forEach((monster) => (monster.debuffs = []));
-      this.pushLog({ log: `${args.by} cleansed the enemy` });
+      this.users.forEach((user) => (user.debuffs = []));
+      this.pushLog({ log: `${args.by} cleansed everyone` });
     }
 
     if (action === 'restore_mana') {
@@ -1337,12 +1412,9 @@ export class BattleInstance {
    * health — enough to be visible and to be spent, which is what a test needs.
    */
   private grantDebugBuff(args: { target: UserWithStats; buff: Buff }) {
-    args.target.buffs.push({
-      duration: args.buff.duration,
-      id: 0,
-      userEmail: args.target.email,
-      buffId: args.buff.id,
-      buff: { ...args.buff },
+    applyBuff({
+      target: args.target,
+      buff: args.buff,
       barrier:
         args.buff.effect === BuffEffect.Barrier ? Math.max(1, Math.floor(args.target.stats.maxHealth / 2)) : undefined,
     });
@@ -1383,12 +1455,17 @@ export class BattleInstance {
       ...monster,
       maxHealth: monster.health,
       debuffs: [],
+      buffs: [],
     }));
   }
 
   private generateUserBattleValues(users: UserWithStats[]) {
     users.forEach((user) => {
       user.aggro = 0;
+      // Never carried in from the last fight: a debuff is spent inside the one
+      // that applied it, and the cached profile these come from may still be
+      // holding the list a previous battle left on it.
+      user.debuffs = [];
       user.learnedSkills.forEach((ls) => {
         ls.cooldown = 0;
       });

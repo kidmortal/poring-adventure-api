@@ -1,4 +1,6 @@
 import { BattleInstance, MonsterWithDrops, UserWithStats } from './battle';
+import { buffedAttack } from './buffs';
+import { debuffedAttack } from './debuffs';
 
 /**
  * The engine driven end to end, because the pieces these tests cover only meet
@@ -36,6 +38,8 @@ const AEGIS = {
   maxStack: 1,
   attackBonus: 0,
   healthBonus: 0,
+  critRateBonus: 0,
+  critDamageBonus: 0,
 };
 
 const SUNDERED = {
@@ -45,6 +49,16 @@ const SUNDERED = {
   duration: 3,
   image: 'sundered.webp',
   potency: 25,
+  maxStack: 1,
+};
+
+const POISON = {
+  id: 7,
+  name: 'Venom',
+  effect: 'poison',
+  duration: 3,
+  image: 'venom.webp',
+  potency: 10,
   maxStack: 1,
 };
 
@@ -243,6 +257,70 @@ describe('BattleInstance', () => {
       // party got 160 points of hits for free.
       expect(after.users[0].stats.health).toBeLessThan(200);
       expect(after.log.some((entry: { message: string }) => entry.message.includes('absorbed'))).toBe(true);
+    });
+  });
+
+  describe('a buff arriving twice', () => {
+    it('refreshes rather than stacking a second copy on the same player', async () => {
+      const { battle, state } = build([player('Mage', [])], [monster('Poring')]);
+      const powerUp = { ...AEGIS, id: 4, name: 'Power up', effect: 'power_up', duration: 5 };
+
+      await battle.runDebugAction({ action: 'buff_allies', by: 'an admin', buff: powerUp });
+      await battle.runDebugAction({ action: 'buff_allies', by: 'an admin', buff: powerUp });
+      await battle.runDebugAction({ action: 'buff_allies', by: 'an admin', buff: powerUp });
+
+      // Three casts, one icon — the screen that started this was three of them.
+      expect(state().users[0].buffs).toHaveLength(1);
+      expect(state().users[0].buffs[0].duration).toBe(5);
+    });
+
+    it('keeps the longer duration when a shorter one lands on top', async () => {
+      const { battle, state } = build([player('Mage', [])], [monster('Poring')]);
+      const long = { ...AEGIS, id: 4, name: 'Power up', effect: 'power_up', duration: 8 };
+      const short = { ...long, duration: 2 };
+
+      await battle.runDebugAction({ action: 'buff_allies', by: 'an admin', buff: long });
+      await battle.runDebugAction({ action: 'buff_allies', by: 'an admin', buff: short });
+
+      expect(state().users[0].buffs[0].duration).toBe(8);
+    });
+  });
+
+  describe("the two sides carrying each other's effects", () => {
+    it('puts a buff on a monster, and lets it hit harder for it', async () => {
+      const { battle, state } = build([player('Mage', [])], [monster('Poring', { attack: 100 })]);
+      const rage = { ...AEGIS, id: 5, name: 'Rage', effect: 'power_up', attackBonus: 50, duration: 3 };
+
+      await battle.runDebugAction({ action: 'buff_monsters', by: 'an admin', buff: rage });
+
+      expect(state().monsters[0].buffs).toHaveLength(1);
+      expect(buffedAttack(state().monsters[0], 100)).toBe(150);
+    });
+
+    it('puts a debuff on the party, and weakens what they swing for', async () => {
+      const { battle, state } = build([player('Mage', [])], [monster('Poring')]);
+      const weakened = { ...POISON, id: 8, name: 'Weakened', effect: 'attack_down', potency: 40 };
+
+      await battle.runDebugAction({ action: 'debuff_allies', by: 'an admin', debuff: weakened });
+
+      expect(state().users[0].debuffs).toHaveLength(1);
+      expect(debuffedAttack(state().users[0], 100)).toBe(60);
+    });
+
+    it('burns a poisoned player at the top of their own turn', async () => {
+      const { battle, state, giveTurn } = build([player('Mage', []), player('Priest', [])], [monster('Poring')]);
+
+      await battle.runDebugAction({ action: 'debuff_allies', by: 'an admin', debuff: POISON });
+      const before = state().users[0].stats.health;
+
+      // Hand the turn round the order until it comes back to the Mage.
+      giveTurn('Mage');
+      await battle.runDebugAction({ action: 'next_turn', by: 'an admin' });
+      await battle.runDebugAction({ action: 'next_turn', by: 'an admin' });
+      await battle.runDebugAction({ action: 'next_turn', by: 'an admin' });
+
+      // 10% of a 200 pool, once their slot came round again.
+      expect(state().users[0].stats.health).toBeLessThan(before);
     });
   });
 

@@ -1,15 +1,17 @@
 import { Debuff } from '@prisma/client';
 
-import { MonsterInBattle } from './battle';
-
 /**
- * What a skill can leave on a monster.
+ * What can be stuck on a combatant — monster or player alike.
  *
- * This is the enemy-side counterpart of `effects.ts`. The difference in shape is
- * deliberate: a buff hooks the damage step of the player wearing it, while a
- * debuff is read by the engine at three fixed points — when the monster is hit,
- * when it swings, and when its turn comes round. There is nothing to dispatch
+ * This is the counterpart of `effects.ts`. The difference in shape is
+ * deliberate: a buff hooks the damage step of whoever wears it, while a debuff
+ * is read by the engine at three fixed points — when its carrier is hit, when
+ * it swings, and when its turn comes round. There is nothing to dispatch
  * per-hit, so these are plain queries over the list rather than an effect map.
+ *
+ * Nothing here knows what a monster is. A carrier is anything with a list of
+ * debuffs and the one number the query needs, which is what lets the same
+ * poison burn a player and a boss without a second implementation.
  */
 export enum DebuffEffect {
   /** Armour shredded: the monster mitigates less of what the party lands. */
@@ -48,26 +50,33 @@ export function toBattleDebuff(debuff: Debuff): BattleDebuff {
   };
 }
 
-/**
- * Puts a debuff on a monster, refreshing rather than stacking once the debuff's
- * own `maxStack` is reached — a party of four Assassins re-applying the same
- * poison every turn should not multiply it four times over.
- */
-export function applyDebuff(args: { monster: MonsterInBattle; debuff: Debuff }) {
-  const { monster, debuff } = args;
-  const existing = monster.debuffs.filter((d) => d.name === debuff.name);
+/** Anything that can carry debuffs: a monster, or a player at the table. */
+export type DebuffCarrier = { debuffs: BattleDebuff[] };
 
-  if (existing.length >= Math.max(debuff.maxStack, 1)) {
-    existing.forEach((d) => (d.duration = debuff.duration));
+/**
+ * Puts a debuff on a carrier — one copy, and re-applying refreshes it.
+ *
+ * A second copy of the same name is never added. Two Assassins poisoning the
+ * same monster, or one of them doing it every turn, would otherwise pile up
+ * duplicate icons and multiply a potency that was tuned to be applied once. The
+ * refresh takes the longer of what is left and what is being applied, so a
+ * fresh cast cannot cut short a longer one already running.
+ */
+export function applyDebuff(args: { target: DebuffCarrier; debuff: Debuff }) {
+  const { target, debuff } = args;
+  const existing = target.debuffs.find((d) => d.name === debuff.name);
+
+  if (existing) {
+    existing.duration = Math.max(existing.duration, debuff.duration);
     return false;
   }
 
-  monster.debuffs.push(toBattleDebuff(debuff));
+  target.debuffs.push(toBattleDebuff(debuff));
   return true;
 }
 
-function totalPotency(monster: MonsterInBattle, effect: DebuffEffect) {
-  return monster.debuffs
+function totalPotency(carrier: DebuffCarrier, effect: DebuffEffect) {
+  return carrier.debuffs
     .filter((debuff) => debuff.effect === effect)
     .reduce((total, debuff) => total + debuff.potency, 0);
 }
@@ -78,39 +87,39 @@ function reduced(value: number, percent: number) {
   return Math.floor(value * (1 - Math.min(percent, MAX_STAT_REDUCTION * 100) / 100));
 }
 
-/** The defense the monster actually mitigates with, once its armour is shredded. */
-export function debuffedDefense(monster: MonsterInBattle) {
-  return reduced(monster.defense, totalPotency(monster, DebuffEffect.DefenseDown));
+/** The defense actually mitigated with, once the armour is shredded. */
+export function debuffedDefense(carrier: DebuffCarrier, defense: number) {
+  return reduced(defense, totalPotency(carrier, DebuffEffect.DefenseDown));
 }
 
-/** The damage the monster actually swings for, once it has been weakened. */
-export function debuffedAttack(monster: MonsterInBattle, attack: number) {
-  return Math.max(1, reduced(attack, totalPotency(monster, DebuffEffect.AttackDown)));
+/** The damage actually swung for, once weakened. */
+export function debuffedAttack(carrier: DebuffCarrier, attack: number) {
+  return Math.max(1, reduced(attack, totalPotency(carrier, DebuffEffect.AttackDown)));
 }
 
-export function isStunned(monster: MonsterInBattle) {
-  return monster.debuffs.some((debuff) => debuff.effect === DebuffEffect.Stun && debuff.duration > 0);
+export function isStunned(carrier: DebuffCarrier) {
+  return carrier.debuffs.some((debuff) => debuff.effect === DebuffEffect.Stun && debuff.duration > 0);
 }
 
 /**
- * What poison costs the monster this turn: a share of the health it started the
- * fight with, so a burn tuned against a map monster does not become the entire
- * fight when the same skill is pointed at a guild boss.
+ * What poison costs this turn: a share of the health its carrier started with,
+ * so a burn tuned against a map monster does not become the entire fight when
+ * the same skill is pointed at a guild boss — or at a player.
  */
-export function poisonDamage(monster: MonsterInBattle) {
-  const percent = Math.min(totalPotency(monster, DebuffEffect.Poison), MAX_POISON_PER_TURN * 100);
+export function poisonDamage(args: { carrier: DebuffCarrier; maxHealth: number }) {
+  const percent = Math.min(totalPotency(args.carrier, DebuffEffect.Poison), MAX_POISON_PER_TURN * 100);
   if (percent <= 0) return 0;
-  return Math.max(1, Math.floor((monster.maxHealth * percent) / 100));
+  return Math.max(1, Math.floor((args.maxHealth * percent) / 100));
 }
 
 /**
- * Ticks a monster's debuffs down by one of its own turns and drops what has run
- * out. Called once when the monster's slot in the order comes up, so a debuff
- * lasting two turns lasts two of the monster's turns whatever the party size.
+ * Ticks debuffs down by one of the carrier's own turns and drops what has run
+ * out. Called once when its slot in the order comes up, so a debuff lasting two
+ * turns lasts two of *its* turns whatever the party size.
  */
-export function tickDebuffs(monster: MonsterInBattle) {
-  monster.debuffs.forEach((debuff) => (debuff.duration -= 1));
-  const expired = monster.debuffs.filter((debuff) => debuff.duration < 1);
-  monster.debuffs = monster.debuffs.filter((debuff) => debuff.duration >= 1);
+export function tickDebuffs(carrier: DebuffCarrier) {
+  carrier.debuffs.forEach((debuff) => (debuff.duration -= 1));
+  const expired = carrier.debuffs.filter((debuff) => debuff.duration < 1);
+  carrier.debuffs = carrier.debuffs.filter((debuff) => debuff.duration >= 1);
   return expired;
 }

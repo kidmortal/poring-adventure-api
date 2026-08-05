@@ -136,17 +136,37 @@ Two things that are easy to get wrong:
 ## Buffs, barriers and debuffs
 
 - **Buffs** tick down on their holder's own turn and are dropped at zero.
+- **Neither buffs nor debuffs stack.** A second copy of the same name refreshes
+  the one already there, to the longer of the two durations, so re-casting
+  extends a blessing rather than doubling it and a fresh cast can never cut a
+  running one short. `Buff.maxStack` deliberately does not gate this: on a meal
+  it means the ceiling on *banked duration across battles*, enforced where food
+  is eaten, and reading it as a copy count at the table would turn two dinners
+  into two multipliers.
 - **`second_wind`** catches the blow that would kill you and is consumed, leaving
   you at 30% health — what a party can buy instead of bringing a Priest.
 - **`barrier`** is borrowed health, spent before real health, oldest first. Its
   size is locked in from the caster's stats when raised, so it outlives changes
   to those stats. Worth most against many small hits — the opposite of the
   defense curve.
-- **Debuffs** sit on the monster for the fight and are **never persisted**. They
-  are paid out at the top of the monster's own turn (`processMonsterAttack`), so
-  a two-turn debuff is two of its swings whatever the party size — and that is
-  also the only place that still runs when a stun costs it the turn. Effects:
-  `defense_down`, `attack_down`, `poison`, `stun`.
+- **Debuffs** sit on their carrier for the fight and are **never persisted**.
+  Effects: `defense_down`, `attack_down`, `poison`, `stun`.
+  - On a monster they are paid at the top of its own turn
+    (`processMonsterAttack`), so a two-turn debuff is two of its swings whatever
+    the party size — and that is also the only place that still runs when a stun
+    costs it the turn.
+  - **A player carries them too**, paid the same way at the top of their turn
+    (`startPlayerTurn`): poison burns a share of the pool they walked in with,
+    a stun costs them the slot, and the shred and the weakening are read at the
+    moment they are hit or swing. Nothing in the game applies one yet — monsters
+    have no skills — so today they arrive from the debug panel, but the reads
+    are wired so a monster ability would need no engine work.
+
+- **A monster can carry buffs**, from the same catalogue the party's come from.
+  It has no per-hit hooks the way `effects.ts` gives a player, so they are read
+  as plain queries like debuffs are (`buffs.ts`): `attackBonus` raises what it
+  swings for, `healthBonus` cuts what it takes, capped at half. Both tick on its
+  own turn.
   - Poison damage is deliberately **not** credited to anyone's damage total,
     because the guild boss pays out on hits landed.
 
