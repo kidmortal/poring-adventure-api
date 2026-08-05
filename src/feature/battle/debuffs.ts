@@ -20,6 +20,15 @@ export enum DebuffEffect {
   AttackDown = 'attack_down',
   /** Burns a share of the monster's starting health at the top of its turn. */
   Poison = 'poison',
+  /**
+   * The same tick, paid as a flat number instead of a share.
+   *
+   * This is the one a caster can point at anything: `poison` is worth more the
+   * bigger its carrier, which makes a percentage tuned against a map monster
+   * into a free quarter of a boss, while a burn is worth whatever the caster's
+   * own stats made it worth when it landed and no more.
+   */
+  Burn = 'burn',
   /** The monster loses its turn outright. */
   Stun = 'stun',
 }
@@ -32,6 +41,12 @@ export type BattleDebuff = {
   potency: number;
   /** Turns of the monster's own turns still to run. */
   duration: number;
+  /**
+   * What a burn costs its carrier each turn. Locked in from whoever applied it,
+   * the way a barrier's pool is, because it is the only number here that does
+   * not come off the row — everything else is a percentage of the carrier.
+   */
+  amount?: number;
 };
 
 /** No single debuff, and no pile of them, may take more than this off a stat. */
@@ -40,13 +55,14 @@ const MAX_STAT_REDUCTION = 0.7;
 /** Nor may poison burn more than this share of a monster per turn. */
 const MAX_POISON_PER_TURN = 0.25;
 
-export function toBattleDebuff(debuff: Debuff): BattleDebuff {
+export function toBattleDebuff(debuff: Debuff, amount?: number): BattleDebuff {
   return {
     name: debuff.name,
     effect: debuff.effect,
     image: debuff.image,
     potency: debuff.potency,
     duration: debuff.duration,
+    amount,
   };
 }
 
@@ -60,19 +76,36 @@ export type DebuffCarrier = { debuffs: BattleDebuff[] };
  * same monster, or one of them doing it every turn, would otherwise pile up
  * duplicate icons and multiply a potency that was tuned to be applied once. The
  * refresh takes the longer of what is left and what is being applied, so a
- * fresh cast cannot cut short a longer one already running.
+ * fresh cast cannot cut short a longer one already running — and the larger of
+ * the two burns, so the stronger caster's number is the one that stands.
  */
-export function applyDebuff(args: { target: DebuffCarrier; debuff: Debuff }) {
+export function applyDebuff(args: { target: DebuffCarrier; debuff: Debuff; amount?: number }) {
   const { target, debuff } = args;
   const existing = target.debuffs.find((d) => d.name === debuff.name);
 
   if (existing) {
     existing.duration = Math.max(existing.duration, debuff.duration);
+    existing.amount = Math.max(existing.amount ?? 0, args.amount ?? 0) || undefined;
     return false;
   }
 
-  target.debuffs.push(toBattleDebuff(debuff));
+  target.debuffs.push(toBattleDebuff(debuff, args.amount));
   return true;
+}
+
+/**
+ * Strips everything off a carrier and hands back what was lifted, so the caller
+ * can say whose curse it broke.
+ *
+ * Deliberately unconditional: a cleanse that picked and chose which debuff to
+ * lift would need the party to read the icons before casting, and a support
+ * turn is already expensive enough. What it costs is that it is worth nothing
+ * against a clean party — which is the decision the Priest is making.
+ */
+export function clearDebuffs(carrier: DebuffCarrier) {
+  const lifted = carrier.debuffs;
+  carrier.debuffs = [];
+  return lifted;
 }
 
 function totalPotency(carrier: DebuffCarrier, effect: DebuffEffect) {
@@ -110,6 +143,21 @@ export function poisonDamage(args: { carrier: DebuffCarrier; maxHealth: number }
   const percent = Math.min(totalPotency(args.carrier, DebuffEffect.Poison), MAX_POISON_PER_TURN * 100);
   if (percent <= 0) return 0;
   return Math.max(1, Math.floor((args.maxHealth * percent) / 100));
+}
+
+/**
+ * What the burns on a carrier cost it this turn: the flat amounts they landed
+ * with, added up.
+ *
+ * Nothing here reads the carrier at all, which is the entire point. A poison
+ * tuned to hurt a map monster is a quarter of a boss for the same cast; a burn
+ * is the caster's number wherever it is pointed, so a party cannot buy its way
+ * through something enormous by stacking ticks on it.
+ */
+export function burnDamage(carrier: DebuffCarrier) {
+  return carrier.debuffs
+    .filter((debuff) => debuff.effect === DebuffEffect.Burn)
+    .reduce((total, debuff) => total + Math.max(debuff.amount ?? 0, 0), 0);
 }
 
 /**

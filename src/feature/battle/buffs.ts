@@ -16,6 +16,9 @@ export type BuffCarrier = {
   buffs: { buff: Buff; duration: number }[];
 };
 
+/** What a regeneration buff hands its holder at the top of each of their turns. */
+export const REGENERATION_EFFECT = 'regeneration';
+
 /** No pile of buffs may take more than this share off the damage taken. */
 const MAX_DAMAGE_REDUCTION = 0.5;
 
@@ -33,7 +36,13 @@ const MAX_DAMAGE_REDUCTION = 0.5;
  * where food is eaten — and reading it as a copy count here would let two
  * dinners become two multipliers.
  */
-export function applyBuff(args: { target: BuffCarrier; buff: Buff; duration?: number; barrier?: number }) {
+export function applyBuff(args: {
+  target: BuffCarrier;
+  buff: Buff;
+  duration?: number;
+  barrier?: number;
+  regen?: number;
+}) {
   const duration = args.duration ?? args.buff.duration;
   const existing = args.target.buffs.find((held) => held.buff.name === args.buff.name);
 
@@ -51,8 +60,26 @@ export function applyBuff(args: { target: BuffCarrier; buff: Buff; duration?: nu
     // row hanging off a skill definition.
     buff: { ...args.buff },
     barrier: args.barrier,
+    regen: args.regen,
   } as BuffCarrier['buffs'][number]);
   return true;
+}
+
+/** One regeneration buff's payout: what it hands back, and what to call it. */
+export type Regeneration = { name: string; image: string; amount: number };
+
+/**
+ * What a carrier's regeneration buffs give back this turn, one entry each so the
+ * caller can say which blessing did it.
+ *
+ * The amount was locked in when the buff went up, the way a barrier's pool is —
+ * it is the caster's number, not the holder's, and re-reading it here would let
+ * a blessing change value halfway through its own duration.
+ */
+export function regenerations(carrier: { buffs: { buff: Buff; regen?: number }[] }): Regeneration[] {
+  return carrier.buffs
+    .filter((held) => held.buff.effect === REGENERATION_EFFECT && (held.regen ?? 0) > 0)
+    .map((held) => ({ name: held.buff.name, image: held.buff.image, amount: held.regen }));
 }
 
 function totalBonus(carrier: BuffCarrier, read: (buff: Buff) => number | null | undefined) {

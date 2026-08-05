@@ -115,10 +115,16 @@ healing path calls and which logs the crit when it lands:
 | Category | Behaviour |
 |---|---|
 | `target_enemy` | Damage. `areaOfEffect` hits every living monster at `AREA_POWER_MULTIPLIER = 0.7` each. |
-| `target_ally` | `effect` is `healing` or `infusion`. Area version reaches the whole living party at the same 0.7 rate. Skips the dead. |
+| `target_ally` | `effect` is `healing`, `infusion` or `cleanse`. Area version reaches the whole living party — the two restoring ones at the same 0.7 rate, a cleanse in full. Skips the dead. |
 | `buff_self` | Puts the skill's buff on the caster. |
 | `self_restore` | Heals or infuses **the caster only** — a Mage's own sustain, kept apart from `target_ally` so only a Priest can put resources on someone else. |
 | `buff_party` | The skill's buff on everyone still standing, each getting their own copy. |
+| `debuff_enemy` | The skill's debuff and nothing else — no damage, and so no threat. `areaOfEffect` curses every monster standing. A skill in this category without a `debuffName` is a turn that does nothing, which the seed refuses. |
+
+**A cleanse** lifts every debuff off its targets and restores nothing. It reads
+none of the skill's potency: what it is worth is whatever the fight has managed
+to stick on the party, which is nothing at all against a clean one. Untargeted
+and single-target, it goes to whoever is carrying the most.
 
 Power is `attack + stats[attribute] × multiplier × masteryLevel`. Threat is
 `damage × threatModifier` — decoupled from damage so a tank can hold aggro
@@ -156,31 +162,58 @@ Two things that are easy to get wrong:
   size is locked in from the caster's stats when raised, so it outlives changes
   to those stats. Worth most against many small hits — the opposite of the
   defense curve.
+- **`regeneration`** is a heal paid in instalments: it hands its holder a flat
+  amount at the top of each of *their own* turns, the mirror of poison and
+  ticked in the same place (`startPlayerTurn`). The amount is locked in from the
+  caster the way a barrier's pool is, so a Priest's blessing is worth the
+  Priest's intelligence wherever it ends up. It is paid **before** poison, so a
+  regeneration large enough to out-heal a burn saves the player rather than
+  arriving on a corpse, and it logs only what actually landed.
+- **A buff needs no `effect` at all** to be worth casting. `critRateBonus` and
+  `critDamageBonus` are read off the row at the moment of the roll, so a
+  blessing that only sharpens crits — the Priest's `Inspired` — is two columns
+  and no code.
 - **Debuffs** sit on their carrier for the fight and are **never persisted**.
-  Effects: `defense_down`, `attack_down`, `poison`, `stun`.
+  Effects: `defense_down`, `attack_down`, `poison`, `burn`, `stun`.
+  - **`poison` and `burn` are the same tick priced two different ways.** Poison
+    costs a share of what it is stuck on, capped at `MAX_POISON_PER_TURN = 25%`
+    a turn — which means it is worth more the bigger the enemy, and a potency
+    tuned against a map monster is a free quarter of a boss. A burn instead
+    carries a flat `amount`, locked in from the caster's
+    `attribute × multiplier × mastery` when it lands, the way a barrier's pool
+    is. Point a burn at a guild boss and it is worth exactly what it was worth
+    on a Poring, which is why the Priest's Holy Fire is one.
+  - Neither is credited to anyone's damage total, because the guild boss pays
+    out on hits landed.
   - On a monster they are paid at the top of its own turn
     (`processMonsterAttack`), so a two-turn debuff is two of its swings whatever
     the party size — and that is also the only place that still runs when a stun
     costs it the turn.
   - **A player carries them too**, paid the same way at the top of their turn
-    (`startPlayerTurn`): poison burns a share of the pool they walked in with,
+    (`startPlayerTurn`): poison and burn come off the pool they walked in with,
     a stun costs them the slot, and the shred and the weakening are read at the
     moment they are hit or swing. Nothing in the game applies one yet — monsters
     have no skills — so today they arrive from the debug panel, but the reads
     are wired so a monster ability would need no engine work.
+  - **The only way one comes off early is a cleanse** (`clearDebuffs`), which is
+    the Priest's, and it takes everything or nothing. A cleanse that picked which
+    curse to lift would need the party reading icons before the cast, and a
+    support turn is expensive enough already.
 
 - **A monster can carry buffs**, from the same catalogue the party's come from.
   It has no per-hit hooks the way `effects.ts` gives a player, so they are read
   as plain queries like debuffs are (`buffs.ts`): `attackBonus` raises what it
   swings for, `healthBonus` cuts what it takes, capped at half. Both tick on its
   own turn.
-  - Poison damage is deliberately **not** credited to anyone's damage total,
-    because the guild boss pays out on hits landed.
 
 ## Aggro
 
 `user.aggro` accumulates per hit; the monster targets the highest among living
 players (`getHighestAggroPlayer`). Decays 20% per round.
+
+Only damage makes noise. A `debuff_enemy` cast generates none, because there is
+no number to generate it from — a support who weakens a boss should not end up
+holding it.
 
 ## Enrage
 

@@ -4,11 +4,13 @@ import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { Utils } from 'src/utilities/utils';
 import { runEffect } from './effects';
 import { absorbDamage, isSpentBarrier } from './barrier';
-import { applyBuff, buffedAttack, buffedDamageTaken, tickBuffs } from './buffs';
+import { applyBuff, buffedAttack, buffedDamageTaken, regenerations, tickBuffs } from './buffs';
 import { rollCritical } from './crit';
 import {
   applyDebuff,
   BattleDebuff,
+  burnDamage,
+  clearDebuffs,
   DebuffEffect,
   debuffedAttack,
   debuffedDefense,
@@ -33,11 +35,23 @@ enum SkillCategory {
    * not, and it is the only reason to bring one to a fight the party is winning.
    */
   BuffParty = 'buff_party',
+  /**
+   * A turn spent making the enemy worse rather than smaller. The debuff lands
+   * and nothing else does — no damage, and so no threat — which is what lets a
+   * Priest weaken a boss without pulling it off the Knight.
+   */
+  DebuffEnemy = 'debuff_enemy',
 }
 
 enum SkillEffect {
   Healing = 'healing',
   Infusion = 'infusion',
+  /**
+   * Lifts what the fight has stuck on the party. It restores nothing, which is
+   * the trade: against a clean party it is a wasted turn, and against a poisoned
+   * one it is worth more than any single heal.
+   */
+  Cleanse = 'cleanse',
 }
 
 /** Buff effects the engine acts on directly rather than through `runEffect`. */
@@ -49,6 +63,13 @@ enum BuffEffect {
    * what is left of it is state, not a multiplier applied to one hit.
    */
   Barrier = 'barrier',
+  /**
+   * Health handed back at the top of each of the holder's own turns. Like a
+   * barrier it is state rather than a multiplier, and like a barrier its size is
+   * locked in from the caster when it goes up — a Priest's blessing is worth
+   * their intelligence, not the intelligence of whoever is carrying it.
+   */
+  Regeneration = 'regeneration',
 }
 
 /**
@@ -137,6 +158,11 @@ type UserBuffWithBuff = UserBuff & {
    * there is nothing to store on the Buff row and nothing to persist afterwards.
    */
   barrier?: number;
+  /**
+   * What a regeneration buff hands back each turn. Sized off the caster when it
+   * went up, for the same reason a barrier is.
+   */
+  regen?: number;
 };
 
 type LearnedSkillWithSkill = LearnedSkill & {
@@ -521,6 +547,12 @@ export class BattleInstance {
           return this.processCastSelfRestore({ user, skill });
         case SkillCategory.BuffParty:
           return this.processCastBuffParty({ user, skill });
+        case SkillCategory.DebuffEnemy:
+          return this.processCastDebuffEnemy({
+            user,
+            skill,
+            targetName: args.targetName,
+          });
 
         default:
           return this.processCastTargetEnemy({ user, skill });
@@ -660,12 +692,54 @@ export class BattleInstance {
     const debuff = args.skill.skill.debuff;
     if (!debuff) return;
 
-    if (applyDebuff({ target: args.monster, debuff })) {
+    if (
+      applyDebuff({
+        target: args.monster,
+        debuff,
+        // A burn is the only debuff sized off the caster rather than off what it
+        // lands on, so it is locked in here the way a barrier's pool is.
+        amount: debuff.effect === DebuffEffect.Burn ? this.castAmount(args.user, args.skill) : undefined,
+      })
+    ) {
       this.pushLog({
         icon: debuff.image,
         log: `${args.monster.name} is afflicted with ${debuff.name} by ${args.user.name}`,
       });
     }
+  }
+
+  /**
+   * A curse and nothing else: the skill's debuff lands on one monster, or on
+   * every one standing when it is an area cast, and the turn ends.
+   *
+   * No damage, and deliberately no threat with it. A cast that generated aggro
+   * off a number it never dealt would have to invent one, and a support who
+   * weakens a boss should not end up holding it — the party's whole reason for
+   * a Knight is that threat is bought on purpose, by the class that can survive
+   * being looked at.
+   */
+  private async processCastDebuffEnemy(args: {
+    user: UserWithStats;
+    skill: LearnedSkillWithSkill;
+    targetName?: string;
+  }) {
+    const debuff = args.skill.skill.debuff;
+    const targets = args.skill.skill.areaOfEffect
+      ? this.aliveMonsters
+      : [args.targetName ? this.getMonsterTarget(args.targetName) : this.defaultMonsterTarget()].filter(Boolean);
+
+    // Nothing left to curse. Refunded rather than eaten, the same way a damage
+    // cast into an empty table is.
+    if (targets.length === 0 || !debuff) return false;
+
+    args.user.stats.mana -= args.skill.skill.manaCost;
+    this.pushLog({
+      icon: args.skill.skill.image,
+      log: `${args.user.name} cast ${args.skill.skill.name}`,
+    });
+    targets.forEach((monster) => this.applySkillDebuff({ user: args.user, skill: args.skill, monster }));
+
+    return this.afterDamageStep();
   }
 
   private async processCastTargetAlly(args: {
@@ -713,6 +787,24 @@ export class BattleInstance {
         this.infuseUser({ user: targetAlly, amount: potency });
         this.pushLog({
           log: `${args.user.name} Infused ${targetAlly.name} by ${potency} Mana Points`,
+          icon: args.skill.skill.image,
+        });
+      });
+    }
+
+    // A cleanse restores nothing, so it reads none of the potency above — what
+    // it is worth is whatever the fight has managed to stick on the party, and
+    // the dead are skipped because a corpse's poison has stopped mattering.
+    if (args.skill.skill.effect === SkillEffect.Cleanse) {
+      const targets = areaCast
+        ? this.users.filter((user) => !user.isDead)
+        : [args.targetName ? this.getUserTarget(args.targetName) : this.getMostAfflictedMember()];
+
+      targets.forEach((targetAlly) => {
+        const lifted = clearDebuffs(debuffsOf(targetAlly));
+        if (lifted.length === 0) return;
+        this.pushLog({
+          log: `${args.user.name} cleansed ${lifted.map((debuff) => debuff.name).join(', ')} from ${targetAlly.name}`,
           icon: args.skill.skill.image,
         });
       });
@@ -806,12 +898,15 @@ export class BattleInstance {
       // A barrier is worth whatever the caster's stats made it worth when it went
       // up. Locking the size in here is what lets a Priest's shield outlive the
       // turn they cast it on without re-reading stats that may since have moved.
-      barrier: buff.effect === BuffEffect.Barrier ? this.barrierAmount(args.caster, args.skill) : undefined,
+      barrier: buff.effect === BuffEffect.Barrier ? this.castAmount(args.caster, args.skill) : undefined,
+      // Regeneration is locked in the same way and for the same reason: the
+      // blessing is worth the intelligence of whoever cast it.
+      regen: buff.effect === BuffEffect.Regeneration ? this.castAmount(args.caster, args.skill) : undefined,
     });
   }
 
-  /** A barrier's pool: the same `attribute × multiplier × mastery` every skill uses. */
-  private barrierAmount(caster: UserWithStats, skill: LearnedSkillWithSkill) {
+  /** What a cast is worth: the same `attribute × multiplier × mastery` every skill uses. */
+  private castAmount(caster: UserWithStats, skill: LearnedSkillWithSkill) {
     const casterAttribute: number = caster.stats[skill.skill.attribute];
     return Math.max(1, Math.floor(casterAttribute * skill.skill.multiplier * skill.masteryLevel));
   }
@@ -826,6 +921,19 @@ export class BattleInstance {
       }
     });
     return lowestUser;
+  }
+
+  /**
+   * Who an untargeted cleanse lands on: whoever is carrying the most. Counted
+   * rather than weighed, because a stun and a poison are not comparable and the
+   * player who has collected three of them is the one in trouble either way.
+   */
+  private getMostAfflictedMember() {
+    const living = this.users.filter((user) => !user.isDead);
+    const candidates = living.length > 0 ? living : this.users;
+    return candidates.reduce((worst, user) =>
+      (user.debuffs?.length ?? 0) > (worst.debuffs?.length ?? 0) ? user : worst,
+    );
   }
 
   private getLowestHealthMember() {
@@ -980,19 +1088,27 @@ export class BattleInstance {
   }
 
   /**
-   * Poison ticking. It is not credited to anyone's damage total: the guild boss
-   * pays out on hits landed, and a burn that kept paying after its caster left
-   * the fight would be a second, unbudgeted damage source in that ledger.
+   * Poison and burn ticking. Neither is credited to anyone's damage total: the
+   * guild boss pays out on hits landed, and a tick that kept paying after its
+   * caster left the fight would be a second, unbudgeted damage source in that
+   * ledger.
    */
   private burnPoison(monster: MonsterInBattle) {
-    const damage = poisonDamage({ carrier: monster, maxHealth: monster.maxHealth });
+    const damage = poisonDamage({ carrier: monster, maxHealth: monster.maxHealth }) + burnDamage(monster);
     if (damage <= 0) return;
 
     monster.health -= damage;
     this.pushLog({
       log: `${monster.name} takes ${damage} damage from poison`,
-      icon: monster.debuffs.find((debuff) => debuff.effect === DebuffEffect.Poison)?.image ?? monster.image,
+      icon: this.tickIcon(monster) ?? monster.image,
     });
+  }
+
+  /** Whichever tick is doing the damage gets to put its own icon on the log. */
+  private tickIcon(carrier: { debuffs: BattleDebuff[] }) {
+    return carrier.debuffs.find(
+      (debuff) => debuff.effect === DebuffEffect.Poison || debuff.effect === DebuffEffect.Burn,
+    )?.image;
   }
 
   /**
@@ -1047,6 +1163,10 @@ export class BattleInstance {
     const user = this.users.find((u) => u.name === name);
     if (!user) return true;
 
+    // The blessing is paid before the venom, so a regeneration big enough to
+    // out-heal a poison saves the player it was cast on rather than arriving on
+    // a corpse a moment too late.
+    if (!user.isDead) this.regenerateUser(user);
     this.burnPlayerPoison(user);
     if (!this.isPlayersAlive) {
       // Burned down the last of the party: the fight is over, and settling it
@@ -1065,15 +1185,34 @@ export class BattleInstance {
     return true;
   }
 
-  /** Poison on a player, burned off the health they walked in with. */
+  /**
+   * A regeneration buff paying out at the top of its holder's turn — the mirror
+   * of poison, and ticked in the same place so a blessing lasting three turns is
+   * three of *their* turns whatever the party size.
+   *
+   * What is logged is what actually landed, so a heal into a full health bar
+   * says nothing rather than claiming a number the player never got.
+   */
+  private regenerateUser(user: UserWithStats) {
+    regenerations(user).forEach(({ name, image, amount }) => {
+      const before = user.stats.health;
+      this.healUser({ user, amount });
+      const restored = user.stats.health - before;
+      if (restored <= 0) return;
+      this.pushLog({ icon: image, log: `${name} restored ${restored} health to ${user.name}` });
+    });
+  }
+
+  /** The same two ticks on a player: a share of the pool they walked in with, plus any flat burn. */
   private burnPlayerPoison(user: UserWithStats) {
-    const damage = poisonDamage({ carrier: debuffsOf(user), maxHealth: user.stats.maxHealth });
+    const damage =
+      poisonDamage({ carrier: debuffsOf(user), maxHealth: user.stats.maxHealth }) + burnDamage(debuffsOf(user));
     if (damage <= 0) return;
 
     this.damageUser({ user, amount: damage });
     this.pushLog({
       log: `${user.name} takes ${damage} damage from poison`,
-      icon: user.debuffs?.find((debuff) => debuff.effect === DebuffEffect.Poison)?.image,
+      icon: this.tickIcon(debuffsOf(user)),
     });
   }
 
@@ -1362,13 +1501,21 @@ export class BattleInstance {
 
     if (action === 'debuff_monsters') {
       if (!args.debuff) return false;
-      this.aliveMonsters.forEach((monster) => applyDebuff({ target: monster, debuff: args.debuff }));
+      this.aliveMonsters.forEach((monster) =>
+        applyDebuff({ target: monster, debuff: args.debuff, amount: this.debugBurn(monster.maxHealth) }),
+      );
       this.pushLog({ icon: args.debuff.image, log: `${args.by} afflicted the enemy with ${args.debuff.name}` });
     }
 
     if (action === 'debuff_allies') {
       if (!args.debuff) return false;
-      this.users.forEach((user) => applyDebuff({ target: debuffsOf(user), debuff: args.debuff }));
+      this.users.forEach((user) =>
+        applyDebuff({
+          target: debuffsOf(user),
+          debuff: args.debuff,
+          amount: this.debugBurn(user.stats.maxHealth),
+        }),
+      );
       this.pushLog({ icon: args.debuff.image, log: `${args.by} afflicted the party with ${args.debuff.name}` });
     }
 
@@ -1407,16 +1554,32 @@ export class BattleInstance {
   /**
    * A buff handed out by an admin rather than cast by a skill.
    *
-   * A barrier's pool normally comes off the caster's stats through the skill
-   * that raised it; there is no skill here, so it is sized off the holder's own
-   * health — enough to be visible and to be spent, which is what a test needs.
+   * A barrier's pool and a regeneration's payout normally come off the caster's
+   * stats through the skill that raised them; there is no skill here, so both are
+   * sized off the holder's own health — enough to be visible and to be spent,
+   * which is what a test needs.
    */
+  /**
+   * What a burn dropped from the debug panel is worth. A cast one carries the
+   * caster's number and there is no caster here, so it is a twentieth of the bar
+   * it is sitting on — visible over the few turns a test runs, and harmless.
+   */
+  private debugBurn(maxHealth: number) {
+    return Math.max(1, Math.floor(maxHealth / 20));
+  }
+
   private grantDebugBuff(args: { target: UserWithStats; buff: Buff }) {
+    const sizedOffHolder = Math.max(1, Math.floor(args.target.stats.maxHealth / 2));
     applyBuff({
       target: args.target,
       buff: args.buff,
-      barrier:
-        args.buff.effect === BuffEffect.Barrier ? Math.max(1, Math.floor(args.target.stats.maxHealth / 2)) : undefined,
+      barrier: args.buff.effect === BuffEffect.Barrier ? sizedOffHolder : undefined,
+      // A tenth of the bar a turn: enough to watch it tick without a debug
+      // blessing out-healing whatever is being tested.
+      regen:
+        args.buff.effect === BuffEffect.Regeneration
+          ? Math.max(1, Math.floor(args.target.stats.maxHealth / 10))
+          : undefined,
     });
   }
 

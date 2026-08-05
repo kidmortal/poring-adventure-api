@@ -48,6 +48,17 @@ players.
 
 Skill behaviour is in [combat.md](combat.md).
 
+Each class has a ladder of sixteen rungs from level 1 to 50, written as a table
+in `characters.ts` because that is how it is tuned. The **Priest's is the one
+that is deliberately not about damage**: two rungs in sixteen deal any at all
+(Smite at 3 and Holy Strike at 9, early because that is where a Priest is
+levelling alone), and the rest is five heals, three party blessings, a party
+cleanse and three curses that cost a whole turn and land nothing but the curse.
+
+One catch when tuning any of them: **`Skill.multiplier` is an integer column**,
+so a `power` written as `2.5` reaches the table as a `2` while the generated
+description still claims 250%. Several older rungs are already in that state.
+
 ### The level is derived, and derived from the row
 
 `levelUpUser` reads `Stats.level` and `Stats.experience` **off the row**, never

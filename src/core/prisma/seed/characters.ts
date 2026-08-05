@@ -108,6 +108,13 @@ type BuffSeed = {
   /** Percentages the "well_fed" effect reads. A meal is data, not code. */
   attackBonus?: number;
   healthBonus?: number;
+  /**
+   * Percentage points added to the holder's crit rate and crit damage. Read at
+   * the roll rather than through an effect, so a buff that only sharpens crits
+   * needs no `effect` of its own.
+   */
+  critRateBonus?: number;
+  critDamageBonus?: number;
 };
 
 /**
@@ -255,6 +262,44 @@ const BUFFS: BuffSeed[] = [
     persist: false,
     maxStack: 1,
   },
+
+  /**
+   * The Priest's two combat-only blessings. Neither persists — a blessing is
+   * something a support spends a turn on inside the fight, and one that survived
+   * to the next would be a meal wearing a skill's name.
+   *
+   * `Renewed` is a heal paid in instalments: it hands back a share of the
+   * caster's intelligence at the top of each holder's own turn, sized when it
+   * goes up the way a barrier's pool is. It is worth less than a heal cast the
+   * moment somebody is nearly dead and more than one cast on a party that is
+   * about to be, which is the decision it buys.
+   */
+  {
+    name: 'Renewed',
+    effect: 'regeneration',
+    duration: 3,
+    image: skillImage('cleric', 'regeneration'),
+    pose: 'enhanced',
+    persist: false,
+    maxStack: 1,
+  },
+  /**
+   * `Inspired` needs no effect at all: crit rate and crit damage are read off
+   * the buff row at the moment a hit or a heal is rolled, so the whole blessing
+   * is these two columns. It is the party's damage buff that is not a damage
+   * buff — the Priest raising everyone's ceiling instead of raising their own.
+   */
+  {
+    name: 'Inspired',
+    effect: 'none',
+    duration: 4,
+    image: skillImage('cleric', 'holy nova'),
+    pose: 'enhanced',
+    persist: false,
+    maxStack: 1,
+    critRateBonus: 15,
+    critDamageBonus: 40,
+  },
 ];
 
 /**
@@ -326,6 +371,51 @@ const DEBUFFS = [
     effect: 'stun',
     duration: 1,
     image: skillImage('cleric', 'psychic scream'),
+    potency: 0,
+    maxStack: 1,
+  },
+
+  /**
+   * The Priest's three curses. Each is bought with a whole turn that deals no
+   * damage, which is why they are a shade stronger than the same effect riding
+   * on somebody's attack — a Knight sunders while killing, a Priest only
+   * sunders, and the party is paying a turn either way.
+   *
+   * `Judged` is deliberately behind the Knight's `Sundered` all the same:
+   * shredding armour is what a tank's ladder is built around, and a support who
+   * did it better would be doing the Knight's job from the back row.
+   */
+  {
+    name: 'Judged',
+    effect: 'defense_down',
+    duration: 4,
+    image: skillImage('cleric', 'holy strike'),
+    potency: 20,
+    maxStack: 1,
+  },
+  {
+    name: 'Enfeebled',
+    effect: 'attack_down',
+    duration: 4,
+    image: skillImage('cleric', 'mind blast'),
+    potency: 30,
+    maxStack: 1,
+  },
+  /**
+   * The one burn that is not a percentage.
+   *
+   * `poison` costs a share of whatever it is stuck on, which makes a number
+   * tuned against a map monster into a free quarter of a boss — the bigger the
+   * enemy, the better the cast, which is exactly backwards. `burn` is worth what
+   * the caster's intelligence made it worth when it landed and nothing more, so
+   * a Priest's Holy Fire is the same cast on a Poring and on a guild boss.
+   * `potency` is unused for it; the size comes off the skill.
+   */
+  {
+    name: 'Condemned',
+    effect: 'burn',
+    duration: 4,
+    image: skillImage('cleric', 'holy fire'),
     potency: 0,
     maxStack: 1,
   },
@@ -492,14 +582,41 @@ function selfInfuse(ladder: Ladder, rung: Rung): SkillSeed {
   });
 }
 
-/** The same, spread across everyone still standing. */
-function groupInfuse(ladder: Ladder, rung: Rung): SkillSeed {
+/**
+ * A curse and nothing else — a turn spent making the enemy worse rather than
+ * smaller, and the shape most of the Priest's offence takes.
+ *
+ * `power` matters on one of these only: a `burn` is sized off the caster the way
+ * a barrier is, so its rung's power is what it ticks for. Everywhere else the
+ * cast deals nothing and what it is worth is written on the debuff row instead.
+ */
+function debuffCast(
+  ladder: Ladder,
+  rung: Rung,
+  debuffName: string,
+  description: string,
+  extra: Partial<SkillSeed> = {},
+): SkillSeed {
+  return ladderSkill(ladder, rung, {
+    category: 'debuff_enemy',
+    debuffName,
+    description: rung.description ?? description,
+    ...extra,
+  });
+}
+
+/**
+ * The party cleanse. It restores nothing, which is exactly the trade: against a
+ * clean party the turn is wasted, and against a poisoned or stunned one it is
+ * worth more than any single heal — and it is the only answer to a debuff in
+ * the game, because a debuff cannot otherwise be removed before it runs out.
+ */
+function cleanse(ladder: Ladder, rung: Rung): SkillSeed {
   return ladderSkill(ladder, rung, {
     category: 'target_ally',
-    effect: 'infusion',
+    effect: 'cleanse',
     areaOfEffect: true,
-    description:
-      rung.description ?? `Restores ${Math.round(rung.power * 100)}% of your intelligence as mana to the whole party.`,
+    description: rung.description ?? 'Lifts every debuff from the whole party.',
   });
 }
 
@@ -549,15 +666,27 @@ const MAGE_LADDER: SkillSeed[] = [
 ];
 
 /**
- * The healer's ladder. Every band carries a heal, because a Priest who has run
- * out of answers is a party slot spent on nothing, and the damage line is kept
- * deliberately behind the Mage's — a Priest out-lasts, they do not out-burn.
+ * The healer's ladder, and the only one that is mostly not about damage.
+ *
+ * Two rungs in sixteen deal any at all. Everything else answers the fight
+ * sideways: five heals so a Priest who has run out of answers is never a party
+ * slot spent on nothing, three blessings, a cleanse, and three curses that cost
+ * a whole turn and land nothing but the curse. A Priest does not out-burn a
+ * Mage and is not meant to — what they sell is that the party is still standing
+ * when the Mage's turn comes round again.
+ *
+ * The two damage rungs are early on purpose: levels 3 and 9 are where a Priest
+ * is levelling alone with nothing to support, and past that the party is the
+ * damage.
  */
 const PRIEST_LADDER: SkillSeed[] = [
   heal(PRIEST, { asset: 'heal', level: 1, power: 3, mana: 3, cd: 2 }),
   ladderSkill(PRIEST, { asset: 'smite', level: 3, power: 2, mana: 2, cd: 1 }),
   heal(PRIEST, { asset: 'renew', level: 6, power: 2.5, mana: 2, cd: 1 }),
-  ladderSkill(PRIEST, { asset: 'holy strike', level: 9, power: 2.5, mana: 4, cd: 1 }),
+  // The one damage skill that leaves something behind, which is what a support's
+  // nuke is for: the party hits harder through the hole it opens than the Priest
+  // ever would have hit themselves.
+  ladderSkill(PRIEST, { asset: 'holy strike', level: 9, power: 2.5, mana: 4, cd: 2 }, { debuffName: 'Judged' }),
   heal(PRIEST, { asset: 'flash heal', level: 12, power: 4, mana: 7, cd: 1 }),
   partyBuff(
     PRIEST,
@@ -565,21 +694,42 @@ const PRIEST_LADDER: SkillSeed[] = [
     'Blessed',
     'Blesses the whole party: 10% more damage dealt and 10% less taken for four turns.',
   ),
-  ladderSkill(PRIEST, { asset: 'mind blast', level: 18, power: 3.5, mana: 6, cd: 2 }),
-  heal(PRIEST, { asset: 'regeneration', level: 21, power: 3.5, mana: 5, cd: 1 }),
-  ladderSkill(
+  debuffCast(
     PRIEST,
-    { asset: 'holy nova', level: 24, power: 3.5, mana: 8, cd: 2, threat: 0.5 },
+    { asset: 'mind blast', level: 18, power: 1, mana: 5, cd: 3 },
+    'Enfeebled',
+    'Weakens the target: it swings for 30% less for four of its turns.',
+  ),
+  partyBuff(
+    PRIEST,
+    // Whole numbers only: `Skill.multiplier` is an integer column, so a 1.2
+    // written here would reach the table as a 1 and the description would be a
+    // lie the moment it was seeded.
+    { asset: 'regeneration', level: 21, power: 1, mana: 8, cd: 4 },
+    'Renewed',
+    'Renews the whole party: each recovers 100% of your intelligence at the start of their turn, for three turns.',
+  ),
+  partyBuff(
+    PRIEST,
+    { asset: 'holy nova', level: 24, power: 1, mana: 8, cd: 4 },
+    'Inspired',
+    'Inspires the whole party: +15% critical rate and +40% critical damage for four turns.',
+  ),
+  cleanse(PRIEST, { asset: 'dispel magic', level: 27, power: 1, mana: 6, cd: 4 }),
+  heal(PRIEST, { asset: 'greater heal', level: 30, power: 5.5, mana: 10, cd: 2 }),
+  debuffCast(
+    PRIEST,
+    { asset: 'psychic scream', level: 33, power: 1, mana: 9, cd: 4 },
+    'Feared',
+    'Scatters every enemy standing: each loses its next turn.',
     { areaOfEffect: true },
   ),
-  groupInfuse(PRIEST, { asset: 'dispel magic', level: 27, power: 3.5, mana: 0, cd: 4 }),
-  heal(PRIEST, { asset: 'greater heal', level: 30, power: 5.5, mana: 10, cd: 2 }),
-  ladderSkill(
+  debuffCast(
     PRIEST,
-    { asset: 'psychic scream', level: 33, power: 4, mana: 9, cd: 3, threat: 0.2 },
-    { areaOfEffect: true, debuffName: 'Feared' },
+    { asset: 'holy fire', level: 36, power: 1, mana: 8, cd: 3 },
+    'Condemned',
+    'Sets the target alight: it burns for 100% of your intelligence at the start of each of its turns, for four of them.',
   ),
-  ladderSkill(PRIEST, { asset: 'holy fire', level: 36, power: 5, mana: 11, cd: 3 }),
   partyBuff(
     PRIEST,
     { asset: 'blessing of protection', level: 40, power: 4, mana: 14, cd: 5 },
@@ -871,8 +1021,26 @@ function assertSupportIsPriestOnly() {
   }
 }
 
+/**
+ * A curse cast that carries no curse, checked rather than trusted.
+ *
+ * `debuff_enemy` deals no damage — the debuff is the entire skill — so one
+ * seeded without a `debuffName` is a turn that does nothing at all, and it would
+ * do nothing quietly.
+ */
+function assertDebuffCastsCarryACurse() {
+  const offenders = SKILLS.filter((skill) => skill.category === 'debuff_enemy' && !skill.debuffName).map(
+    (skill) => `${skill.className}'s ${skill.name}`,
+  );
+
+  if (offenders.length > 0) {
+    throw new Error(`a debuff cast is nothing but its debuff — found ${offenders.join(', ')} without one`);
+  }
+}
+
 export async function seedSkills() {
   assertSupportIsPriestOnly();
+  assertDebuffCastsCarryACurse();
 
   for (const { className, buffName, debuffName, ...skill } of SKILLS) {
     const characterClass = await prisma.class.findUnique({ where: { name: className } });

@@ -96,6 +96,14 @@ the gear `seedEquipmentDrops` places. Respect that boundary when adding drops
 | A guild task or boss | `guild.ts` | Tasks never wear a boss sprite — progress counts any kill on the map |
 | A dungeon | `dungeons.ts` | Bosses are keyed on `[dungeonId, stage]`, so renaming one moves its row |
 | A real-money product | `store.ts` | Must match the RevenueCat product id |
+| A skill, buff or debuff | `characters.ts` | Art must be in `assets.ts`; `multiplier` is an **integer** column, so `2.5` is stored as `2` |
+
+Two rules the skill seed refuses to break, because both are a `category` string
+away from being wrong: **only a Priest may heal, infuse or cleanse an ally**
+(`assertSupportIsPriestOnly` — a Mage that can heal costs the Priest its reason
+to be in the party), and **a `debuff_enemy` skill must name a debuff**
+(`assertDebuffCastsCarryACurse` — the curse is the whole skill, so one without it
+is a turn that quietly does nothing).
 
 ## One-off migrations
 

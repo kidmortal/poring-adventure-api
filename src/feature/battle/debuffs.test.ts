@@ -1,7 +1,16 @@
 import { Debuff } from '@prisma/client';
 
 import { MonsterInBattle } from './battle';
-import { applyDebuff, debuffedAttack, debuffedDefense, isStunned, poisonDamage, tickDebuffs } from './debuffs';
+import {
+  applyDebuff,
+  burnDamage,
+  clearDebuffs,
+  debuffedAttack,
+  debuffedDefense,
+  isStunned,
+  poisonDamage,
+  tickDebuffs,
+} from './debuffs';
 
 function monster(overrides: Partial<MonsterInBattle> = {}) {
   return {
@@ -141,6 +150,65 @@ describe('debuffs', () => {
       const expired = tickDebuffs(target);
       expect(expired).toHaveLength(1);
       expect(target.debuffs).toHaveLength(0);
+    });
+  });
+
+  describe('burnDamage', () => {
+    it('costs the same whatever it is stuck on, which poison does not', () => {
+      const condemned = debuff({ name: 'Condemned', effect: 'burn', potency: 0 });
+      const poring = monster();
+      const boss = monster({ health: 50000, maxHealth: 50000 });
+
+      applyDebuff({ target: poring, debuff: condemned, amount: 108 });
+      applyDebuff({ target: boss, debuff: condemned, amount: 108 });
+
+      // The whole reason a burn exists: the cast is worth the caster's number,
+      // so pointing it at something enormous does not make it enormous too.
+      expect(burnDamage(poring)).toBe(108);
+      expect(burnDamage(boss)).toBe(108);
+      expect(poisonDamage({ carrier: boss, maxHealth: 50000 })).toBe(0);
+    });
+
+    it('adds the burns up and ignores everything else on the carrier', () => {
+      const target = monster();
+      applyDebuff({ target, debuff: debuff({ id: 1, name: 'Condemned', effect: 'burn' }), amount: 40 });
+      applyDebuff({ target, debuff: debuff({ id: 2, name: 'Scorched', effect: 'burn' }), amount: 15 });
+      applyDebuff({ target, debuff: debuff({ id: 3, name: 'Sundered' }) });
+
+      expect(burnDamage(target)).toBe(55);
+    });
+
+    it('keeps the stronger caster’s number when the same burn lands twice', () => {
+      const target = monster();
+      const condemned = debuff({ name: 'Condemned', effect: 'burn' });
+
+      applyDebuff({ target, debuff: condemned, amount: 90 });
+      applyDebuff({ target, debuff: condemned, amount: 40 });
+
+      expect(burnDamage(target)).toBe(90);
+    });
+
+    it('is nothing at all on a carrier that has never been lit', () => {
+      expect(burnDamage(monster())).toBe(0);
+    });
+  });
+
+  describe('clearDebuffs', () => {
+    it('lifts everything at once and says what it lifted', () => {
+      const target = monster();
+      applyDebuff({ target, debuff: debuff({ id: 1, name: 'Poisoned', effect: 'poison', potency: 5 }) });
+      applyDebuff({ target, debuff: debuff({ id: 2, name: 'Frozen', effect: 'stun', duration: 1 }) });
+
+      const lifted = clearDebuffs(target);
+
+      expect(lifted.map((d) => d.name)).toEqual(['Poisoned', 'Frozen']);
+      expect(target.debuffs).toHaveLength(0);
+      expect(isStunned(target)).toBe(false);
+    });
+
+    it('lifts nothing off a carrier that has nothing on it', () => {
+      const target = monster();
+      expect(clearDebuffs(target)).toHaveLength(0);
     });
   });
 
