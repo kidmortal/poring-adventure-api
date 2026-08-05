@@ -3,6 +3,7 @@ import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { FullParty, PartyRepository } from './party.repository';
 import { PartyNotifier } from './party.notifier';
 import { PartyState } from './party.state';
+import { UsersRepository } from 'src/feature/users/users.repository';
 
 const MAX_PARTY_MEMBERS = 4;
 
@@ -17,7 +18,20 @@ export class PartyService {
     private readonly repository: PartyRepository,
     private readonly notifier: PartyNotifier,
     private readonly state: PartyState,
+    private readonly usersRepository: UsersRepository,
   ) {}
+
+  /**
+   * A member's cached profile carries their `partyId`, and every entrance to a
+   * fight reads it from there. Leaving it behind after the party is gone sent
+   * the next battle looking for a party that no longer exists — which is not a
+   * stale screen but a crash, since nothing downstream expected a null one.
+   */
+  private async _forgetPartyOnUsers(emails: string[]) {
+    for await (const email of emails) {
+      await this.usersRepository.clearUserCache({ email });
+    }
+  }
 
   async create(args: { email: string }) {
     if (await this.repository.userHasParty({ email: args.email })) return false;
@@ -163,6 +177,8 @@ export class PartyService {
   private async _removeUserFromParty(args: { email: string; partyId: number }) {
     const leftUser = await this.repository.setUserParty({ email: args.email, partyId: null });
     await this.repository.clearPartyCache({ partyId: args.partyId });
+    // Or the next fight they start would still gather the party they just left.
+    await this._forgetPartyOnUsers([args.email]);
     this.notifier.userWithNoParty({ email: args.email });
     await this.notifier.memberLeft({ partyId: args.partyId, playerName: leftUser.name });
     await this.notifier.partyWithData({ partyId: args.partyId });
@@ -174,6 +190,7 @@ export class PartyService {
 
     await this.repository.deletePartyOwnedBy({ email: args.email });
     await this.repository.clearPartyCache({ partyId: ownedParty.id });
+    await this._forgetPartyOnUsers(ownedParty.members.map((member) => member.email));
     ownedParty.members.forEach((member) => this.notifier.userWithNoParty({ email: member.email }));
     this.state.forget(ownedParty.id);
     return true;

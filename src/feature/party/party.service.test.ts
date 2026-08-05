@@ -4,6 +4,7 @@ import { PartyService } from './party.service';
 import { PartyRepository } from './party.repository';
 import { PartyNotifier } from './party.notifier';
 import { PartyState } from './party.state';
+import { UsersRepository } from 'src/feature/users/users.repository';
 
 describe('Party Service', () => {
   let service: PartyService;
@@ -12,8 +13,10 @@ describe('Party Service', () => {
     setPartyLeader: jest.Mock;
     clearPartyCache: jest.Mock;
     setUserParty: jest.Mock;
+    deletePartyOwnedBy: jest.Mock;
   };
-  let notifier: { partyWithData: jest.Mock };
+  let notifier: { partyWithData: jest.Mock; userWithNoParty: jest.Mock; memberLeft: jest.Mock };
+  let users: { clearUserCache: jest.Mock };
 
   const LEADER = 'leader@test.com';
   const MEMBER = 'member@test.com';
@@ -33,15 +36,18 @@ describe('Party Service', () => {
       setPartyLeader: jest.fn().mockResolvedValue({}),
       clearPartyCache: jest.fn(),
       setUserParty: jest.fn().mockResolvedValue({ name: 'Member' }),
+      deletePartyOwnedBy: jest.fn().mockResolvedValue({}),
     };
-    notifier = { partyWithData: jest.fn() };
+    notifier = { partyWithData: jest.fn(), userWithNoParty: jest.fn(), memberLeft: jest.fn() };
+    users = { clearUserCache: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PartyService,
         { provide: PartyRepository, useValue: repository },
         { provide: PartyNotifier, useValue: notifier },
-        { provide: PartyState, useValue: { isOpen: jest.fn(), pushMessage: jest.fn() } },
+        { provide: PartyState, useValue: { isOpen: jest.fn(), pushMessage: jest.fn(), forget: jest.fn() } },
+        { provide: UsersRepository, useValue: users },
         {
           provide: WebsocketService,
           useValue: { sendTextNotification: jest.fn(), sendErrorNotification: jest.fn() },
@@ -50,6 +56,30 @@ describe('Party Service', () => {
     }).compile();
 
     service = module.get<PartyService>(PartyService);
+  });
+
+  describe('leaving a party', () => {
+    /**
+     * The profile cache carries the member's partyId, and every entrance to a
+     * fight reads it from there. Left behind, it sent the next battle looking
+     * for a party that had been disbanded — a null dereference rather than a
+     * stale screen.
+     */
+    it("drops the leaver's cached profile, which still says they are in one", async () => {
+      repository.setUserParty.mockResolvedValue({ name: 'Member' });
+
+      await service.quitParty({ email: MEMBER, partyId: 1 });
+
+      expect(repository.setUserParty).toHaveBeenCalledWith({ email: MEMBER, partyId: null });
+      expect(users.clearUserCache).toHaveBeenCalledWith({ email: MEMBER });
+    });
+
+    it("drops every member's when the leader disbands it", async () => {
+      await service.quitParty({ email: LEADER, partyId: 1 });
+
+      expect(users.clearUserCache).toHaveBeenCalledWith({ email: LEADER });
+      expect(users.clearUserCache).toHaveBeenCalledWith({ email: MEMBER });
+    });
   });
 
   describe('promote', () => {

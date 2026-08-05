@@ -82,17 +82,9 @@ export class BattleService {
     const battle = this.getUserBattle(args.userEmail);
 
     if (!battle) {
-      let users: UserWithStats[] = [];
-      const userData = await this.usersRepository.getFullUser({
-        userEmail: args.userEmail,
-      });
-      if (userData.partyId) {
-        const fullPartyInfo = await this.partyRepository.getPartyFromId({ partyId: userData.partyId });
-        const partyMembers = fullPartyInfo.members;
-        users = partyMembers;
-      } else {
-        users = [userData];
-      }
+      // The same gathering the other two entrances use, rather than a second
+      // copy of it — this one had its own null dereference to prove the point.
+      const { users } = await this._gatherParty(args.userEmail);
       // A pull rather than a single monster — unless the map handed out its
       // boss, which is always fought alone.
       const monsters = await this.monsterService.findPullFromMap({
@@ -307,11 +299,26 @@ export class BattleService {
   }
 
   /** The caller and whoever they are partied with, plus who leads them. */
+  /**
+   * Who is walking in. A party fights together; anyone else fights alone.
+   *
+   * A `partyId` that resolves to nothing means the party was disbanded while a
+   * copy of the user still remembered it. That is worth fixing where it is
+   * found rather than throwing: the player asked for a fight, and one player is
+   * a perfectly good party.
+   */
   private async _gatherParty(userEmail: string) {
     const userData = await this.usersRepository.getFullUser({ userEmail });
-    if (!userData.partyId) return { users: [userData] as UserWithStats[], partyLeaderEmail: undefined };
+    const solo = { users: [userData] as UserWithStats[], partyLeaderEmail: undefined };
+    if (!userData.partyId) return solo;
 
     const fullPartyInfo = await this.partyRepository.getPartyFromId({ partyId: userData.partyId });
+    if (!fullPartyInfo) {
+      this.logger.warn(`${userEmail} still points at party ${userData.partyId}, which is gone`);
+      await this.usersRepository.clearUserCache({ email: userEmail });
+      return solo;
+    }
+
     return { users: fullPartyInfo.members as UserWithStats[], partyLeaderEmail: fullPartyInfo.leaderEmail };
   }
 

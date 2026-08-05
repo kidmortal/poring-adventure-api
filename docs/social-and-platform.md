@@ -23,6 +23,19 @@ Why the party matters elsewhere: **every battle pulls the whole party in
 automatically** (`BattleService._gatherParty`), and both the guild boss entry and
 the dungeon entry are spent party-wide.
 
+### Two caches hold membership, and both have to be dropped
+
+`User.partyId` is copied into the cached profile (`user_<email>`), and the
+members are copied into the cached party (`party_<id>`). Leaving, being kicked
+and disbanding all clear **both** — `_forgetPartyOnUsers` is the profile half.
+Skipping it left a member whose cached profile still pointed at a party that had
+been deleted, and the next fight they started went looking for it: a null
+dereference in `BattleService`, not merely a stale screen.
+
+`_gatherParty` also treats a `partyId` that resolves to nothing as solo rather
+than throwing, and drops the offending cache entry on the way past. The player
+asked for a fight, and one player is a perfectly good party.
+
 ## Mail
 
 `src/feature/mail/mail.service.ts`. A `Mail` row can carry silver and one item
