@@ -50,7 +50,7 @@ the whole game moves together when a curve is retuned:
 | File | Curve |
 |---|---|
 | `monsters.ts` | `normalStats(level)` — `health = level×10 + level²×0.6`, `exp = level×6`; `bossStats` = 5× health |
-| `equipment.ts` | Five tiers, one per map band. Armour and weapon stats derived from tier, line and slot weight |
+| `equipment.ts` | Five tiers, one per map band. Armour, weapon and accessory stats derived from tier, line and slot weight |
 | `dungeons.ts` | The monster curve weighted per stage — see [dungeons.md](dungeons.md) |
 | `guild.ts` | Boss rows hold easy-difficulty numbers; `scaleBoss` does the rest |
 
@@ -90,7 +90,7 @@ the gear `seedEquipmentDrops` places. Respect that boundary when adding drops
 | A monster | `monsters.ts` `MAPS` | Sprite must exist; stats come from the curve |
 | A map | `monsters.ts` `MAPS` + a tier in `equipment.ts` | Its image is its boss |
 | An item | `items.ts` | Art must be in `assets.ts` |
-| Gear | `equipment.ts` `ARMOR_SETS` / `WEAPONS` | Stats are derived from the tier |
+| Gear | `equipment.ts` `ARMOR_SETS` / `WEAPONS` / `ACCESSORIES` | Stats are derived from the tier. Accessories are the only source of crit; a `grade: 'dungeon'` piece is left out of the map tables and claimed by `dungeons.ts` |
 | A recipe or node | `professions.ts` | Then re-run so `pruneProfessionDrops` clears the new outputs off monsters |
 | A commission | `commissions.ts` | |
 | A guild task or boss | `guild.ts` | Tasks never wear a boss sprite — progress counts any kill on the map |

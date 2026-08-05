@@ -220,7 +220,7 @@ export class GuildBossService {
     // split evenly, whoever happened to land the hits.
     const banked = shareDamageEvenly(capped, args.participants);
     const partyKey = partyKeyFor(args.participants);
-    const partyLeaderEmail = partyKey ? (args.partyLeaderEmail ?? null) : null;
+    const partyLeaderEmail = partyKey ? args.partyLeaderEmail ?? null : null;
     // What each of them actually hit for is kept beside the score, so the
     // ranking can show who carried the fight.
     const dealtBy = new Map(args.damageByUser.map((entry) => [entry.userEmail, entry.damage]));

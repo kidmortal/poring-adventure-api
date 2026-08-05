@@ -190,20 +190,27 @@ const DUNGEONS: DungeonSeed[] = [
  * pieces, one per armour line, so a party is never told the run was for a class
  * they did not bring. The third hands out all five weapons at once for the same
  * reason — a weapon is the piece a map makes you grind for at five percent, and
- * one attempt a day at twelve is the entire point of coming here.
+ * one attempt a day at twelve is the entire point of coming here — plus the
+ * dungeon accessory set, which drops nowhere else and is worth about twice its
+ * map counterpart at the same required level.
  */
 function gearDrops(tier: number, stage: number): DropSeed[] {
   const tierGear = gearCatalog().filter((piece) => piece.tier === tier);
 
   if (stage === 2) {
     return tierGear
-      .filter((piece) => piece.category === 'armor')
+      .filter((piece) => piece.category === 'armor' && piece.grade === 'map')
       .map((piece) => ({ itemName: piece.name, chance: 18 }));
   }
   if (stage === 3) {
-    return tierGear
-      .filter((piece) => piece.category === 'weapon')
-      .map((piece) => ({ itemName: piece.name, chance: 12 }));
+    return [
+      ...tierGear
+        .filter((piece) => piece.category === 'weapon' && piece.grade === 'map')
+        .map((piece) => ({ itemName: piece.name, chance: 12 })),
+      // The dungeon accessory set, found nowhere else. One piece per line, so
+      // whatever the party brought, the run had something in it for them.
+      ...tierGear.filter((piece) => piece.grade === 'dungeon').map((piece) => ({ itemName: piece.name, chance: 12 })),
+    ];
   }
   return [];
 }

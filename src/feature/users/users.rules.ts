@@ -12,6 +12,8 @@ export type StatChanges = {
   int?: number;
   agi?: number;
   defense?: number;
+  critRate?: number;
+  critDamage?: number;
 };
 
 /**
@@ -47,5 +49,7 @@ export function statDelta(changes: StatChanges, direction: 'increment' | 'decrem
     agi: { [direction]: changes.agi ?? 0 },
     int: { [direction]: changes.int ?? 0 },
     defense: { [direction]: changes.defense ?? 0 },
+    critRate: { [direction]: changes.critRate ?? 0 },
+    critDamage: { [direction]: changes.critDamage ?? 0 },
   };
 }

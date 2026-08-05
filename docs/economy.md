@@ -15,7 +15,13 @@ the reason the player market has people in it.
 `inventory.service.ts`, `equipment.service.ts`, `items.rules.ts` (pure).
 
 Categories: `weapon`, `armor`, `legs`, `boots`, `accessory` (equippable, listed
-in `entities/categories.ts`), plus `consumable` and `material`.
+in `entities/categories.ts`), plus `consumable` and `material`. Equipping swaps
+by category, so one piece per category is worn at a time. `accessory` is the
+slot every class shops the same list for: four lines per tier — crit, mana,
+health, defense — and the only source of `critRate` / `critDamage` in the
+catalog. The top three tiers carry a second version of each line that drops only
+in that band's dungeon, worth about twice its map counterpart at the same
+required level.
 
 ### Quality and enhancement
 

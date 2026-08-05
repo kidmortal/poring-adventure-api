@@ -88,6 +88,26 @@ Knight.
 
 Evasion is `agi / 200`, capped at `MAX_EVASION = 0.2`.
 
+### Critical hits
+
+`crit.ts` (pure). Every character starts on `Stats.critRate = 5` percent for
+`Stats.critDamage = 200` percent of the plain value, and both are raised by gear
+(the accessory slot is the only source in the catalog) and by buffs
+(`Buff.critRateBonus` / `critDamageBonus`, added at the moment of the roll so
+nothing has to be unwound when the buff falls off). `MAX_CRIT_RATE = 75` keeps a
+crit from ever becoming a certainty.
+
+The roll goes through `BattleInstance.rollCrit`, which every damaging and
+healing path calls and which logs the crit when it lands:
+
+- **Damage** — the basic attack, and `target_enemy` casts, which roll once *per
+  target* so one bad roll does not decide a whole area cast. Threat is computed
+  off the crit value, so a crit is louder as well as bigger.
+- **Healing** — `target_ally` and `self_restore` with `effect: healing`.
+- **Nothing else.** Infusion, barriers and buffs never crit: a doubled mana
+  return is worth more than any amount of crit damage, and a doubled buff is a
+  different mechanic wearing the same name.
+
 ## Skills
 
 `Skill.category` decides the branch in `processUserCast`:

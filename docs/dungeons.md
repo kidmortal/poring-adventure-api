@@ -113,7 +113,9 @@ the numbers, not a coin flip on whether the party's turn happened.
 
 Loot follows a rule rather than a list (`gearDrops`): stage 2 drops the band's
 three armour chest pieces at 18%, stage 3 drops **all five tier weapons at 12%
-each** — so a run is never wasted on a class the party did not bring — plus
+each** — so a run is never wasted on a class the party did not bring — plus the
+band's four **dungeon accessories** at 12% each, which drop nowhere else and are
+worth about twice their map counterparts at the same required level, plus
 materials per boss.
 
 Seeded dungeons: Forgotten Crypt (rec. 28, tier 3 gear), Scorched Tomb (rec. 40,

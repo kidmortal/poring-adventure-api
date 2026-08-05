@@ -4,6 +4,7 @@ import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { Utils } from 'src/utilities/utils';
 import { runEffect } from './effects';
 import { absorbDamage, isSpentBarrier } from './barrier';
+import { rollCritical } from './crit';
 import {
   applyDebuff,
   BattleDebuff,
@@ -408,9 +409,15 @@ export class BattleInstance {
 
     if (isUserTurn) {
       const user = this.getUserFromBattle(args.email);
-      const userDamage = user.stats.attack;
       const targetMonster = this.defaultMonsterTarget();
       if (!targetMonster) return false;
+
+      const { value: userDamage } = this.rollCrit({
+        user,
+        value: user.stats.attack,
+        icon: 'https://kidmortal.sirv.com/skills/attack.webp',
+        log: `${user.name} lands a critical hit`,
+      });
 
       return this.beforeDamageStep({
         attacker: 'user',
@@ -561,6 +568,14 @@ export class BattleInstance {
 
     targets.forEach((monster, index) => {
       this.applySkillDebuff({ user: args.user, skill: args.skill, monster });
+      // Every target of an area cast rolls its own crit — one unlucky roll for
+      // the whole screen would make the skill swing far harder than it should.
+      const { value: targetDamage } = this.rollCrit({
+        user: args.user,
+        value: userDamage,
+        icon: args.skill.skill.image,
+        log: `${args.skill.skill.name} critically strikes ${monster.name}`,
+      });
       this.beforeDamageStep({
         attacker: 'user',
         monster,
@@ -568,17 +583,31 @@ export class BattleInstance {
         damage: {
           image: args.skill.skill.image,
           name: '',
-          value: userDamage,
+          value: targetDamage,
           skill: areaCast ? undefined : args.skill,
           // Threat is no longer the same thing as damage: a skill decides how
           // loudly it lands, which is the only reason a tank can hold a boss it
           // is not out-damaging anyone with.
-          aggro: Math.floor(userDamage * (args.skill.skill.threatModifier ?? 1)),
+          aggro: Math.floor(targetDamage * (args.skill.skill.threatModifier ?? 1)),
         },
         deferTurnEnd: index < targets.length - 1,
       });
     });
     return true;
+  }
+
+  /**
+   * Rolls a critical for whatever the user is about to land, and says so in the
+   * log when it happens. Every damaging and healing path goes through here, so
+   * a crit reads the same wherever it comes from — and buffs are conspicuously
+   * not among the callers, which is the rule rather than an oversight.
+   */
+  private rollCrit(args: { user: UserWithStats; value: number; icon: string; log: string }) {
+    const rolled = rollCritical({ value: args.value, stats: args.user.stats, buffs: args.user.buffs });
+    if (rolled.critical) {
+      this.pushLog({ icon: args.icon, log: args.log });
+    }
+    return rolled;
   }
 
   /** Sticks whatever the skill carries onto the monster it just landed on. */
@@ -615,7 +644,12 @@ export class BattleInstance {
         : [args.targetName ? this.getUserTarget(args.targetName) : this.getLowestHealthMember()];
 
       targets.forEach((targetAlly) => {
-        const potency = Utils.randomDamage(rawPotency, 20);
+        const { value: potency } = this.rollCrit({
+          user: args.user,
+          value: Utils.randomDamage(rawPotency, 20),
+          icon: args.skill.skill.image,
+          log: `${args.user.name} lands a critical heal on ${targetAlly.name}`,
+        });
         this.healUser({ user: targetAlly, amount: potency });
         this.pushLog({
           log: `${args.user.name} Healed ${targetAlly.name} by ${potency} Health Points`,
@@ -654,13 +688,22 @@ export class BattleInstance {
     args.user.stats.mana -= args.skill.skill.manaCost;
 
     if (args.skill.skill.effect === SkillEffect.Healing) {
-      this.healUser({ user: args.user, amount: potency });
+      const { value: healed } = this.rollCrit({
+        user: args.user,
+        value: potency,
+        icon: args.skill.skill.image,
+        log: `${args.user.name} lands a critical heal on themselves`,
+      });
+      this.healUser({ user: args.user, amount: healed });
       this.pushLog({
-        log: `${args.user.name} Recovered ${potency} Health Points`,
+        log: `${args.user.name} Recovered ${healed} Health Points`,
         icon: args.skill.skill.image,
       });
     }
 
+    // Infusion is left plain on purpose: mana is a budget, not a health bar, and
+    // a crit that occasionally handed a caster a free extra cast would be worth
+    // more than any amount of crit damage.
     if (args.skill.skill.effect === SkillEffect.Infusion) {
       this.infuseUser({ user: args.user, amount: potency });
       this.pushLog({

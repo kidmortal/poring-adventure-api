@@ -14,9 +14,7 @@ type ProductSeed = {
   itemStack: number;
 };
 
-const PRODUCTS: ProductSeed[] = [
-  { name: 'gift', displayName: 'Apoio emocional', silver: 0, itemStack: 1 },
-];
+const PRODUCTS: ProductSeed[] = [{ name: 'gift', displayName: 'Apoio emocional', silver: 0, itemStack: 1 }];
 
 export async function seedStoreProducts() {
   for (const { itemName, ...product } of PRODUCTS) {

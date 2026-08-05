@@ -35,6 +35,8 @@ describe('users rules', () => {
         str: { increment: 5 },
         agi: { increment: 0 },
         int: { increment: 0 },
+        critRate: { increment: 0 },
+        critDamage: { increment: 0 },
       });
     });
 

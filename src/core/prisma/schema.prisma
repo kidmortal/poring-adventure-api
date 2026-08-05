@@ -70,6 +70,14 @@ model Stats {
   /// battle engine, which caps the reduction so no gear tier can reach immunity.
   defense    Int    @default(0)
 
+  /// Percent chance a hit or a heal lands for critDamage instead of its plain
+  /// value. Everyone starts on 5 — a crit is something every character sees,
+  /// not a mechanic a build has to opt into — and gear and buffs raise it.
+  critRate   Int    @default(5)
+
+  /// What a critical is worth, as a percent of the normal value. 200 is double.
+  critDamage Int    @default(200)
+
   user       User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   userEmail  String @unique
 
@@ -147,6 +155,11 @@ model Item {
   health    Int?
   mana      Int?
   defense   Int?
+
+  /// Both in percentage points, added on top of the character's own. The
+  /// accessory slot is where they mostly live.
+  critRate   Int?
+  critDamage Int?
 
   /// A consumable that grants this buff when eaten. Cooking's whole niche: a
   /// meal is worth eating before a fight rather than during one.
@@ -475,6 +488,12 @@ model Buff {
   /// encoded in the effect string so a new meal is a seed row, not new code.
   attackBonus Int @default(0)
   healthBonus Int @default(0)
+
+  /// Percentage points added to the holder's crit rate and crit damage while
+  /// the buff is up. Read at the moment a hit or a heal is rolled, so nothing
+  /// has to be unwound when the buff falls off.
+  critRateBonus   Int @default(0)
+  critDamageBonus Int @default(0)
 
   userBuff UserBuff[]
   skill    Skill[]

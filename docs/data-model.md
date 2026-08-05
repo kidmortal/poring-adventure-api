@@ -25,11 +25,11 @@ that are *not* visible in a column definition.
 | Model | Notes |
 |---|---|
 | `User` | Identity, silver, admin flag, and the hub every other table hangs off. `partyId` is nullable — most players are in no party. |
-| `Stats` | Level, exp, health/mana with their maxes, attack, str/agi/int, `defense`, and the daily `stamina` / `maxStamina` / `staminaRefilledAt`. One per user. |
+| `Stats` | Level, exp, health/mana with their maxes, attack, str/agi/int, `defense`, `critRate` / `critDamage` (5% for 200%, before gear), and the daily `stamina` / `maxStamina` / `staminaRefilledAt`. One per user. |
 | `Appearance` / `Head` | Cosmetics. `Head` is the catalogue, keyed `[name, gender]`. |
 | `Class` | The combat archetype chosen at creation: per-level stat block plus the skill list. **Renamed from Profession** — that name now means a trade. |
 | `LearnedSkill` | A skill a player owns, with `masteryLevel` (multiplies its power) and `equipped`. |
-| `UserBuff` / `Buff` | A buff on a player, and the catalogue row it copies. `Buff.effect` is a named string the battle engine branches on. |
+| `UserBuff` / `Buff` | A buff on a player, and the catalogue row it copies. `Buff.effect` is a named string the battle engine branches on. `attackBonus` / `healthBonus` / `critRateBonus` / `critDamageBonus` are percentages the effect reads off the row, so a new meal or blessing is a seed entry rather than new code. |
 | `Discord` | Links a `discordId` to an email. One per user. |
 | `Notification` | Things that happened while away (a service of theirs was hired). Purely informational — rewards are already paid when the row is written. |
 | `Mail` | Can carry silver and one item stack; `claimed` gates the payout. |
