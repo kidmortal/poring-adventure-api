@@ -158,6 +158,14 @@ export class AdminGateway {
     });
   }
 
+  /** No email repairs every character. */
+  @SubscribeMessage('resync_levels')
+  async resyncLevels(@MessageBody() targetEmail: string, @ConnectedSocket() client: Socket) {
+    this.logger.debug(`resync_levels ${targetEmail || 'all'}`);
+    const email = client.handshake.auth.email;
+    return this.adminService.resyncLevels({ userEmail: email, targetEmail: targetEmail || undefined });
+  }
+
   @SubscribeMessage('clear_user_cache')
   async clearUserCache(@MessageBody() targetEmail: string, @ConnectedSocket() client: Socket) {
     this.logger.debug(`clear_user_cache ${targetEmail}`);

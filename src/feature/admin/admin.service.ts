@@ -214,6 +214,32 @@ export class AdminService {
     return this._report(args.userEmail, `Battle: ${args.action.replace(/_/g, ' ')}`);
   }
 
+  /**
+   * Puts a character's level back where their experience says it belongs, and
+   * gives back the stat blocks the wrong levels took with them.
+   *
+   * The repair for the stale-snapshot bug in `levelUpUser`: every bad move was
+   * one level's worth of the class block, so restoring the level difference
+   * restores exactly what was lost — and nothing else, which is why this does
+   * not recompute the stats outright. Equipment and guild blessings are written
+   * into the same row, and a recompute would quietly delete them.
+   */
+  async resyncLevels(args: { userEmail: string; targetEmail?: string }) {
+    const where = args.targetEmail ? { userEmail: args.targetEmail } : {};
+    const stats = await this.prisma.stats.findMany({ where });
+
+    let repaired = 0;
+    for await (const stat of stats) {
+      const moved = await this.userStats.levelUpUser({ userEmail: stat.userEmail });
+      if (!moved) continue;
+      repaired += 1;
+      await this.usersRepository.clearUserCache({ email: stat.userEmail });
+      await this.userService.notifyUserUpdateWithProfile({ email: stat.userEmail });
+    }
+
+    return this._report(args.userEmail, `Levels resynced: ${repaired} character(s) corrected`);
+  }
+
   /** Forces the next read of a user to come from the database. */
   async clearUserCache(args: { userEmail: string; targetEmail: string }) {
     await this.usersRepository.clearUserCache({ email: args.targetEmail });

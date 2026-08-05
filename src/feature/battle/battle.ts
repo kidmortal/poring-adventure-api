@@ -256,6 +256,16 @@ export class BattleInstance {
   get aliveMonsters() {
     return this.monsters.filter((monster) => monster.health > 0);
   }
+  /**
+   * Anyone whose sheet is not merely hurt but impossible — a level below one or
+   * a maximum health at or under zero. Nothing in the game should produce this;
+   * it means a row has been corrupted, and starting a fight on top of it would
+   * bury the evidence under a wipe.
+   */
+  get brokenMembers() {
+    return this.users.filter((user) => user.stats.maxHealth <= 0 || user.stats.level < 1);
+  }
+
   get isPlayersAlive() {
     const aliveUsers = this.users.filter((u) => !u.isDead);
     if (aliveUsers.length > 0) {

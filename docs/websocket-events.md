@@ -118,7 +118,7 @@ Behind `AdminGuard`. `get_all_connected_users` · `get_server_info` ·
 `clear_all_cache` · `clear_user_cache` · `send_push_notification` ·
 `send_push_notification_user` · `send_gift_mail` · `give_silver` ·
 `full_heal_user` · `kill_user` · `force_end_battle` · `kill_battle_monsters` ·
-`battle_debug_action` ·
+`battle_debug_action` · `resync_levels` ·
 `reset_daily_stamina` ·
 `reset_boss_entry` · `clear_guild_bosses`
 

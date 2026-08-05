@@ -498,11 +498,9 @@ export class BattleService {
       await this.prisma.$transaction(async (tx) => {
         await this.userStats.decreaseUserBuffs({ userEmail, tx });
         await this.userWallet.addExpSilver({ userEmail, silver, exp, tx });
-        await this.userStats.levelUpUser({
-          user: rewardUser,
-          expGain: exp,
-          tx,
-        });
+        // After the exp is credited, so the level is derived from the row that
+        // now holds it rather than from this fight's copy of the player.
+        await this.userStats.levelUpUser({ userEmail, tx });
         await this.userStats.updateUserHealthMana({
           userEmail,
           health: remainingHealth,
@@ -535,6 +533,12 @@ export class BattleService {
       await this.userService.notifyUserUpdateWithProfile({ email: userEmail });
     }
 
+    // The party payload carries a copy of every member's stats, and it is what
+    // the next fight is built from. Nothing else invalidates it — clearUserCache
+    // is a different key — so leaving it would hand the next battle the levels
+    // and experience these rewards have just moved on.
+    await this._clearPartyCaches(battle);
+
     // Last, so the kill payout lands after everyone's own rewards are committed.
     await this._bankGuildBossDamage(battle);
 
@@ -542,6 +546,17 @@ export class BattleService {
     // last of them. Everything the fight was worth is already banked above.
     if (battle.dungeon) {
       await this.dungeonService.completeStage({ runId: battle.dungeon.runId });
+    }
+  }
+
+  /** Drops the cached party payload for everyone who fought, once per party. */
+  private async _clearPartyCaches(battle: BattleInstance) {
+    const cleared = new Set<number>();
+    for await (const userEmail of battle.participantEmails) {
+      const user = await this.usersRepository.getFullUser({ userEmail });
+      if (!user?.partyId || cleared.has(user.partyId)) continue;
+      cleared.add(user.partyId);
+      await this.partyRepository.clearPartyCache({ partyId: user.partyId });
     }
   }
 

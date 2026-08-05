@@ -48,6 +48,34 @@ players.
 
 Skill behaviour is in [combat.md](combat.md).
 
+### The level is derived, and derived from the row
+
+`levelUpUser` reads `Stats.level` and `Stats.experience` **off the row**, never
+off a caller's copy, and moves the level to whatever `getLevelFromExp` says the
+experience is worth. It is idempotent by construction: run it twice and the
+second run finds nothing to do.
+
+That is not a stylistic preference. It used to take the battle's in-memory
+player, and for a **party member** that object is a snapshot out of the *party*
+cache — a different key from `user_<email>`, which reward writes clear and the
+party payload's copy does not. The snapshot's experience stopped moving while
+the row's kept climbing, so every fight re-derived the same level-up from the
+same stale basis and incremented again. When the party cache finally refreshed,
+the row's inflated level was suddenly far above what its experience justified
+and the correction arrived as one enormous decrement — enough, after a few
+fights, to leave a character at a negative level with the maximum health to
+match. `battle.service` now clears the party cache after paying rewards as well.
+
+`resync_levels` (admin) is the repair: it runs the same correction over one
+character or all of them. It restores the level difference and the class stat
+blocks that went with it, and deliberately does **not** recompute the stats
+outright — equipment and guild blessings are written into the same row, and a
+recompute would delete them.
+
+A battle refuses to start at all if a member's sheet is impossible — level below
+1, or maximum health at or under zero. That is corruption rather than injury,
+and it says whose sheet it is.
+
 ## Stamina
 
 `Stats.stamina` / `maxStamina` / `staminaRefilledAt` —

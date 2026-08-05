@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { Buff } from '@prisma/client';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { TransactionContext } from 'src/core/prisma/types/prisma';
-import { UserWithStats } from 'src/feature/battle/battle';
 import { Utils } from 'src/utilities/utils';
 import { UsersRepository } from './users.repository';
 import { StatChanges, clampVital, statDelta } from './users.rules';
@@ -80,16 +79,37 @@ export class UserStatsService {
     return this._applyLevels({ ...args, direction: 'decrement' });
   }
 
-  /** Brings the user's level in line with their experience, in either direction. */
-  async levelUpUser({ user, expGain, ...args }: { user: UserWithStats; expGain: number; tx?: TransactionContext }) {
-    const currentLevel = user.stats.level;
-    const correctLevel = Utils.getLevelFromExp(user.stats.experience + expGain);
+  /**
+   * Brings the user's level in line with their experience, in either direction.
+   *
+   * **Both numbers are read from the row, never from a copy of it.** This used
+   * to take the caller's in-memory user — which, for a party member, is a
+   * snapshot out of the party cache that reward writes never invalidate. The
+   * experience on that snapshot stops moving while the row's keeps climbing, so
+   * every fight re-derived the same "you just levelled" from the same stale
+   * basis and incremented again; when the cache finally refreshed, the row's
+   * inflated level was suddenly far above what its experience justified and the
+   * correction came back as one enormous decrement. A few of those and a level
+   * one Priest is level -6 with the health to match.
+   *
+   * Reading the row makes the correction idempotent: run it a thousand times
+   * and the second run has nothing to do.
+   *
+   * The exp gain is not passed in either — the caller credits it in the same
+   * transaction, so by the time this reads the row it is already there.
+   */
+  async levelUpUser(args: { userEmail: string; tx?: TransactionContext }) {
+    const tx = args.tx || this.prisma;
+    const stats = await tx.stats.findUnique({ where: { userEmail: args.userEmail } });
+    if (!stats) return false;
+
+    const currentLevel = stats.level;
+    const correctLevel = Utils.getLevelFromExp(stats.experience);
     if (correctLevel === currentLevel) return false;
 
-    const amount = Math.abs(correctLevel - currentLevel);
     await this._applyLevels({
-      userEmail: user.email,
-      amount,
+      userEmail: args.userEmail,
+      amount: Math.abs(correctLevel - currentLevel),
       direction: correctLevel > currentLevel ? 'increment' : 'decrement',
       tx: args.tx,
     });
