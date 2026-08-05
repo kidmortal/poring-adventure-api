@@ -260,6 +260,25 @@ describe('BattleInstance', () => {
     });
   });
 
+  describe('what a fight starts with', () => {
+    it('keeps the meal and drops the blessing the last fight put up', () => {
+      const mage = player('Mage', []);
+      const meal = { ...AEGIS, id: 20, name: 'Well Fed', effect: 'well_fed', persist: true };
+      const blessing = { ...AEGIS, id: 21, name: 'Aegis', persist: false };
+      mage.buffs = [
+        { id: 1, userEmail: mage.email, buffId: 20, duration: 3, buff: meal },
+        { id: 2, userEmail: mage.email, buffId: 21, duration: 3, buff: blessing },
+      ] as unknown as typeof mage.buffs;
+
+      const { state } = build([mage], [monster('Poring')]);
+
+      // Food is a decision made before the fight and it outlives one; a skill's
+      // buff belongs to the fight it was cast in.
+      expect(state().users[0].buffs).toHaveLength(1);
+      expect(state().users[0].buffs[0].buff.name).toBe('Well Fed');
+    });
+  });
+
   describe('a buff arriving twice', () => {
     it('refreshes rather than stacking a second copy on the same player', async () => {
       const { battle, state } = build([player('Mage', [])], [monster('Poring')]);

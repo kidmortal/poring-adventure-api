@@ -136,6 +136,13 @@ Two things that are easy to get wrong:
 ## Buffs, barriers and debuffs
 
 - **Buffs** tick down on their holder's own turn and are dropped at zero.
+- **A fight starts with what was eaten before it, and nothing else.**
+  `generateUserBattleValues` keeps only `persist` buffs — those are `UserBuff`
+  rows, ticked per battle where food is eaten — and drops everything a skill put
+  up, because the players arrive as cached profile objects that a previous
+  battle may have pushed a blessing onto. Debuffs are cleared for the same
+  reason. So the battle bar shows only what *this* fight has done, and a meal
+  belongs on the character sheet with the other standing numbers.
 - **Neither buffs nor debuffs stack.** A second copy of the same name refreshes
   the one already there, to the longer of the two durations, so re-casting
   extends a blessing rather than doubling it and a fresh cast can never cut a

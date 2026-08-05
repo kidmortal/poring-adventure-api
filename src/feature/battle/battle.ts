@@ -1466,6 +1466,12 @@ export class BattleInstance {
       // that applied it, and the cached profile these come from may still be
       // holding the list a previous battle left on it.
       user.debuffs = [];
+      // Nor is a buff a skill put up. Only what was eaten beforehand survives
+      // between fights — those are rows in the database, and `persist` is what
+      // says so. A blessing cast last fight is not a standing stat, and the
+      // profile these arrive on is a cached object a previous battle may have
+      // pushed one onto.
+      user.buffs = (user.buffs ?? []).filter((held) => held.buff.persist);
       user.learnedSkills.forEach((ls) => {
         ls.cooldown = 0;
       });
