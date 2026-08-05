@@ -49,6 +49,29 @@ export class UserStatsService {
     return this._applyStats(args, 'decrement');
   }
 
+  /**
+   * Raises the daily stamina ceiling by something other than a profession level
+   * — today only the guild stamina blessing.
+   *
+   * The gain is banked in `bonusMaxStamina` as well as in the ceiling itself,
+   * because levelling a trade recomputes maxStamina from that trade's level and
+   * would otherwise quietly wipe what the guild paid for. Only the ceiling
+   * moves: the day's remaining bar is left where it is, the same way levelling
+   * a profession refuses to hand out a free refill.
+   */
+  async raiseMaxStamina(args: { userEmail: string; amount: number; tx?: TransactionContext }) {
+    const tx = args.tx || this.prisma;
+    await tx.stats.update({
+      where: { userEmail: args.userEmail },
+      data: {
+        maxStamina: { increment: args.amount },
+        bonusMaxStamina: { increment: args.amount },
+      },
+    });
+    await this.repository.clearUserCache({ email: args.userEmail });
+    return true;
+  }
+
   increaseUserLevel(args: { userEmail: string; amount: number; tx?: TransactionContext }) {
     return this._applyLevels({ ...args, direction: 'increment' });
   }

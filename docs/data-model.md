@@ -25,7 +25,7 @@ that are *not* visible in a column definition.
 | Model | Notes |
 |---|---|
 | `User` | Identity, silver, admin flag, and the hub every other table hangs off. `partyId` is nullable — most players are in no party. |
-| `Stats` | Level, exp, health/mana with their maxes, attack, str/agi/int, `defense`, `critRate` / `critDamage` (5% for 200%, before gear), and the daily `stamina` / `maxStamina` / `staminaRefilledAt`. One per user. |
+| `Stats` | Level, exp, health/mana with their maxes, attack, str/agi/int, `defense`, `critRate` / `critDamage` (5% for 200%, before gear), and the daily `stamina` / `maxStamina` / `staminaRefilledAt`. `bonusMaxStamina` remembers how much of the ceiling a guild blessing bought, so a profession level-up can recompute `maxStamina` without spending it. One per user. |
 | `Appearance` / `Head` | Cosmetics. `Head` is the catalogue, keyed `[name, gender]`. |
 | `Class` | The combat archetype chosen at creation: per-level stat block plus the skill list. **Renamed from Profession** — that name now means a trade. |
 | `LearnedSkill` | A skill a player owns, with `masteryLevel` (multiplies its power) and `equipped`. |
@@ -75,7 +75,7 @@ that are *not* visible in a column definition.
 | `GuildBoss` | The catalogue. **Its columns are the easy-difficulty numbers** — harder difficulties multiply them, see `guildBoss.rules.scaleBoss`. |
 | `CurrentGuildBoss` | The boss a guild has standing. **Its health pool persists between fights**: the guild wears it down over days, one entry per member per day. |
 | `GuildBossDamage` | `damage` is the *score*, shared evenly across a party, and decides the token payout. `dealtDamage` is what the member personally hit for, kept only so the ranking can show who carried. Goes away with the boss. |
-| `GuildBlessing` | Guild-wide stat bonuses. |
+| `GuildBlessing` | Guild-wide stat bonuses: health, mana, str/agi/int, defense, critRate, critDamage, and daily profession `stamina`. Each column holds the **total granted**, not a level — the level is that total over the stat's `UPGRADE_FACTOR`, which is what prices the next one. |
 | `GuildStoreProduct` | Priced in guild tokens. |
 
 ## Dungeon

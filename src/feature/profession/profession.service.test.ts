@@ -121,6 +121,9 @@ describe('Profession Service', () => {
     it('adds experience to one profession and re-derives its level', async () => {
       prisma.userProfession.findUnique = jest.fn().mockResolvedValue({ id: 5, level: 1, experience: 90 });
       prisma.userProfession.update = jest.fn().mockResolvedValue({});
+      // The new level moves the stamina ceiling, which reads the stats row.
+      prisma.stats.findUnique = jest.fn().mockResolvedValue({ stamina: 50, maxStamina: 50, bonusMaxStamina: 0 });
+      prisma.stats.update = jest.fn().mockResolvedValue({});
 
       const result = await service.addExperience({ userEmail: 'test@test.com', professionId: 1, amount: 20 });
 

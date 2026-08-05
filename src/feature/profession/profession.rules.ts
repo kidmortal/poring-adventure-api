@@ -47,9 +47,15 @@ export const LEVELS_PER_STAMINA = 2;
  * same fifty points. Every two levels adds one, so a level-20 crafter works a
  * sixth again as much in a day as a beginner — a real ceiling increase, and
  * still nowhere near uncapped combat.
+ *
+ * `bonus` is whatever the player was given from outside the trade — currently
+ * the guild stamina blessing. It is passed in rather than added by the caller
+ * because this function is the one place that decides a ceiling, and a caller
+ * that forgot to re-add it would silently take the guild's purchase away.
  */
-export function maxStaminaForProfession(args: { level: number }) {
-  return BASE_MAX_STAMINA + Math.floor(Math.max(args.level, 1) / LEVELS_PER_STAMINA);
+export function maxStaminaForProfession(args: { level: number; bonus?: number }) {
+  const earned = Math.floor(Math.max(args.level, 1) / LEVELS_PER_STAMINA);
+  return BASE_MAX_STAMINA + earned + Math.max(args.bonus ?? 0, 0);
 }
 
 /** Below this, a failed enhancement only costs silver. At or above it, it bites. */

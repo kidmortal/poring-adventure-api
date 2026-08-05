@@ -206,6 +206,11 @@ describe('Stamina from profession level', () => {
     expect(maxStaminaForProfession({ level: 50 })).toBe(BASE_MAX_STAMINA + 25);
   });
 
+  it('carries a guild blessing on top of what the trade earned', () => {
+    expect(maxStaminaForProfession({ level: 20, bonus: 5 })).toBe(BASE_MAX_STAMINA + 10 + 5);
+    expect(maxStaminaForProfession({ level: 1, bonus: 0 })).toBe(BASE_MAX_STAMINA);
+  });
+
   it('never goes backwards as the level climbs', () => {
     for (let level = 1; level < 50; level++) {
       expect(maxStaminaForProfession({ level: level + 1 })).toBeGreaterThanOrEqual(maxStaminaForProfession({ level }));

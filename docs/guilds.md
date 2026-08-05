@@ -100,9 +100,51 @@ them linked.
 
 ## Blessings
 
-`GuildBlessing` — a shared stat bonus every member receives. Unlock costs 100
-guild tokens, each upgrade another 100. `UPGRADE_FACTOR` in `constants.ts`
-scales the step: health and mana move 5 per upgrade, str/agi/int 1.
+`GuildBlessing` — a shared stat bonus every member receives, paid for in
+soulshards (`Guild.taskPoints`). Unlocking the shrine costs 100.
+
+**A column stores the total stat granted, not a level.** The level is that total
+divided by the stat's step, which is what `blessingLevel` in `guild.rules.ts`
+reads back. Storing the total is what lets the bonus be handed to members as it
+is bought, with no second column to keep in step.
+
+`UPGRADE_FACTOR` in `constants.ts` is that step, and is the only thing that
+separates a cheap blessing from an expensive one — every blessing costs the
+same per level:
+
+| Blessing | Per level |
+|---|---|
+| `health`, `mana` | 5 |
+| `critDamage` | 5 — percent of a normal hit, where one point is not felt |
+| `str`, `agi`, `int`, `defense`, `critRate` | 1 |
+| `stamina` | 1 point of daily profession stamina |
+
+### What a level costs
+
+`blessingUpgradeCost({ level })` — `100 × 1.35^level`, rounded. The first level
+is 100, the twentieth about 29,700, and `MAX_BLESSING_LEVEL` stops it there. A
+flat 100 forever meant a mature guild's shard income was not a decision; the
+compounding is what makes spreading levels across the blessings members
+actually use a different plan from pushing one alone.
+
+Both `unlock` and `upgrade` check affordability **before** opening the
+transaction and push the refusal, naming the price and what the guild holds.
+
+### The stamina blessing
+
+The only one that does not go through `increaseUserStats`, because daily
+stamina is not a combat stat. `UserStatsService.raiseMaxStamina` increments
+`Stats.maxStamina` **and** `Stats.bonusMaxStamina`.
+
+The second column is not redundant: levelling a profession recomputes
+`maxStamina` from the trade's level (`_syncMaxStamina` →
+`maxStaminaForProfession({ level, bonus })`), and without somewhere to remember
+the guild's purchase that recompute would spend it. Only the ceiling moves —
+the day's remaining bar is left alone, so buying the blessing at teatime is not
+a free refill.
+
+Blessings are applied to whoever is a member **at the moment of purchase**.
+Joining later grants nothing retroactively, and quitting takes nothing back.
 
 ## Store
 

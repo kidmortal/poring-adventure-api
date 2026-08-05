@@ -134,9 +134,12 @@ export class ProfessionService {
    */
   private async _syncMaxStamina(args: { userEmail: string; level: number; tx?: TransactionContext }) {
     const tx = args.tx || this.prisma;
-    const maxStamina = maxStaminaForProfession({ level: args.level });
     const stats = await tx.stats.findUnique({ where: { userEmail: args.userEmail } });
-    if (!stats || stats.maxStamina === maxStamina) return false;
+    if (!stats) return false;
+
+    // Guild blessings ride along, or recomputing the ceiling would spend them.
+    const maxStamina = maxStaminaForProfession({ level: args.level, bonus: stats.bonusMaxStamina });
+    if (stats.maxStamina === maxStamina) return false;
 
     await tx.stats.update({
       where: { userEmail: args.userEmail },

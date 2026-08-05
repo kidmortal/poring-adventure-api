@@ -3,12 +3,16 @@ import { PrismaService } from 'src/core/prisma/prisma.service';
 import { TransactionContext } from 'src/core/prisma/types/prisma';
 import { WebsocketService } from 'src/core/websocket/websocket.service';
 import { UserStatsService } from 'src/feature/users/userStats.service';
-import { ALLOWED_BLESSINGS, UPGRADE_FACTOR } from './constants';
+import { ALLOWED_BLESSINGS, STAMINA_BLESSING, UPGRADE_FACTOR } from './constants';
 import { GuildRepository } from './guild.repository';
 import { GuildPermission, GuildPermissions } from './guild.permissions';
-
-const BLESSING_UNLOCK_COST = 100;
-const BLESSING_UPGRADE_COST = 100;
+import {
+  BLESSING_UNLOCK_COST,
+  MAX_BLESSING_LEVEL,
+  blessingLevel,
+  blessingUpgradeCost,
+  canUpgradeBlessing,
+} from './guild.rules';
 
 /** Guild blessings: a shared stat bonus every member receives. */
 @Injectable()
@@ -33,6 +37,14 @@ export class GuildBlessingService {
       this.websocket.sendErrorNotification({
         email: args.userEmail,
         text: 'Blessings are already unlocked',
+      });
+      return false;
+    }
+
+    if (guild.taskPoints < BLESSING_UNLOCK_COST) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Unlocking blessings costs ${BLESSING_UNLOCK_COST} soulshards, the guild has ${guild.taskPoints}`,
       });
       return false;
     }
@@ -75,8 +87,27 @@ export class GuildBlessingService {
     }
 
     const upgradeAmount = UPGRADE_FACTOR[args.blessing];
+    const level = blessingLevel({ current: guild.blessing[args.blessing] ?? 0, factor: upgradeAmount });
+
+    if (!canUpgradeBlessing({ level })) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Blessing ${args.blessing} is already at its maximum level (${MAX_BLESSING_LEVEL})`,
+      });
+      return false;
+    }
+
+    const cost = blessingUpgradeCost({ level });
+    if (guild.taskPoints < cost) {
+      this.websocket.sendErrorNotification({
+        email: args.userEmail,
+        text: `Level ${level + 1} costs ${cost} soulshards, the guild has ${guild.taskPoints}`,
+      });
+      return false;
+    }
+
     await this.prisma.$transaction(async (tx) => {
-      await this._spendTokens({ guildId: args.guildId, amount: BLESSING_UPGRADE_COST, tx });
+      await this._spendTokens({ guildId: args.guildId, amount: cost, tx });
       await tx.guild.update({
         where: { id: args.guildId },
         data: { blessing: { update: { [args.blessing]: { increment: upgradeAmount } } } },
@@ -92,7 +123,7 @@ export class GuildBlessingService {
     await this._refresh(args.guildId);
     this.websocket.sendTextNotification({
       email: args.userEmail,
-      text: `Blessing ${args.blessing} upgraded`,
+      text: `Blessing ${args.blessing} upgraded to level ${level + 1}`,
     });
     return true;
   }
@@ -103,6 +134,15 @@ export class GuildBlessingService {
     if (!guild) return;
 
     for await (const member of guild.members) {
+      // Stamina is not a combat stat, so it moves the ceiling rather than the sheet.
+      if (args.stat === STAMINA_BLESSING) {
+        await this.userStats.raiseMaxStamina({
+          userEmail: member.userEmail,
+          amount: args.amount,
+          tx: args.tx,
+        });
+        continue;
+      }
       await this.userStats.increaseUserStats({
         userEmail: member.userEmail,
         [args.stat]: args.amount,

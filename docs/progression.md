@@ -59,6 +59,12 @@ the supply of everything the trades produce. Base is 50
 (`BASE_MAX_STAMINA`), and a profession adds one point per two of its levels
 (`LEVELS_PER_STAMINA`) via `maxStaminaForProfession`.
 
+A guild can buy more of it. The `stamina` blessing adds a point per level to
+every member's ceiling, banked in `Stats.bonusMaxStamina` and fed back into
+`maxStaminaForProfession({ level, bonus })` so a profession level-up recomputes
+the ceiling without spending it — see [guilds.md](guilds.md#blessings). It is
+the only blessing a player who never fights has a reason to care about.
+
 Combat costs no stamina. Gathering, crafting and hired jobs cost all of it.
 
 ## Buffs on a player

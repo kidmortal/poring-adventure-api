@@ -86,6 +86,11 @@ model Stats {
   stamina           Int      @default(50)
   maxStamina        Int      @default(50)
   staminaRefilledAt DateTime @default(now())
+
+  /// Ceiling granted from outside the trade — currently the guild stamina
+  /// blessing. Kept apart from maxStamina because levelling a profession
+  /// recomputes the ceiling from scratch, and would otherwise erase it.
+  bonusMaxStamina Int @default(0)
 }
 
 model InventoryItem {
@@ -557,15 +562,30 @@ model Guild {
   blessing          GuildBlessing?
 }
 
+/// A guild-wide stat bonus every member carries. Each column holds the total
+/// granted so far, not a level — the level is that total divided by the stat's
+/// step (UPGRADE_FACTOR), which is what prices the next upgrade.
+///
+/// Everything starts at 0. An unlocked blessing grants nothing until the guild
+/// pays for it: the old non-zero defaults advertised stats that were never
+/// actually written onto anyone's sheet.
 model GuildBlessing {
   id      Int   @id @default(autoincrement())
   guild   Guild @relation(fields: [guildId], references: [id])
   guildId Int   @unique
-  health  Int   @default(5)
-  mana    Int   @default(5)
-  str     Int   @default(1)
-  int     Int   @default(1)
-  agi     Int   @default(1)
+  health  Int   @default(0)
+  mana    Int   @default(0)
+  str     Int   @default(0)
+  int     Int   @default(0)
+  agi     Int   @default(0)
+
+  defense    Int @default(0)
+  critRate   Int @default(0)
+  critDamage Int @default(0)
+
+  /// Extra daily profession stamina. The only blessing that buys time rather
+  /// than combat power, and the reason a guild is worth joining for a crafter.
+  stamina Int @default(0)
 }
 
 model CurrentGuildTask {
