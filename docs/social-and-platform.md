@@ -88,9 +88,16 @@ marks the row.
 Live-operations tools: connected sockets, server info and restart, cache
 clearing (all or one user), push notifications, gift mail, silver grants,
 full-heal and kill, `force_end_battle` (for a fight stuck in the in-memory list),
-and three daily-reset escapes — `reset_daily_stamina`, `reset_boss_entry`,
-`clear_guild_bosses`.
+`kill_battle_monsters`, and three daily-reset escapes — `reset_daily_stamina`,
+`reset_boss_entry`, `clear_guild_bosses`.
 
 `force_end_battle` exists because battles are in memory: before wipes set
 `battleFinished`, a lost fight would sit in `battleList` until an admin cleared
 it.
+
+`kill_battle_monsters` drops everything standing in a fight — the admin's own
+when no email is given — and settles it through `BattleInstance.forceKillMonsters`,
+which runs the battle's ordinary victory path. It is a testing tool for what a
+kill *leads to*: the drop roll, the experience, a dungeon's next stage, a guild
+boss's banked damage. Paying the rewards out directly instead would be
+exercising a path the game does not otherwise have.

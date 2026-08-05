@@ -133,6 +133,14 @@ export class AdminGateway {
     return this.adminService.forceEndBattle({ userEmail: email, targetEmail });
   }
 
+  /** No email kills the monsters in the admin's own fight. */
+  @SubscribeMessage('kill_battle_monsters')
+  async killBattleMonsters(@MessageBody() targetEmail: string, @ConnectedSocket() client: Socket) {
+    this.logger.debug(`kill_battle_monsters ${targetEmail || 'self'}`);
+    const email = client.handshake.auth.email;
+    return this.adminService.killBattleMonsters({ userEmail: email, targetEmail: targetEmail || undefined });
+  }
+
   @SubscribeMessage('clear_user_cache')
   async clearUserCache(@MessageBody() targetEmail: string, @ConnectedSocket() client: Socket) {
     this.logger.debug(`clear_user_cache ${targetEmail}`);

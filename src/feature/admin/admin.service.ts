@@ -143,6 +143,25 @@ export class AdminService {
     return this._report(args.userEmail, 'Battle ended');
   }
 
+  /**
+   * Kills whatever the target is fighting, and pays the fight out as a win.
+   *
+   * The point is reaching what a kill leads to — a drop table, a level, the next
+   * dungeon stage — without playing the fight first, so it settles through the
+   * battle's own victory path rather than shortcutting to the rewards. With no
+   * target it kills the admin's own fight, which is what it is used for.
+   */
+  async killBattleMonsters(args: { userEmail: string; targetEmail?: string }) {
+    const targetEmail = args.targetEmail || args.userEmail;
+    const battle = this.battleService.getUserBattle(targetEmail);
+    if (!battle) return this._report(args.userEmail, 'That user is not in a battle');
+
+    const killed = await battle.forceKillMonsters({ by: 'an admin' });
+    if (!killed) return this._report(args.userEmail, 'That battle is already settled');
+
+    return this._report(args.userEmail, 'Monsters killed');
+  }
+
   /** Forces the next read of a user to come from the database. */
   async clearUserCache(args: { userEmail: string; targetEmail: string }) {
     await this.usersRepository.clearUserCache({ email: args.targetEmail });

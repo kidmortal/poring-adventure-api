@@ -1145,6 +1145,31 @@ export class BattleInstance {
     // when the monster is stunned out of acting.
   }
 
+  /**
+   * Drops everything still standing and settles the fight as a won one.
+   *
+   * An admin tool, for testing what a kill leads to — the drops, the rewards, a
+   * dungeon's next stage, a guild boss's banked damage — without playing the
+   * fight out first. It deliberately goes through the same settle step a real
+   * killing blow does, so whatever it produces is what a player would have got;
+   * anything cheaper would be testing a path the game does not have.
+   *
+   * Buffs are not ticked and the turn does not advance, because no turn was
+   * taken: the monsters simply stop being alive.
+   */
+  async forceKillMonsters(args: { by: string }) {
+    if (this.battleFinished) return false;
+    if (!this.isMonsterAlive) return false;
+
+    this.aliveMonsters.forEach((monster) => {
+      monster.health = 0;
+      this.pushLog({ icon: monster.image, log: `${monster.name} was struck down by ${args.by}` });
+    });
+
+    await this.settleBattleAndProcessRewards();
+    return true;
+  }
+
   private async settleBattleAndProcessRewards() {
     if (this.battleFinished) {
       this.removeBattle();

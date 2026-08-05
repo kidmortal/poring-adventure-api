@@ -117,7 +117,8 @@ Behind `AdminGuard`. `get_all_connected_users` · `get_server_info` ·
 `restart_server` · `message_socket` · `disconnect_user_websocket` ·
 `clear_all_cache` · `clear_user_cache` · `send_push_notification` ·
 `send_push_notification_user` · `send_gift_mail` · `give_silver` ·
-`full_heal_user` · `kill_user` · `force_end_battle` · `reset_daily_stamina` ·
+`full_heal_user` · `kill_user` · `force_end_battle` · `kill_battle_monsters` ·
+`reset_daily_stamina` ·
 `reset_boss_entry` · `clear_guild_bosses`
 
 ## Adding an event
