@@ -36,3 +36,10 @@ lerna-debug.log*
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Local copies of the live database, and the journal files sqlite leaves beside
+# one. dev.db is tracked on purpose; a snapshot pulled off the server is not —
+# it is real player data and it does not belong in a public repository.
+backup.db
+*.db-shm
+*.db-wal
