@@ -410,11 +410,11 @@ export class BattleService {
     return false;
   }
 
-  async attack(userEmail: string) {
-    const battle = this.getUserBattle(userEmail);
+  async attack(args: { userEmail: string; targetName?: string }) {
+    const battle = this.getUserBattle(args.userEmail);
     if (!battle) return false;
     if (battle.battleFinished) return false;
-    battle.processUserAttack({ email: userEmail });
+    battle.processUserAttack({ email: args.userEmail, targetName: args.targetName });
     return true;
   }
   /**

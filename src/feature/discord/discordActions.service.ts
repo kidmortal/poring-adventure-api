@@ -119,7 +119,7 @@ export class DiscordActionsService {
 
   async attack(args: { discordId: string }) {
     const userEmail = await this.email(args.discordId);
-    await this.battleService.attack(userEmail);
+    await this.battleService.attack({ userEmail });
     return this.battleService.getUserBattle(userEmail)?.toJson() ?? false;
   }
 

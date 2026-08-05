@@ -163,6 +163,37 @@ describe('BattleInstance', () => {
     });
   });
 
+  describe('a plain attack with a target picked', () => {
+    it('swings at the monster named rather than the first one standing', async () => {
+      const { battle, state, giveTurn } = build(
+        [player('Knight', [])],
+        [monster('Poring A'), monster('Poring B'), monster('Poring C')],
+      );
+
+      giveTurn('Knight');
+      await battle.processUserAttack({ email: 'Knight@test', targetName: 'Poring C' });
+
+      const after = state();
+      expect(after.monsters[0].health).toBe(300);
+      expect(after.monsters[1].health).toBe(300);
+      expect(after.monsters[2].health).toBeLessThan(300);
+    });
+
+    it('falls through to whatever is standing when the pick died first', async () => {
+      // A stale pick is the normal case in a party: the monster the client had
+      // highlighted can die before the turn comes round, and that must not cost
+      // the swing.
+      const { battle, state, giveTurn } = build([player('Knight', [])], [monster('Poring A'), monster('Poring B')]);
+
+      const inBattle = (battle as unknown as { monsters: { name: string; health: number }[] }).monsters;
+      inBattle.find((m) => m.name === 'Poring A')!.health = 0;
+      giveTurn('Knight');
+      await battle.processUserAttack({ email: 'Knight@test', targetName: 'Poring A' });
+
+      expect(state().monsters[1].health).toBeLessThan(300);
+    });
+  });
+
   describe('an area damage skill', () => {
     it('hits every monster standing, for one mana cost and one turn', () => {
       const flamestrike = skill({

@@ -206,6 +206,19 @@ Two things that are easy to get wrong:
   swings for, `healthBonus` cuts what it takes, capped at half. Both tick on its
   own turn.
 
+## Choosing what to hit
+
+A plain attack and a single-target enemy skill both take an optional
+`targetName`. Unnamed, they fall to `defaultMonsterTarget` — the first monster
+still standing — which is what the game did for everything before players could
+pick.
+
+`getMonsterTarget` resolves the name **and falls through to whatever is still
+standing when the named one is dead.** That is the normal case in a party, not
+an edge one: the client highlights a monster, three other players act, and the
+pack it was aimed into is gone by the time the turn comes round. A stale pick
+must never cost a swing.
+
 ## Aggro
 
 `user.aggro` accumulates per hit; the monster targets the highest among living

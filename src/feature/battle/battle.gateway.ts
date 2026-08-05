@@ -62,10 +62,10 @@ export class BattleGateway {
   }
 
   @SubscribeMessage('battle_attack')
-  async attack(@ConnectedSocket() client: Socket) {
+  async attack(@MessageBody() dto: BattleAttackDto, @ConnectedSocket() client: Socket) {
     const email = client.handshake.auth.email;
     this.logger.debug(`battle_attack ${email}`);
-    return this.battleService.attack(email);
+    return this.battleService.attack({ userEmail: email, targetName: dto?.targetName });
   }
   @SubscribeMessage('battle_use_item')
   async useItem(@MessageBody() dto: BattleUseItemDto, @ConnectedSocket() client: Socket) {

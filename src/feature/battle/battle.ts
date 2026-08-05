@@ -480,12 +480,15 @@ export class BattleInstance {
     });
   }
 
-  async processUserAttack(args: { email: string }) {
+  async processUserAttack(args: { email: string; targetName?: string }) {
     const isUserTurn = this.isUserTurn(args);
 
     if (isUserTurn) {
       const user = this.getUserFromBattle(args.email);
-      const targetMonster = this.defaultMonsterTarget();
+      // Named, when the player picked one off the board. `getMonsterTarget`
+      // falls through to whatever is still standing if the pack they aimed at
+      // died before the turn came round, so a stale pick never wastes a swing.
+      const targetMonster = args.targetName ? this.getMonsterTarget(args.targetName) : this.defaultMonsterTarget();
       if (!targetMonster) return false;
 
       const { value: userDamage } = this.rollCrit({

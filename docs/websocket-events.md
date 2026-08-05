@@ -52,8 +52,12 @@ the trigger.
 ### `battle.gateway.ts`
 `battle_create` (`{ mapId }`) · `battle_create_guild_boss` ·
 `battle_create_dungeon` (`{ dungeonId }`) · `battle_dungeon_continue` ·
-`battle_update` · `battle_reset` · `battle_attack` ·
+`battle_update` · `battle_reset` · `battle_attack` (`{ targetName? }`) ·
 `battle_use_item` (`{ inventoryId }`) · `battle_cast` (`{ skillId, targetName? }`)
+
+`targetName` on both is the monster the player picked. `getMonsterTarget` falls
+through to whatever is still standing when the named one died first, so a stale
+pick — the normal case in a party — never costs the swing.
 
 The two dungeon events live here rather than on the dungeon gateway because they
 open a battle, and the battle list belongs to `BattleService`.
