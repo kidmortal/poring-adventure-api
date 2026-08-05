@@ -126,6 +126,35 @@ export class AdminGateway {
     });
   }
 
+  /**
+   * Puts any item into a bag by id. No email spawns into the admin's own.
+   */
+  @SubscribeMessage('spawn_item')
+  async spawnItem(
+    @MessageBody()
+    params: { email?: string; itemId: number; stack?: number; quality?: number; enhancement?: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.logger.debug(`spawn_item ${params.itemId}`);
+    const email = client.handshake.auth.email;
+    return this.adminService.spawnItem({
+      userEmail: email,
+      receiverEmail: params.email || undefined,
+      itemId: params.itemId,
+      stack: params.stack,
+      quality: params.quality,
+      enhancement: params.enhancement,
+    });
+  }
+
+  /** The whole item catalogue, so the panel can search by name. */
+  @SubscribeMessage('get_item_catalog')
+  async getItemCatalog(@ConnectedSocket() client: Socket) {
+    this.logger.debug('get_item_catalog');
+    const email = client.handshake.auth.email;
+    return this.adminService.getItemCatalog({ userEmail: email });
+  }
+
   @SubscribeMessage('force_end_battle')
   async forceEndBattle(@MessageBody() targetEmail: string, @ConnectedSocket() client: Socket) {
     this.logger.debug(`force_end_battle ${targetEmail}`);

@@ -12,6 +12,7 @@ import { PrismaService } from 'src/core/prisma/prisma.service';
 import { UserWalletService } from 'src/feature/users/userWallet.service';
 import { GuildRepository } from 'src/feature/guild/guild.repository';
 import { BattleService } from 'src/feature/battle/battle.service';
+import { InventoryService } from 'src/feature/items/inventory.service';
 import { BattleDebugAction } from 'src/feature/battle/battle';
 import * as os from 'os';
 import { execSync } from 'child_process';
@@ -29,6 +30,7 @@ export class AdminService {
     private readonly userWallet: UserWalletService,
     private readonly guildRepository: GuildRepository,
     private readonly battleService: BattleService,
+    private readonly inventory: InventoryService,
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
@@ -130,6 +132,60 @@ export class AdminService {
     await this.userService.notifyUserUpdateWithProfile({ email: args.receiverEmail });
     this.websocket.sendTextNotification({ email: args.receiverEmail, text: `An admin gave you ${args.amount} silver` });
     return this._report(args.userEmail, `Gave ${args.amount} silver`);
+  }
+
+  /**
+   * Puts any item straight into a bag, by id.
+   *
+   * Quality and enhancement are settable because the states worth testing are
+   * the ones that take an evening to reach honestly — a +5 Epic to feed the
+   * rarity upgrade, a Legendary potion to check what it restores. The id is
+   * looked up first so a typo reports the miss rather than failing on a foreign
+   * key nobody can read.
+   */
+  async spawnItem(args: {
+    userEmail: string;
+    receiverEmail?: string;
+    itemId: number;
+    stack?: number;
+    quality?: number;
+    enhancement?: number;
+  }) {
+    const receiverEmail = args.receiverEmail || args.userEmail;
+    const item = await this.prisma.item.findUnique({ where: { id: args.itemId } });
+    if (!item) return this._report(args.userEmail, `No item with id ${args.itemId}`);
+
+    const stack = Math.max(args.stack ?? 1, 1);
+    const quality = Math.min(Math.max(args.quality ?? 1, 1), 5);
+    const enhancement = Math.max(args.enhancement ?? 0, 0);
+
+    await this.inventory.addItemToInventory({
+      userEmail: receiverEmail,
+      itemId: args.itemId,
+      stack,
+      quality,
+      enhancement,
+    });
+    await this.userService.notifyUserUpdateWithProfile({ email: receiverEmail });
+
+    const described = `${stack}x ${item.name}${enhancement ? ` +${enhancement}` : ''}`;
+    if (receiverEmail !== args.userEmail) {
+      this.websocket.sendTextNotification({ email: receiverEmail, text: `An admin gave you ${described}` });
+    }
+    return this._report(args.userEmail, `Spawned ${described}`);
+  }
+
+  /**
+   * The catalogue, so the panel can offer a name to search rather than asking
+   * for an id nobody has memorised. Small enough to send whole.
+   */
+  async getItemCatalog(args: { userEmail: string }) {
+    const items = await this.prisma.item.findMany({
+      select: { id: true, name: true, category: true, image: true },
+      orderBy: { id: 'asc' },
+    });
+    this.websocket.sendMessageToSocket({ email: args.userEmail, event: 'item_catalog', payload: items });
+    return true;
   }
 
   /**

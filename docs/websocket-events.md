@@ -32,6 +32,7 @@ refusal is normally `error_notification` + `false`, not a thrown exception.
 | `purchases` | `UserPurchase[]` | |
 | `connected_users` | `{ id, email }[]` | Admin panel. |
 | `server_info` | server stats | Admin panel. |
+| `item_catalog` | `{ id, name, category, image }[]` | Admin panel — the whole item list, so the spawn picker can search by name. |
 | `notification` | `string` | Info toast. |
 | `error_notification` | `string` | Error toast — the standard refusal channel. |
 
@@ -65,6 +66,10 @@ open a battle, and the battle list belongs to `BattleService`.
 
 ### `items.gateway.ts`
 `consume_item` · `equip_item` · `unequip_item` · `enhance_item` · `upgrade_item`
+
+`upgrade_item` takes an optional `materialInventoryId` — the duplicate to feed
+in. Left out, the server picks the least enhanced spare it can legally take. See
+[economy.md](economy.md) for the odds and what a failure costs.
 
 ### `market.gateway.ts`
 `get_all_market_listing` · `create_market_listing` · `purchase_market_listing` ·
@@ -120,7 +125,15 @@ Behind `AdminGuard`. `get_all_connected_users` · `get_server_info` ·
 `full_heal_user` · `kill_user` · `force_end_battle` · `kill_battle_monsters` ·
 `battle_debug_action` · `resync_levels` ·
 `reset_daily_stamina` ·
-`reset_boss_entry` · `clear_guild_bosses`
+`reset_boss_entry` · `clear_guild_bosses` · `spawn_item` · `get_item_catalog`
+
+`spawn_item` puts any item into a bag by id — no email spawns into the admin's
+own. `quality` and `enhancement` are settable and clamped server-side, because
+the states worth testing are the ones that take an evening to reach honestly: a
++5 Epic to feed a rarity upgrade, a Legendary potion to check what it restores.
+`get_item_catalog` answers on the `item_catalog` event with every item's id,
+name, category and image, so the panel can search by name instead of asking for
+an id nobody has memorised.
 
 ## Adding an event
 
