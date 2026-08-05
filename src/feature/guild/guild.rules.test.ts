@@ -67,9 +67,7 @@ describe('guild.rules', () => {
     });
 
     it('carries the stats the combat rebuild gave everyone, and the crafter one', () => {
-      expect(ALLOWED_BLESSINGS).toEqual(
-        expect.arrayContaining(['defense', 'critRate', 'critDamage', 'stamina']),
-      );
+      expect(ALLOWED_BLESSINGS).toEqual(expect.arrayContaining(['defense', 'critRate', 'critDamage', 'stamina']));
     });
   });
 });

@@ -141,6 +141,23 @@ export class AdminGateway {
     return this.adminService.killBattleMonsters({ userEmail: email, targetEmail: targetEmail || undefined });
   }
 
+  /**
+   * One event for every battle debug action, rather than a dozen of them: they
+   * differ only in the verb, and the client sends the verb.
+   */
+  @SubscribeMessage('battle_debug_action')
+  async battleDebugAction(@MessageBody() params: BattleDebugActionDto, @ConnectedSocket() client: Socket) {
+    this.logger.debug(`battle_debug_action ${params?.action}`);
+    const email = client.handshake.auth.email;
+    return this.adminService.runBattleDebugAction({
+      userEmail: email,
+      action: params.action,
+      targetEmail: params.email || undefined,
+      name: params.name,
+      amount: params.amount,
+    });
+  }
+
   @SubscribeMessage('clear_user_cache')
   async clearUserCache(@MessageBody() targetEmail: string, @ConnectedSocket() client: Socket) {
     this.logger.debug(`clear_user_cache ${targetEmail}`);

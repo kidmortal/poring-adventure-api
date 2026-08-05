@@ -267,6 +267,43 @@ describe('BattleInstance', () => {
       expect(battle.consumeDamage()).toEqual([{ userEmail: 'Mage@test', damage: 300 }]);
     });
 
+    it('leaves the turn where it was, whatever it did', async () => {
+      // The whole point of the debug actions: a fight is driven by turns, so a
+      // tool that spent one would change the thing it is being used to inspect.
+      const { battle, state } = build([player('Mage', []), player('Priest', [])], [monster('Poring')]);
+      const before = state().attackerTurn;
+
+      for (const action of ['heal_allies', 'restore_mana', 'drain_mana', 'clear_buffs', 'enrage'] as const) {
+        await battle.runDebugAction({ action, by: 'an admin' });
+        expect(state().attackerTurn).toBe(before);
+      }
+    });
+
+    it('passes the turn only when asked to', async () => {
+      const { battle, state } = build([player('Mage', []), player('Priest', [])], [monster('Poring')]);
+      const before = state().attackerTurn;
+
+      await battle.runDebugAction({ action: 'next_turn', by: 'an admin' });
+      expect(state().attackerTurn).not.toBe(before);
+    });
+
+    it('revives the party it heals, so a wiped fight can carry on', async () => {
+      const { battle, state } = build([player('Mage', [])], [monster('Poring')]);
+      await battle.runDebugAction({ action: 'hurt_allies', by: 'an admin', amount: 9999 });
+      expect(state().users[0].isDead).toBe(true);
+
+      await battle.runDebugAction({ action: 'heal_allies', by: 'an admin' });
+      expect(state().users[0].isDead).toBe(false);
+      expect(state().users[0].stats.health).toBe(state().users[0].stats.maxHealth);
+    });
+
+    it('banks what it takes off a monster, the way a real hit does', async () => {
+      const { battle } = build([player('Mage', [])], [monster('Poring')]);
+      await battle.runDebugAction({ action: 'hurt_monsters', by: 'Mage@test', amount: 120 });
+
+      expect(battle.consumeDamage()).toEqual([{ userEmail: 'Mage@test', damage: 120 }]);
+    });
+
     it('refuses a fight that is already settled, so nothing banks twice', async () => {
       const { battle } = build([player('Mage', [])], [monster('Poring')]);
 

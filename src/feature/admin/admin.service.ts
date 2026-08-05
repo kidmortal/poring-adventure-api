@@ -1,6 +1,7 @@
 import { UsersRepository } from 'src/feature/users/users.repository';
 import { UserStatsService } from 'src/feature/users/userStats.service';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Buff, Debuff } from '@prisma/client';
 import { Inject, Injectable } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { MailService } from 'src/feature/mail/mail.service';
@@ -11,6 +12,7 @@ import { PrismaService } from 'src/core/prisma/prisma.service';
 import { UserWalletService } from 'src/feature/users/userWallet.service';
 import { GuildRepository } from 'src/feature/guild/guild.repository';
 import { BattleService } from 'src/feature/battle/battle.service';
+import { BattleDebugAction } from 'src/feature/battle/battle';
 import * as os from 'os';
 import { execSync } from 'child_process';
 import { memoryUsage } from 'process';
@@ -160,6 +162,56 @@ export class AdminService {
     if (!killed) return this._report(args.userEmail, 'That battle is already settled');
 
     return this._report(args.userEmail, 'Monsters killed');
+  }
+
+  /**
+   * The debug panel's battle controls: heal or wound either side, hand out a
+   * buff or a debuff, empty a mana pool, pass the turn, enrage the monster.
+   *
+   * The catalogue rows are read here and handed to the engine, which has no
+   * database of its own — the rule that keeps the fight unit-testable. A named
+   * buff or debuff that is not seeded is refused rather than silently skipped,
+   * because a debug tool that does nothing and says nothing is worse than none.
+   */
+  async runBattleDebugAction(args: {
+    userEmail: string;
+    action: BattleDebugAction;
+    targetEmail?: string;
+    /** Buff or debuff to apply, by name. Only read by the actions that need one. */
+    name?: string;
+    amount?: number;
+  }) {
+    const targetEmail = args.targetEmail || args.userEmail;
+    const battle = this.battleService.getUserBattle(targetEmail);
+    if (!battle) return this._report(args.userEmail, 'That user is not in a battle');
+
+    let buff: Buff | undefined;
+    let debuff: Debuff | undefined;
+
+    if (args.action === 'buff_allies') {
+      buff = args.name
+        ? await this.prisma.buff.findUnique({ where: { name: args.name } })
+        : await this.prisma.buff.findFirst();
+      if (!buff) return this._report(args.userEmail, `No buff named ${args.name}`);
+    }
+
+    if (args.action === 'debuff_monsters') {
+      debuff = args.name
+        ? await this.prisma.debuff.findUnique({ where: { name: args.name } })
+        : await this.prisma.debuff.findFirst();
+      if (!debuff) return this._report(args.userEmail, `No debuff named ${args.name}`);
+    }
+
+    const ran = await battle.runDebugAction({ action: args.action, by: 'an admin', buff, debuff, amount: args.amount });
+    if (!ran) return this._report(args.userEmail, 'That battle is already settled');
+
+    // The party's rows are only written when a fight ends, so a healed player
+    // still reads their old health off their profile until this pushes it.
+    for await (const email of battle.participantEmails) {
+      await this.userService.notifyUserUpdateWithProfile({ email });
+    }
+
+    return this._report(args.userEmail, `Battle: ${args.action.replace(/_/g, ' ')}`);
   }
 
   /** Forces the next read of a user to come from the database. */

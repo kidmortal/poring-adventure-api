@@ -129,6 +129,25 @@ type SkillWithBuff = Skill & {
   debuff?: Debuff;
 };
 
+/**
+ * What the debug panel can do to a fight. Kept as a union rather than a handful
+ * of methods so the gateway carries one event and the client one list.
+ */
+export type BattleDebugAction =
+  | 'heal_allies'
+  | 'hurt_allies'
+  | 'kill_allies'
+  | 'heal_monsters'
+  | 'hurt_monsters'
+  | 'buff_allies'
+  | 'clear_buffs'
+  | 'debuff_monsters'
+  | 'clear_debuffs'
+  | 'restore_mana'
+  | 'drain_mana'
+  | 'next_turn'
+  | 'enrage';
+
 export type Battle = {
   users: UserWithStats[];
   monsters: MonsterInBattle[];
@@ -1181,6 +1200,142 @@ export class BattleInstance {
 
     await this.settleBattleAndProcessRewards();
     return true;
+  }
+
+  /**
+   * Everything an admin can do to a fight from the debug panel.
+   *
+   * None of these take a turn. A fight is a state machine driven by turns, and
+   * an inspection tool that advanced it would change the very thing being
+   * inspected — so each action mutates the table and pushes, and the turn order
+   * is left exactly where it was. `next_turn` is the deliberate exception, and
+   * says so in its name.
+   *
+   * Both catalogue rows arrive from the caller rather than being looked up
+   * here: the engine has no database, which is the rule that keeps it testable.
+   */
+  async runDebugAction(args: {
+    action: BattleDebugAction;
+    by: string;
+    buff?: Buff;
+    debuff?: Debuff;
+    /** Health or mana moved, where the action moves an amount. */
+    amount?: number;
+  }) {
+    if (this.battleFinished) return false;
+    const { action } = args;
+
+    if (action === 'heal_allies') {
+      this.users.forEach((user) => {
+        user.stats.health = user.stats.maxHealth;
+        user.stats.mana = user.stats.maxMana;
+        // A revived player gets their slot in the order back with them.
+        user.isDead = false;
+      });
+      this.pushLog({ log: `${args.by} restored the party` });
+    }
+
+    if (action === 'hurt_allies') {
+      for (const user of this.users) {
+        // Through the ordinary damage path, so barriers absorb and second wind
+        // fires — the whole point is testing what a hit actually does.
+        await this.damageUser({ user, amount: args.amount ?? Math.floor(user.stats.maxHealth / 2) });
+      }
+      this.pushLog({ log: `${args.by} wounded the party` });
+    }
+
+    if (action === 'kill_allies') {
+      this.users.forEach((user) => {
+        user.stats.health = 0;
+        user.isDead = true;
+      });
+      this.pushLog({ log: `${args.by} struck the party down` });
+      await this.settleBattleAndProcessRewards();
+      return true;
+    }
+
+    if (action === 'heal_monsters') {
+      this.monsters.forEach((monster) => (monster.health = monster.maxHealth));
+      this.pushLog({ log: `${args.by} restored the enemy` });
+    }
+
+    if (action === 'hurt_monsters') {
+      this.aliveMonsters.forEach((monster) => {
+        const dealt = args.amount ?? Math.floor(monster.maxHealth / 3);
+        monster.health = Math.max(monster.health - dealt, 0);
+        // Banked like any other hit, so a guild boss pays out on it.
+        this.damageDealt[args.by] = (this.damageDealt[args.by] ?? 0) + dealt;
+      });
+      this.pushLog({ log: `${args.by} wounded the enemy` });
+      await this.settleBattleAndProcessRewards();
+      return true;
+    }
+
+    if (action === 'buff_allies') {
+      if (!args.buff) return false;
+      this.users.forEach((user) => this.grantDebugBuff({ target: user, buff: args.buff }));
+      this.pushLog({ icon: args.buff.image, log: `${args.by} granted ${args.buff.name} to the party` });
+    }
+
+    if (action === 'clear_buffs') {
+      this.users.forEach((user) => (user.buffs = []));
+      this.pushLog({ log: `${args.by} stripped the party's buffs` });
+    }
+
+    if (action === 'debuff_monsters') {
+      if (!args.debuff) return false;
+      this.aliveMonsters.forEach((monster) => applyDebuff({ monster, debuff: args.debuff }));
+      this.pushLog({ icon: args.debuff.image, log: `${args.by} afflicted the enemy with ${args.debuff.name}` });
+    }
+
+    if (action === 'clear_debuffs') {
+      this.monsters.forEach((monster) => (monster.debuffs = []));
+      this.pushLog({ log: `${args.by} cleansed the enemy` });
+    }
+
+    if (action === 'restore_mana') {
+      this.users.forEach((user) => (user.stats.mana = user.stats.maxMana));
+      this.pushLog({ log: `${args.by} refilled the party's mana` });
+    }
+
+    if (action === 'drain_mana') {
+      this.users.forEach((user) => (user.stats.mana = 0));
+      this.pushLog({ log: `${args.by} drained the party's mana` });
+    }
+
+    if (action === 'next_turn') {
+      // The one action that moves the fight on, because passing the turn is the
+      // thing being tested.
+      await this.processNextTurn();
+      this.pushLog({ log: `${args.by} passed the turn` });
+    }
+
+    if (action === 'enrage') {
+      this.enrageStacks += 1;
+      this.pushLog({ log: `${args.by} enraged the enemy (stack ${this.enrageStacks})` });
+    }
+
+    this.notifyUsers();
+    return true;
+  }
+
+  /**
+   * A buff handed out by an admin rather than cast by a skill.
+   *
+   * A barrier's pool normally comes off the caster's stats through the skill
+   * that raised it; there is no skill here, so it is sized off the holder's own
+   * health — enough to be visible and to be spent, which is what a test needs.
+   */
+  private grantDebugBuff(args: { target: UserWithStats; buff: Buff }) {
+    args.target.buffs.push({
+      duration: args.buff.duration,
+      id: 0,
+      userEmail: args.target.email,
+      buffId: args.buff.id,
+      buff: { ...args.buff },
+      barrier:
+        args.buff.effect === BuffEffect.Barrier ? Math.max(1, Math.floor(args.target.stats.maxHealth / 2)) : undefined,
+    });
   }
 
   private async settleBattleAndProcessRewards() {

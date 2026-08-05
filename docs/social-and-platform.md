@@ -102,6 +102,21 @@ kill *leads to*: the drop roll, the experience, a dungeon's next stage, a guild
 boss's banked damage. Paying the rewards out directly instead would be
 exercising a path the game does not otherwise have.
 
+`battle_debug_action` is the rest of the fight put under the same guard — heal
+or wound either side, hand out a buff or a debuff, refill or empty the mana,
+pass the turn, add an enrage stack (`BattleDebugAction` lists them). One event
+carrying a verb rather than a dozen events, since they differ only in the verb.
+
+**None of them spend a turn.** A fight is a state machine driven by turns, so a
+tool that advanced one would change the thing being inspected: each action
+mutates the table and pushes, and the order is left where it was. `next_turn` is
+the deliberate exception and is named for it.
+
+Two things the engine cannot do, so the tool does not offer them: a monster
+carries debuffs and never buffs, and a player carries buffs and never debuffs.
+The catalogue rows are read in `AdminService` and handed to the engine, which
+has no database of its own — the rule that keeps the fight unit-testable.
+
 The kill is **dealt, not declared** — the monster's remaining health goes
 through the same per-player tally a real hit feeds, credited to the admin when
 they are in the fight and to a participant when they are not. A guild boss banks
