@@ -125,6 +125,20 @@ Migrations are hand-written SQL under `core/prisma/migrations/<timestamp>_<name>
 — the SQLite provider cannot do everything `migrate dev` wants, and the files
 carry comments explaining the change. Apply with `npx prisma migrate deploy`.
 
+**Two database files, and only one of them is tracked.** `seed.db` is every
+migration plus `yarn seed` and nothing else — content, no players — so it can
+live in the repository. `dev.db` is your own machine's play data and is
+ignored, along with `backup.db` and any other `.db`.
+
+```bash
+yarn db:init          # copy seed.db to dev.db (first run after cloning)
+yarn db:init --force  # throw the local database away and start over
+yarn db:seed-file     # rebuild seed.db from the migrations, then commit it
+```
+
+Rebuild and commit `seed.db` whenever a migration or a seed file changes,
+otherwise a fresh clone starts on a schema older than the code beside it.
+
 ## Commands
 
 ```bash

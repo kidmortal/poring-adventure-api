@@ -37,9 +37,12 @@ lerna-debug.log*
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# Local copies of the live database, and the journal files sqlite leaves beside
-# one. dev.db is tracked on purpose; a snapshot pulled off the server is not —
-# it is real player data and it does not belong in a public repository.
-backup.db
+# Every database is local except seed.db, and the journal files sqlite leaves
+# beside one. seed.db is content with no players in it, rebuilt by
+# `yarn db:seed-file`; dev.db is your own play data, and backup.db is a snapshot
+# pulled off the server — real player data that does not belong in a public
+# repository. Start a fresh clone with `yarn db:init`.
+*.db
+!seed.db
 *.db-shm
 *.db-wal

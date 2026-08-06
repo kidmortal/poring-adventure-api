@@ -6,7 +6,13 @@ dungeons — is defined in `src/core/prisma/seed/` and written by `yarn seed`.
 ```bash
 yarn seed                                          # local dev.db
 TURSO_DATABASE_URL=… TURSO_AUTH_TOKEN=… yarn seed  # the deployed database
+yarn db:seed-file                                  # rebuild the tracked seed.db
 ```
+
+`seed.db` is the committed result of running the migrations and this seed
+against an empty file — content, no players. Rebuild and commit it whenever a
+seed file changes, so a fresh clone (`yarn db:init`) starts with what the code
+expects. See [architecture.md](architecture.md#database).
 
 ## Three rules the seed lives by
 

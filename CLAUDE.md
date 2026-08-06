@@ -47,6 +47,8 @@ is what it is; `docs/` is for what exists.
 - Cached reads hand back the object they hold, not a copy. Mutating a user means
   clearing `user_<email>`.
 - Migrations are hand-written SQL under `src/core/prisma/migrations/`.
+- `seed.db` is tracked (content, no players); `dev.db` and every other `.db` is
+  local and ignored. `yarn db:init` makes one from the other.
 - Content is seeded by natural key, never by id — ids differ between dev.db and
   Turso.
 
@@ -58,6 +60,8 @@ yarn build          # prisma generate && nest build
 yarn test           # jest — *.test.ts colocated in src
 yarn lint           # eslint --fix (prettier runs as an eslint rule)
 yarn seed           # idempotent content seed
+yarn db:init        # create dev.db from the tracked seed.db (--force to reset)
+yarn db:seed-file   # rebuild seed.db after a migration or seed change
 ```
 
 Tests and `tsc --noEmit` must be clean before anything is considered done.
